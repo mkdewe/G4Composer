@@ -1,0 +1,2 @@
+D:\Studia\Projekty\G4Composer\g4composer.client\obj\Debug\g4composer.client.esproj.CoreCompileInputs.cache
+D:\Studia\Projekty\Nowy folder\G4Composer\g4composer.client\obj\Debug\g4composer.client.esproj.CoreCompileInputs.cache

@@ -1,0 +1,92 @@
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.csproj.AssemblyReference.cache
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\spa.proxy.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\rpswa.dswa.cache.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.GeneratedMSBuildEditorConfig.editorconfig
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.AssemblyInfoInputs.cache
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.AssemblyInfo.cs
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.csproj.CoreCompileInputs.cache
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.MvcApplicationPartsAssemblyInfo.cs
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.MvcApplicationPartsAssemblyInfo.cache
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\spa.proxy.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\appsettings.Development.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\appsettings.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.staticwebassets.endpoints.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.exe
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.deps.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.runtimeconfig.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.pdb
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Microsoft.AspNetCore.SpaProxy.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Microsoft.OpenApi.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Scalar.AspNetCore.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\rjimswa.dswa.cache.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\rjsmrazor.dswa.cache.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\rjsmcshtml.dswa.cache.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\scopedcss\bundle\G4Composer.Server.styles.css
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.build.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.build.json.cache
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.development.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.build.endpoints.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\swae.build.ex.cache
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Compos.93B8835F.Up2Date
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\refint\G4Composer.Server.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.pdb
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.genruntimeconfig.cache
+D:\Studia\Projekty\G4Composer\G4Composer.Server\obj\Debug\net10.0\ref\G4Composer.Server.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Microsoft.Extensions.DependencyModel.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Scrutor.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.Filters.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.Filters.Abstractions.dll
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\appsettingsb.json
+D:\Studia\Projekty\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.Annotations.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\appsettings.Development.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\appsettings.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\appsettingsb.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.staticwebassets.endpoints.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\spa.proxy.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.exe
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.deps.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.runtimeconfig.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\G4Composer.Server.pdb
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Microsoft.AspNetCore.SpaProxy.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Microsoft.Extensions.DependencyModel.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Microsoft.OpenApi.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Scalar.AspNetCore.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Scrutor.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.Annotations.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.Filters.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.Filters.Abstractions.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.csproj.AssemblyReference.cache
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\spa.proxy.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\rpswa.dswa.cache.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.GeneratedMSBuildEditorConfig.editorconfig
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.AssemblyInfoInputs.cache
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.AssemblyInfo.cs
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.csproj.CoreCompileInputs.cache
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.MvcApplicationPartsAssemblyInfo.cs
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.MvcApplicationPartsAssemblyInfo.cache
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\rjimswa.dswa.cache.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\rjsmrazor.dswa.cache.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\rjsmcshtml.dswa.cache.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\scopedcss\bundle\G4Composer.Server.styles.css
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.build.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.build.json.cache
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.development.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.build.endpoints.json
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\swae.build.ex.cache
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Compos.93B8835F.Up2Date
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\refint\G4Composer.Server.dll
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.pdb
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\G4Composer.Server.genruntimeconfig.cache
+D:\Studia\Projekty\Nowy folder\G4Composer\G4Composer.Server\obj\Debug\net10.0\ref\G4Composer.Server.dll

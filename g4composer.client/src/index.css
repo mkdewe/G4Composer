@@ -1,0 +1,90 @@
+/* ── Reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Design tokens ── */
+:root {
+  --teal:          #1D9E75;
+  --teal-dark:     #0F6E56;
+  --teal-light:    #E1F5EE;
+  --teal-mid:      #5DCAA5;
+  --border:        #e0e0e0;
+  --border-med:    #d0d0d0;
+  --bg:            #f8f9fa;
+  --surface:       #ffffff;
+  --surface2:      #f3f4f6;
+  --text:          #1a1a1a;
+  --text-sub:      #444;
+  --text-dim:      #777;
+  --mono:          'Courier New', monospace;
+  --sans:          'Helvetica Neue', Arial, sans-serif;
+  --warn-bg:       #FFFBEB;
+  --warn-border:   #F59E0B;
+  --warn-text:     #92400E;
+  --err-bg:        #FEF2F2;
+  --err-border:    #EF4444;
+  --err-text:      #991B1B;
+  --ok-bg:         #F0FDF4;
+  --ok-border:     #22C55E;
+  --ok-text:       #166534;
+  --r-sm:          6px;
+  --r-md:          8px;
+  --r-lg:          10px;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Shared form elements ── */
+select,
+input[type='text'],
+input[type='number'] {
+  width: 100%;
+  padding: 9px 13px;
+  font-size: 14px;
+  font-family: var(--sans);
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+select:focus,
+input[type='text']:focus,
+input[type='number']:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.12);
+}
+
+textarea {
+  width: 100%;
+  padding: 11px 13px;
+  font-size: 14px;
+  font-family: var(--mono);
+  line-height: 1.75;
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+textarea:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.12);
+}

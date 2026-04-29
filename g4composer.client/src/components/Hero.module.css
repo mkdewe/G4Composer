@@ -1,0 +1,85 @@
+.hero {
+  text-align: center;
+  padding: 52px 24px 44px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.logoWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.heroLogoText {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1;
+}
+.heroG4 {
+  font-weight: 700;
+  font-size: 32px;
+  color: #1B2D52;
+  letter-spacing: 0;
+}
+.heroComposer {
+  font-weight: 400;
+  font-size: 32px;
+  color: var(--teal);
+  letter-spacing: 3px;
+}
+
+.heroLabel {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.heroDesc {
+  font-size: 16px;
+  color: var(--text-sub);
+  line-height: 1.8;
+  max-width: 780px;
+  margin: 0 auto 28px;
+}
+
+.heroCtas {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.ctaPrimary {
+  padding: 11px 28px;
+  background: var(--teal);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-md);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ctaPrimary:hover { background: var(--teal-dark); }
+
+.ctaSecondary {
+  padding: 11px 28px;
+  background: none;
+  color: var(--text-sub);
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-md);
+  font-size: 15px;
+  font-weight: 500;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ctaSecondary:hover { background: var(--surface2); }

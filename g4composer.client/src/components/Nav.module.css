@@ -1,0 +1,127 @@
+.nav {
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.inner {
+  max-width: 1060px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px 12px 0;
+  margin-right: 4px;
+  border-right: 1px solid var(--border);
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-bottom: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.logoText {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1;
+}
+.logoG4 {
+  font-weight: 700;
+  font-size: 20px;
+  color: #1B2D52;
+  letter-spacing: 0;
+}
+.logoComposer {
+  font-weight: 400;
+  font-size: 20px;
+  color: var(--teal);
+  letter-spacing: 2px;
+}
+
+/* Links */
+.links {
+  display: flex;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 15px;
+  font-size: 14px;
+  font-family: var(--sans);
+  color: var(--text-sub);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+.link svg {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.link:hover {
+  color: var(--teal);
+}
+.active {
+  color: var(--teal);
+  border-bottom-color: var(--teal);
+  font-weight: 500;
+}
+.active svg {
+  opacity: 1;
+}
+
+/* Right side */
+.right {
+  margin-left: auto;
+}
+
+.apiPill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+.apiPill:hover {
+  border-color: var(--teal-mid);
+  color: var(--teal-dark);
+}
+
+.apiDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  flex-shrink: 0;
+}
+
+@media (max-width: 860px) {
+  .logoComposer { display: none; }
+  .link { padding: 14px 10px; font-size: 13px; }
+}
+@media (max-width: 640px) {
+  .link span { display: none; }
+}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="G4Composer — G-Quadruplex 3D Structure Prediction Server powered by CYANA and Xplor-NIH." />
+    <title>G4Composer</title>
+
+    <!--
+      Mol* Viewer — pinned to 4.14.0 (stable, has Viewer.create() API).
+      Do NOT use @latest — the API changes between major versions.
+      To upgrade: test that window.molstar.Viewer.create exists first.
+    -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/molstar@4.14.0/build/viewer/molstar.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/molstar@4.14.0/build/viewer/molstar.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "dgSpecHash": "F6RR8HuqA2Y=",
+  "success": true,
+  "projectFilePath": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\G4Composer.Server.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\darek\\.nuget\\packages\\microsoft.aspnetcore.spaproxy\\10.0.7\\microsoft.aspnetcore.spaproxy.10.0.7.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\microsoft.extensions.apidescription.server\\10.0.0\\microsoft.extensions.apidescription.server.10.0.0.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\microsoft.extensions.dependencymodel\\3.1.6\\microsoft.extensions.dependencymodel.3.1.6.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\microsoft.openapi\\2.4.1\\microsoft.openapi.2.4.1.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\microsoft.visualstudio.azure.containers.tools.targets\\1.23.0\\microsoft.visualstudio.azure.containers.tools.targets.1.23.0.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\scalar.aspnetcore\\2.13.13\\scalar.aspnetcore.2.13.13.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\scrutor\\3.3.0\\scrutor.3.3.0.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\swashbuckle.aspnetcore\\10.1.5\\swashbuckle.aspnetcore.10.1.5.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\swashbuckle.aspnetcore.annotations\\10.1.7\\swashbuckle.aspnetcore.annotations.10.1.7.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\swashbuckle.aspnetcore.filters\\10.0.1\\swashbuckle.aspnetcore.filters.10.0.1.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\swashbuckle.aspnetcore.filters.abstractions\\10.0.1\\swashbuckle.aspnetcore.filters.abstractions.10.0.1.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\swashbuckle.aspnetcore.swagger\\10.1.7\\swashbuckle.aspnetcore.swagger.10.1.7.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\swashbuckle.aspnetcore.swaggergen\\10.1.7\\swashbuckle.aspnetcore.swaggergen.10.1.7.nupkg.sha512",
+    "C:\\Users\\darek\\.nuget\\packages\\swashbuckle.aspnetcore.swaggerui\\10.1.5\\swashbuckle.aspnetcore.swaggerui.10.1.5.nupkg.sha512"
+  ],
+  "logs": []
+}

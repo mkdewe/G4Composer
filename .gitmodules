@@ -1,0 +1,3 @@
+[submodule "quadro-docker"]
+	path = quadro-docker
+	url = https://github.com/mkdewe/docker-quadro

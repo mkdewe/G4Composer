@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "G4Composer.Server\\G4Composer.Server.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "g4composer.client\\g4composer.client.esproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

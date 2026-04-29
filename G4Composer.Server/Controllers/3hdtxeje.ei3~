@@ -1,0 +1,347 @@
+using G4Composer.Api.Models;
+using G4Composer.Server.Examples;
+using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
+using Swashbuckle.AspNetCore.Filters;
+using System.Diagnostics;
+
+namespace G4Composer.Server.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Produces("application/json")]
+public class Quadro11Controller : ControllerBase
+{
+    private readonly ILogger<Quadro11Controller> _logger;
+    private readonly IConfiguration _config;
+
+    private string DockerImage => _config["Quadro11:DockerImage"] ?? "quadro11:latest";
+    private int DockerTimeoutSeconds => _config.GetValue("Quadro11:TimeoutSeconds", 300);
+
+    public Quadro11Controller(ILogger<Quadro11Controller> logger, IConfiguration config)
+    {
+        _logger = logger;
+        _config = config;
+    }
+
+    // ── Health ────────────────────────────────────────────────────────────────
+
+    [HttpGet("health")]
+    [SwaggerOperation(Summary = "Health check", Tags = new[] { "Quadro11" })]
+    [ProducesResponseType(typeof(HealthDto), 200)]
+    public async Task<IActionResult> Health()
+    {
+        bool dockerAvailable = await CheckDockerAvailableAsync();
+        bool imageExists = dockerAvailable && await CheckDockerImageExistsAsync(DockerImage);
+        return Ok(new HealthDto
+        {
+            Status = imageExists ? "ready" : "degraded",
+            DockerAvailable = dockerAvailable,
+            ImageExists = imageExists,
+            ImageName = DockerImage,
+            Timestamp = DateTimeOffset.UtcNow,
+        });
+    }
+
+    // ── Example ───────────────────────────────────────────────────────────────
+
+    [HttpGet("example")]
+    [SwaggerOperation(Summary = "Example input", Tags = new[] { "Quadro11" })]
+    [ProducesResponseType(typeof(List<Quadro11Input>), 200)]
+    [SwaggerResponseExample(200, typeof(Quadro11InputListExample))]
+    public IActionResult GetExample() => Ok(Quadro11InputListExample.GetExample());
+
+    // ── Run ───────────────────────────────────────────────────────────────────
+
+    [HttpPost("run")]
+    [Consumes("application/json")]
+    [Produces("chemical/x-pdb", "application/json")]
+    [SwaggerOperation(
+        Summary = "Run Quadro11 computation",
+        Description = "Generates .inp files, runs the quadro11:latest Docker container and returns the resulting .pdb file.",
+        Tags = new[] { "Quadro11" }
+    )]
+    [SwaggerRequestExample(typeof(List<Quadro11Input>), typeof(Quadro11InputListExample))]
+    [ProducesResponseType(typeof(FileContentResult), 200, "chemical/x-pdb")]
+    [ProducesResponseType(typeof(ErrorDto), 400)]
+    [ProducesResponseType(typeof(ErrorDto), 500)]
+    public async Task<IActionResult> Run([FromBody] List<Quadro11Input> inputs)
+    {
+        if (inputs is null || inputs.Count == 0)
+            return BadRequest(new ErrorDto("No input data. A list of Quadro11Input is required."));
+
+        var errors = ValidateInputs(inputs);
+        if (errors.Any())
+            return BadRequest(new ErrorDto("Validation error", string.Join("; ", errors)));
+
+        string jobId = Guid.NewGuid().ToString("N")[..12];
+        string jobDir = Path.Combine(Path.GetTempPath(), "g4composer_" + jobId);
+        Directory.CreateDirectory(jobDir);
+
+        _logger.LogInformation("Job {JobId}: started, {Count} structure(s)", jobId, inputs.Count);
+
+        try
+        {
+            // Generate one .inp per input structure
+            for (int i = 0; i < inputs.Count; i++)
+            {
+                string content = GenerateInpFile(inputs[i]);
+                string path = Path.Combine(jobDir, $"struct_{i:D3}.inp");
+                await System.IO.File.WriteAllTextAsync(path, content);
+                _logger.LogDebug("Job {JobId}: wrote {File}", jobId, path);
+            }
+
+            // Run the container once per .inp file; keep the last PDB
+            byte[]? pdbContent = null;
+            for (int i = 0; i < inputs.Count; i++)
+            {
+                string inpName = $"struct_{i:D3}.inp";
+                pdbContent = await RunDockerAsync(jobId, jobDir, inpName);
+            }
+
+            if (pdbContent is null || pdbContent.Length == 0)
+                return StatusCode(500, new ErrorDto("Container did not produce a PDB file."));
+
+            _logger.LogInformation("Job {JobId}: success, {Bytes} bytes", jobId, pdbContent.Length);
+
+            Response.Headers["X-Job-Id"] = jobId;
+            Response.Headers["X-Atom-Count"] = CountPdbAtoms(pdbContent).ToString();
+            Response.Headers["Access-Control-Expose-Headers"] = "X-Job-Id, X-Atom-Count";
+
+            return File(pdbContent, "chemical/x-pdb", $"g4_{jobId}.pdb");
+        }
+        catch (DockerException ex)
+        {
+            _logger.LogError(ex, "Job {JobId}: Docker error", jobId);
+            return StatusCode(500, new ErrorDto($"Docker container error: {ex.Message}", ex.DockerOutput));
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning("Job {JobId}: timeout after {Sec}s", jobId, DockerTimeoutSeconds);
+            return StatusCode(500, new ErrorDto($"Container timeout after {DockerTimeoutSeconds}s"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Job {JobId}: unexpected error", jobId);
+            return StatusCode(500, new ErrorDto($"Internal error: {ex.Message}"));
+        }
+        finally
+        {
+            _ = Task.Run(() => CleanupJobDir(jobDir));
+        }
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private static List<string> ValidateInputs(List<Quadro11Input> inputs)
+    {
+        var errors = new List<string>();
+        for (int i = 0; i < inputs.Count; i++)
+        {
+            var inp = inputs[i];
+            if (string.IsNullOrWhiteSpace(inp.Sequence))
+                errors.Add($"[{i}] Missing sequence");
+            else if (!inp.Sequence.All(c => "ACGUTacgut".Contains(c)))
+                errors.Add($"[{i}] Sequence '{inp.Name}' contains invalid characters");
+
+            if (inp.Twist is < 0 or > 90)
+                errors.Add($"[{i}] Twist must be 0-90 (got: {inp.Twist})");
+
+            if (inp.SugarPucker is not "N" and not "S")
+                errors.Add($"[{i}] SugarPucker must be 'N' (RNA) or 'S' (DNA)");
+        }
+        return errors;
+    }
+
+    /// <summary>
+    /// Produces a .inp file in the exact format that quadro11.exe reads.
+    ///
+    /// Observed working example (from container manual test):
+    ///   name      quad_01
+    ///   sequence  GGAGGUAGGGCGG
+    ///   structure AB.AB...AB.AB
+    ///   orient    A+;B+
+    ///   rise      3.5
+    ///   twist     30.0
+    ///   path      A1;B1;A2;B2;A3;B3;A4;B4
+    /// </summary>
+    private static string GenerateInpFile(Quadro11Input input)
+    {
+        string name = input.Name ?? "structure";
+        string sequence = input.Sequence.ToUpper();
+        string structure = input.Structure ?? BuildDefaultStructure(sequence);
+        string orient = input.Orient ?? "A+;B+";
+        string pathStr = input.Path?.ToString() ?? string.Empty;
+
+        return
+            $"name\t\t{name}\n" +
+            $"sequence\t{sequence}\n" +
+            $"structure\t{structure}\n" +
+            $"orient\t\t{orient}\n" +
+            $"rise\t\t{input.Rise:F1}\n" +
+            $"twist\t\t{input.Twist:F1}\n" +
+            $"path\t\t{pathStr}\n";
+    }
+
+    private static string BuildDefaultStructure(string sequence)
+    {
+        // Fallback: alternate strand labels A/B with dots for non-G residues
+        var sb = new System.Text.StringBuilder();
+        int strandIdx = 0;
+        char[] labels = ['A', 'B'];
+        foreach (char c in sequence)
+            sb.Append(char.ToUpper(c) == 'G' ? labels[strandIdx++ % 2] : '.');
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Runs the quadro11.exe computation inside the container.
+    ///
+    /// Key insight from manual container test:
+    ///   - quadro11.exe MUST be called from /opt/bin (its working directory)
+    ///     because it reads Q.lib, Q.seq and writes output PDB files there.
+    ///   - The .inp file is also expected to be in /opt/bin.
+    ///   - Output PDB files land in /opt/bin, so we copy them to /data after completion.
+    ///
+    /// Shell command sequence:
+    ///   cp /data/struct_000.inp /opt/bin/struct_000.inp
+    ///   cd /opt/bin
+    ///   ./quadro11.exe struct_000.inp
+    ///   cp /opt/bin/*.pdb /data/
+    /// </summary>
+    private async Task<byte[]?> RunDockerAsync(string jobId, string jobDir, string inpFileName)
+    {
+        // Normalize path separators for Docker volume mount on Windows
+        string mountPath = jobDir.Replace('\\', '/');
+
+        string shellCmd =
+            $"cp /data/{inpFileName} /opt/bin/{inpFileName} && " +
+            $"cd /opt/bin && " +
+            $"./quadro11.exe {inpFileName} && " +
+            $"cp /opt/bin/*.pdb /data/ 2>/dev/null || true";
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = "docker",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        psi.ArgumentList.Add("run");
+        psi.ArgumentList.Add("--rm");
+        psi.ArgumentList.Add("-v");
+        psi.ArgumentList.Add($"{mountPath}:/data");
+        psi.ArgumentList.Add(DockerImage);
+        psi.ArgumentList.Add("/bin/bash");
+        psi.ArgumentList.Add("-c");
+        psi.ArgumentList.Add(shellCmd);
+
+        _logger.LogDebug("Job {JobId}: running shell: {Cmd}", jobId, shellCmd);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(DockerTimeoutSeconds));
+        using var process = new Process { StartInfo = psi };
+
+        var stdout = new System.Text.StringBuilder();
+        var stderr = new System.Text.StringBuilder();
+        process.OutputDataReceived += (_, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
+        process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderr.AppendLine(e.Data); };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        try
+        {
+            await process.WaitForExitAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException($"Docker timeout after {DockerTimeoutSeconds}s");
+        }
+
+        _logger.LogDebug("Job {JobId}: stdout length={Len}", jobId, stdout.Length);
+        if (stderr.Length > 0)
+            _logger.LogDebug("Job {JobId}: stderr:\n{E}", jobId, stderr);
+
+        if (process.ExitCode != 0)
+        {
+            string dockerOutput = $"STDOUT:\n{stdout}\nSTDERR:\n{stderr}";
+            _logger.LogError("Job {JobId}: container exit {Code}\n{Out}", jobId, process.ExitCode, dockerOutput);
+            throw new DockerException(
+                $"Container exited with code {process.ExitCode}. " +
+                $"Last stderr line: {stderr.ToString().Trim().Split('\n').LastOrDefault()}",
+                dockerOutput);
+        }
+
+        // Find PDB files copied to jobDir by the shell command
+        var pdbFiles = Directory.GetFiles(jobDir, "*.pdb");
+        if (pdbFiles.Length == 0)
+        {
+            _logger.LogWarning("Job {JobId}: no .pdb found. jobDir contents: {Files}",
+                jobId,
+                string.Join(", ", Directory.GetFiles(jobDir).Select(Path.GetFileName)));
+            return null;
+        }
+
+        // Prefer Xplor-refined file (contains "_xplor"), else take first
+        string best = pdbFiles.FirstOrDefault(f => f.Contains("xplor")) ?? pdbFiles[0];
+        _logger.LogInformation("Job {JobId}: returning {File}", jobId, Path.GetFileName(best));
+        return await System.IO.File.ReadAllBytesAsync(best);
+    }
+
+    private static int CountPdbAtoms(byte[] pdbContent)
+    {
+        var text = System.Text.Encoding.UTF8.GetString(pdbContent);
+        return text.Split('\n').Count(l => l.StartsWith("ATOM") || l.StartsWith("HETATM"));
+    }
+
+    private async Task<bool> CheckDockerAvailableAsync()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("docker", "info")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            using var p = Process.Start(psi)!;
+            await p.WaitForExitAsync();
+            return p.ExitCode == 0;
+        }
+        catch { return false; }
+    }
+
+    private async Task<bool> CheckDockerImageExistsAsync(string image)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("docker", $"image inspect {image}")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            using var p = Process.Start(psi)!;
+            await p.WaitForExitAsync();
+            return p.ExitCode == 0;
+        }
+        catch { return false; }
+    }
+
+    private void CleanupJobDir(string dir)
+    {
+        try
+        {
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Could not delete {Dir}: {Msg}", dir, ex.Message);
+        }
+    }
+}

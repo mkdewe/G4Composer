@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="g4composer.client/g4composer.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="G4Composer.Server/G4Composer.Server.csproj" />
+</Solution>

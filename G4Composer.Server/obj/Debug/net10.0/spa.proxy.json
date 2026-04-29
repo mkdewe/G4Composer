@@ -1,0 +1,10 @@
+{
+"SpaProxyServer": {
+"ServerUrl": "http://localhost:5173",
+"RedirectUrl": "",
+"LaunchCommand": "npm run dev",
+"WorkingDirectory": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\..\\g4composer.client",
+"MaxTimeoutInSeconds": "120",
+"KeepRunning": "false"
+}
+}

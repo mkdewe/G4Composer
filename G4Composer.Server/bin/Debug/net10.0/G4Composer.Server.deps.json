@@ -1,0 +1,218 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "G4Composer.Server/1.0.0": {
+        "dependencies": {
+          "Microsoft.AspNetCore.SpaProxy": "10.0.7",
+          "Scalar.AspNetCore": "2.13.13",
+          "Swashbuckle.AspNetCore.Annotations": "10.1.7",
+          "Swashbuckle.AspNetCore.Filters": "10.0.1",
+          "Swashbuckle.AspNetCore.Filters.Abstractions": "10.0.1",
+          "Swashbuckle.AspNetCore.Swagger": "10.1.7",
+          "Swashbuckle.AspNetCore.SwaggerGen": "10.1.7",
+          "Swashbuckle.AspNetCore.SwaggerUI": "10.1.5"
+        },
+        "runtime": {
+          "G4Composer.Server.dll": {}
+        }
+      },
+      "Microsoft.AspNetCore.SpaProxy/10.0.7": {
+        "runtime": {
+          "lib/net10.0/Microsoft.AspNetCore.SpaProxy.dll": {
+            "assemblyVersion": "10.0.7.0",
+            "fileVersion": "10.0.726.21808"
+          }
+        }
+      },
+      "Microsoft.Extensions.DependencyModel/3.1.6": {
+        "runtime": {
+          "lib/netstandard2.0/Microsoft.Extensions.DependencyModel.dll": {
+            "assemblyVersion": "3.1.6.0",
+            "fileVersion": "3.100.620.31604"
+          }
+        }
+      },
+      "Microsoft.OpenApi/2.4.1": {
+        "runtime": {
+          "lib/net8.0/Microsoft.OpenApi.dll": {
+            "assemblyVersion": "2.4.1.0",
+            "fileVersion": "2.4.1.0"
+          }
+        }
+      },
+      "Scalar.AspNetCore/2.13.13": {
+        "runtime": {
+          "lib/net10.0/Scalar.AspNetCore.dll": {
+            "assemblyVersion": "2.13.13.0",
+            "fileVersion": "2.13.13.0"
+          }
+        }
+      },
+      "Scrutor/3.3.0": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyModel": "3.1.6"
+        },
+        "runtime": {
+          "lib/netcoreapp3.1/Scrutor.dll": {
+            "assemblyVersion": "3.0.2.0",
+            "fileVersion": "3.0.2.0"
+          }
+        }
+      },
+      "Swashbuckle.AspNetCore.Annotations/10.1.7": {
+        "dependencies": {
+          "Swashbuckle.AspNetCore.SwaggerGen": "10.1.7"
+        },
+        "runtime": {
+          "lib/net10.0/Swashbuckle.AspNetCore.Annotations.dll": {
+            "assemblyVersion": "10.1.7.0",
+            "fileVersion": "10.1.7.2427"
+          }
+        }
+      },
+      "Swashbuckle.AspNetCore.Filters/10.0.1": {
+        "dependencies": {
+          "Scrutor": "3.3.0",
+          "Swashbuckle.AspNetCore.Filters.Abstractions": "10.0.1",
+          "Swashbuckle.AspNetCore.SwaggerGen": "10.1.7"
+        },
+        "runtime": {
+          "lib/net8.0/Swashbuckle.AspNetCore.Filters.dll": {
+            "assemblyVersion": "10.0.1.0",
+            "fileVersion": "10.0.1.0"
+          }
+        }
+      },
+      "Swashbuckle.AspNetCore.Filters.Abstractions/10.0.1": {
+        "dependencies": {
+          "Swashbuckle.AspNetCore.SwaggerGen": "10.1.7"
+        },
+        "runtime": {
+          "lib/net8.0/Swashbuckle.AspNetCore.Filters.Abstractions.dll": {
+            "assemblyVersion": "10.0.1.0",
+            "fileVersion": "10.0.1.0"
+          }
+        }
+      },
+      "Swashbuckle.AspNetCore.Swagger/10.1.7": {
+        "dependencies": {
+          "Microsoft.OpenApi": "2.4.1"
+        },
+        "runtime": {
+          "lib/net10.0/Swashbuckle.AspNetCore.Swagger.dll": {
+            "assemblyVersion": "10.1.7.0",
+            "fileVersion": "10.1.7.2427"
+          }
+        }
+      },
+      "Swashbuckle.AspNetCore.SwaggerGen/10.1.7": {
+        "dependencies": {
+          "Swashbuckle.AspNetCore.Swagger": "10.1.7"
+        },
+        "runtime": {
+          "lib/net10.0/Swashbuckle.AspNetCore.SwaggerGen.dll": {
+            "assemblyVersion": "10.1.7.0",
+            "fileVersion": "10.1.7.2427"
+          }
+        }
+      },
+      "Swashbuckle.AspNetCore.SwaggerUI/10.1.5": {
+        "runtime": {
+          "lib/net10.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
+            "assemblyVersion": "10.1.5.0",
+            "fileVersion": "10.1.5.2342"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "G4Composer.Server/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.AspNetCore.SpaProxy/10.0.7": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-K1zHPjHZap3NKURVED91/v2E9e5mazt/n0cIxY8S0PXDMk+bAUUbXWsOyz/mLAF+p5Mhv5ns6Pnff2sXIPaFqQ==",
+      "path": "microsoft.aspnetcore.spaproxy/10.0.7",
+      "hashPath": "microsoft.aspnetcore.spaproxy.10.0.7.nupkg.sha512"
+    },
+    "Microsoft.Extensions.DependencyModel/3.1.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-/UlDKULIVkLQYn1BaHcy/rc91ApDxJb7T75HcCbGdqwvxhnRQRKM2di1E70iCPMF9zsr6f4EgQTotBGxFIfXmw==",
+      "path": "microsoft.extensions.dependencymodel/3.1.6",
+      "hashPath": "microsoft.extensions.dependencymodel.3.1.6.nupkg.sha512"
+    },
+    "Microsoft.OpenApi/2.4.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-u7QhXCISMQuab3flasb1hoaiERmUqyWsW7tmQODyILoQ7mJV5IRGM+2KKZYo0QUfC13evEOcHAb6TPWgqEQtrw==",
+      "path": "microsoft.openapi/2.4.1",
+      "hashPath": "microsoft.openapi.2.4.1.nupkg.sha512"
+    },
+    "Scalar.AspNetCore/2.13.13": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-QS94/CNp2thhykXwBaOHjDe8Zlexs8v0QOrdLfUvxS85uW84IhCf1zGiOnYZNNtVxunJvtsr7yPgEP36TXnJ3w==",
+      "path": "scalar.aspnetcore/2.13.13",
+      "hashPath": "scalar.aspnetcore.2.13.13.nupkg.sha512"
+    },
+    "Scrutor/3.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-BwqCnFzp2/Z+pq17iztxlIkR/ZANyPRR4PdE57WL1w/JW4AM/2imoxBWTL3+G+YXA46ce4s9OUgwWqTXYrtI8A==",
+      "path": "scrutor/3.3.0",
+      "hashPath": "scrutor.3.3.0.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore.Annotations/10.1.7": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-qHNQghKAzrjDEECIlyKEanmWxXDzrh6PyjGWVdql2qZfap0Ionuxam5OrUozibjbgQbVjRmgSXxWC8giIuCbGA==",
+      "path": "swashbuckle.aspnetcore.annotations/10.1.7",
+      "hashPath": "swashbuckle.aspnetcore.annotations.10.1.7.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore.Filters/10.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Bbmg6UelUTrCHmheejcuiGyYrJ+mO5GyV4pG7ZEhrX9P+gc0UppUQTVb+6HyEBsFsXDrBWvOXp/oqnTTz8wCEA==",
+      "path": "swashbuckle.aspnetcore.filters/10.0.1",
+      "hashPath": "swashbuckle.aspnetcore.filters.10.0.1.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore.Filters.Abstractions/10.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-YTOZBnL/STbpkSGldDnvhtW0ci4h3deRXn7zfhN3dA+Xck/jdteIGxthiRfnEfNtTICPkBxRRzd9U6KKSPmNpA==",
+      "path": "swashbuckle.aspnetcore.filters.abstractions/10.0.1",
+      "hashPath": "swashbuckle.aspnetcore.filters.abstractions.10.0.1.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore.Swagger/10.1.7": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-EjLibt/d/QuRv170GoihTbcPUpgzSFm2WKHhnGJFZQ03JYzfuitsM79azaAR8NBwRunU7yScSX6HRE5JUlrEMQ==",
+      "path": "swashbuckle.aspnetcore.swagger/10.1.7",
+      "hashPath": "swashbuckle.aspnetcore.swagger.10.1.7.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore.SwaggerGen/10.1.7": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-PuubO9BjvNn6U3D9kLpuWKY1JtziWw7SsGBq0age1E50uQjQ8Fzl8s0EwzrLfANqYJNgDnJi9l7N1QxcGVB2Zw==",
+      "path": "swashbuckle.aspnetcore.swaggergen/10.1.7",
+      "hashPath": "swashbuckle.aspnetcore.swaggergen.10.1.7.nupkg.sha512"
+    },
+    "Swashbuckle.AspNetCore.SwaggerUI/10.1.5": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-tQWVKNJWW7lf6S0bv22+7yfxK5IKzvsMeueF4XHSziBfREhLKt42OKzi6/1nINmyGlM4hGbR8aSMg72dLLVBLw==",
+      "path": "swashbuckle.aspnetcore.swaggerui/10.1.5",
+      "hashPath": "swashbuckle.aspnetcore.swaggerui.10.1.5.nupkg.sha512"
+    }
+  }
+}

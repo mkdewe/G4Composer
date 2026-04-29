@@ -1,0 +1,95 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\Studia\\Projekty\\Nowy folder\\G4Composer\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\nowy folder\\g4composer\\g4composer.server\\controllers\\quadro11controller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\controllers\\quadro11controller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|d:\\studia\\projekty\\nowy folder\\g4composer\\g4composer.client\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|solutionrelative:g4composer.client\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\nowy folder\\g4composer\\g4composer.server\\examples\\quadro11inputlistexample.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\examples\\quadro11inputlistexample.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\nowy folder\\g4composer\\g4composer.server\\models\\quadroinput.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\models\\quadroinput.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            }
+          ]
+        },
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 3,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "index.html",
+              "DocumentMoniker": "D:\\Studia\\Projekty\\Nowy folder\\G4Composer\\g4composer.client\\index.html",
+              "RelativeDocumentMoniker": "g4composer.client\\index.html",
+              "ToolTip": "D:\\Studia\\Projekty\\Nowy folder\\G4Composer\\g4composer.client\\index.html",
+              "RelativeToolTip": "g4composer.client\\index.html",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABgAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
+              "WhenOpened": "2026-04-21T00:36:07.031Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "QuadroInput.cs",
+              "DocumentMoniker": "D:\\Studia\\Projekty\\Nowy folder\\G4Composer\\G4Composer.Server\\Models\\QuadroInput.cs",
+              "RelativeDocumentMoniker": "G4Composer.Server\\Models\\QuadroInput.cs",
+              "ToolTip": "D:\\Studia\\Projekty\\Nowy folder\\G4Composer\\G4Composer.Server\\Models\\QuadroInput.cs",
+              "RelativeToolTip": "G4Composer.Server\\Models\\QuadroInput.cs",
+              "ViewState": "AgIAAAUAAAAAAAAAAAAAwBMAAAAXAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-20T00:53:31.197Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Quadro11InputListExample.cs",
+              "DocumentMoniker": "D:\\Studia\\Projekty\\Nowy folder\\G4Composer\\G4Composer.Server\\Examples\\Quadro11InputListExample.cs",
+              "RelativeDocumentMoniker": "G4Composer.Server\\Examples\\Quadro11InputListExample.cs",
+              "ToolTip": "D:\\Studia\\Projekty\\Nowy folder\\G4Composer\\G4Composer.Server\\Examples\\Quadro11InputListExample.cs",
+              "RelativeToolTip": "G4Composer.Server\\Examples\\Quadro11InputListExample.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAuAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-20T00:43:55.55Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Quadro11Controller.cs",
+              "DocumentMoniker": "D:\\Studia\\Projekty\\Nowy folder\\G4Composer\\G4Composer.Server\\Controllers\\Quadro11Controller.cs",
+              "RelativeDocumentMoniker": "G4Composer.Server\\Controllers\\Quadro11Controller.cs",
+              "ToolTip": "D:\\Studia\\Projekty\\Nowy folder\\G4Composer\\G4Composer.Server\\Controllers\\Quadro11Controller.cs",
+              "RelativeToolTip": "G4Composer.Server\\Controllers\\Quadro11Controller.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACsAAAALAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-30T17:36:36.869Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

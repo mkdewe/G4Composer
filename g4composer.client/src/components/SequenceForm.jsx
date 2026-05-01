@@ -1,254 +1,172 @@
-import { useState, useRef } from 'react'
-import { parseInputLines, validateEntry, defaultPolarityLabel, countTetrads } from '../utils/sequenceParser.js'
+import { useState, useEffect } from 'react'
+import {
+  parseInputLines,
+  validateEntry,
+  defaultPolarityLabel,
+  countTetrads,
+  orientFromGroup,
+} from '../utils/sequenceParser.js'
+import { fetchSilvaGroups, fetchExampleDetail } from '../services/apiService.js'
+import { buildPath, buildDefaultTwist, scaleOrientToTetrads } from '../utils/silvaTopology.js'
 import styles from './SequenceForm.module.css'
 
 // ── Silva classification data ─────────────────────────────────────────────────
-// Source: Webba da Silva 2007, Karsisiotis 2013, Dvorkin 2018
-const SILVA_DATA = {
-  UUDD: {
-    group: 'I', name: 'antiparallel: basket2', groove: 'mwmn',
-    subtypes: [
-      { code: '3a', loop: '-P-Lw-P',   silva: '-(plp)',  onz: 'O' },
-      { code: '5a', loop: '-PD+P',     silva: '-pd+p',   onz: 'N', note: 'RNA only' },
-      { code: '8b', loop: '+Ln+P+Lw',  silva: '+(lpl)',  onz: 'O' },
-      { code: '11b',loop: '+LnD-Lw',   silva: '+ld-l',   onz: 'N' },
-      { code: '12a',loop: 'D-PD',      silva: 'd-pd',    onz: 'Z' },
-    ],
-  },
-  UDUD: {
-    group: 'II', name: 'antiparallel: chair', groove: 'wnwn',
-    subtypes: [
-      { code: '6a', loop: '-Lw-Ln-Lw', silva: '-(lll)', onz: 'O' },
-      { code: '6b', loop: '+Ln+Lw+Ln', silva: '+(lll)', onz: 'O' },
-    ],
-  },
-  UDUU: {
-    group: 'III', name: 'hybrid3', groove: 'wnmm',
-    subtypes: [
-      { code: '2b', loop: '+P+P+Ln',   silva: '+(ppl)', onz: 'O' },
-      { code: '7a', loop: '-Lw-Ln-P',  silva: '-(llp)', onz: 'O' },
-      { code: '10b',loop: '+PD-Ln',    silva: '-pd-l',  onz: 'N' },
-      { code: '13a',loop: '-LwD+P',    silva: '-ldp',   onz: 'N' },
-    ],
-  },
-  UUUD: {
-    group: 'IV', name: 'hybrid2', groove: 'mmwn',
-    subtypes: [
-      { code: '2a', loop: '-P-P-Lw',   silva: '-(ppl)', onz: 'O' },
-      { code: '7b', loop: '+Ln+Lw+P',  silva: '+l-l-p', onz: 'O' },
-      { code: '10a',loop: '-PD+Lw',    silva: '-pd+l',  onz: 'N' },
-      { code: '13b',loop: '+LnD-P',    silva: '+ld-p',  onz: 'N' },
-    ],
-  },
-  UUDU: {
-    group: 'V', name: 'hybrid1', groove: 'mwnm',
-    subtypes: [
-      { code: '9a', loop: '-P-Lw-Ln',  silva: '-(pll)', onz: 'O' },
-      { code: '9b', loop: '+P+Ln+Lw',  silva: '+(pll)', onz: 'O' },
-    ],
-  },
-  UDDU: {
-    group: 'VI', name: 'antiparallel: basket', groove: 'wmnm',
-    subtypes: [
-      { code: '3b', loop: '+P+Ln+P',   silva: '+(plp)', onz: 'O' },
-      { code: '5b', loop: '+PD-P',     silva: '+pd-p',  onz: 'N' },
-      { code: '8a', loop: '-Lw-P-Ln',  silva: '-(lpl)', onz: 'O' },
-      { code: '11a',loop: '-LwD+Ln',   silva: '-ld+l',  onz: 'N' },
-      { code: '12b',loop: 'D+PD',      silva: 'dpd',    onz: 'Z' },
-    ],
-  },
-  UDDD: {
-    group: 'VII', name: 'hybrid4', groove: 'wmmn',
-    subtypes: [
-      { code: '4a', loop: '-Lw-P-P',   silva: '-(lpp)', onz: 'O' },
-      { code: '4b', loop: '+Ln+P+P',   silva: '+(lpp)', onz: 'O' },
-    ],
-  },
-  UUUU: {
-    group: 'VIII', name: 'parallel', groove: 'mmmm',
-    subtypes: [
-      { code: '1a', loop: '-P-P-P',    silva: '-(ppp)', onz: 'O' },
-      { code: '1b', loop: '+P+P+P',    silva: '+(ppp)', onz: 'O', note: 'left-handed only' },
-    ],
-  },
-}
-
-const SILVA_GROUPS = Object.keys(SILVA_DATA)
-
-// ── Example database ──────────────────────────────────────────────────────────
-// Source: G4_unimolecular_all (DSSR G4DB). TODO: fill in full .inp data per example.
-const EXAMPLES_DB = {
-  // Group I — UUDD
-  '5a':  [{ pdbId: '8k7w', tetrads: 2, note: 'Spinach aptamer (bulges in D strand)' }],
-  '8b':  [{ pdbId: '2mbj', tetrads: 3, note: 'Classic UUDD 3-tetrad basket2' }],
-  '11b': [{ pdbId: '2kow', tetrads: 3, note: 'UUDD antiparallel basket2' }],
-  // Group II — UDUD
-  '6a':  [{ pdbId: '1hap', tetrads: 2, note: 'Oxytricha telomeric G4' },
-          { pdbId: '1hut', tetrads: 2, note: 'Tet repeat d(T4G4)' }],
-  '6b':  [{ pdbId: '1qdh', tetrads: 2, note: 'Human telomere antiparallel' },
-          { pdbId: '148d', tetrads: 4, note: 'Antiparallel chair 4-tetrad' }],
-  // Group III — UDUU
-  '7a':  [{ pdbId: '2mfu', tetrads: 2, note: 'UDUU hybrid3' },
-          { pdbId: '186d', tetrads: 3, note: 'Intramolecular G4 hybrid3' }],
-  // Group IV — UUUD
-  '2a':  [{ pdbId: '6up0', tetrads: 2, note: 'Mango-III aptamer' }],
-  '10a': [{ pdbId: '5ov2', tetrads: 3, note: 'UUUD hybrid2 3-tetrad' }],
-  // Group V — UUDU
-  '9a':  [{ pdbId: '2gku', tetrads: 3, note: 'UUDU hybrid1 3-tetrad' },
-          { pdbId: '2may', tetrads: 3, note: 'Human telomere hybrid-1' }],
-  // Group VI — UDDU
-  '11a': [{ pdbId: '143d', tetrads: 2, note: 'Human telomere basket' },
-          { pdbId: '2m91', tetrads: 2, note: 'UDDU antiparallel basket' }],
-  '12b': [{ pdbId: '1i34', tetrads: 2, note: 'Oxytricha basket diagonal' }],
-  // Group VII — UDDD
-  '4b':  [{ pdbId: '7zeo', tetrads: 2, note: 'UDDD hybrid4' }],
-  // Group VIII — UUUU
-  '1a':  [{ pdbId: '1kf1', tetrads: 3, note: 'Human telomere parallel' },
-          { pdbId: '2a5r', tetrads: 2, note: 'TBA parallel 2-tetrad' }],
-}
-
-// Placeholder .inp data for each example — TODO: fill with real coordinates/paths
-function getExampleInp(pdbId, subtypeCode) {
-  const PLACEHOLDER_INPUTS = {
-    '1hap': {
-      name: '1hap_js12B', sequence: 'ggttggtgtggttgg',
-      structure: 'AB..BA...AB..BA', chi: 'S...S....S...S.',
-      orient: 'A+;B-', rise: 3.4, twist: 19,
-      path: ['A1','B1','B4','A4','A3','B3','B2','A2'],
-      isTest: true, RM_Level: 5, Iterations: 50,
-    },
-    '1kf1': {
-      name: '1kf1_parallel', sequence: 'agggttagggttagggttaggg',
-      structure: 'AAAA....AAAA....AAAA....AAAA', chi: '',
-      orient: 'A+;B+;C+;D+', rise: 3.4, twist: 29,
-      path: ['A1','B1','C1','D1','A2','B2','C2','D2','A3','B3','C3','D3'],
-      isTest: true, RM_Level: 5, Iterations: 100,
-    },
-    '143d': {
-      name: '143d_basket', sequence: 'agggttagggttagggttaggg',
-      structure: 'AB..BA...AB..BA', chi: '',
-      orient: 'A+;B-', rise: 3.4, twist: 19,
-      path: ['A1','B1','B4','A4','A3','B3','B2','A2'],
-      isTest: true, RM_Level: 5, Iterations: 100,
-    },
-  }
-  // Return placeholder or generic template
-  const data = PLACEHOLDER_INPUTS[pdbId]
-  if (data) return data
-  return {
-    name: `${pdbId}_${subtypeCode}`,
-    sequence: 'ggttggtgtggttgg',
-    structure: 'AB..BA...AB..BA',
-    chi: '', orient: 'A+;B-', rise: 3.4, twist: 29,
-    path: ['A1','B1','B4','A4'],
-    isTest: true, RM_Level: 5, Iterations: 100,
-  }
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function SequenceForm({ onRun, runState }) {
-  // Textarea is empty by default — placeholder shows watermark text
-  const [nameVal, setNameVal]       = useState('')
-  const [seqVal, setSeqVal]         = useState('')
-  const [structVal, setStructVal]   = useState('')
+  // ── Database-driven classification data ──────────────────────────────────
+  const [silvaData,     setSilvaData]     = useState(null)   // null = loading
+  const [silvaError,    setSilvaError]    = useState(false)
 
-  const [silvaGroup, setSilvaGroup] = useState('UDDU')
-  const [subtype, setSubtype]       = useState('11a')
-  const [advOpen, setAdvOpen]       = useState(false)
-  const [twist, setTwist]           = useState(29)
-  const [rise, setRise]             = useState(3.4)
-  const [pucker, setPucker]         = useState('S')
-  const [parseError, setParseError] = useState(null)
-  const [showExamples, setShowExamples] = useState(false)
+  useEffect(() => {
+    fetchSilvaGroups().then(data => {
+      if (data) setSilvaData(data)
+      else setSilvaError(true)
+    })
+  }, [])
+
+  const [nameVal,       setNameVal]       = useState('')
+  const [seqVal,        setSeqVal]        = useState('')
+  const [structVal,     setStructVal]     = useState('')
+  const [pathVal,       setPathVal]       = useState('')
+  const [chiVal,        setChiVal]        = useState('')
+  const [orientVal,     setOrientVal]     = useState('A+;B-')
+  const [silvaGroup,    setSilvaGroup]    = useState('UDUD')
+  const [subtype,       setSubtype]       = useState('6a')
+  const [advOpen,       setAdvOpen]       = useState(false)
+  const [twist,         setTwist]         = useState('29')
+  const [rise,          setRise]          = useState(3.4)
+  const [pucker,        setPucker]        = useState('S')
+  const [iterations,    setIterations]    = useState(100)
+  const [rmLevel,       setRmLevel]       = useState(0)
+  const [isTest,        setIsTest]        = useState(false)
+  const [parseError,    setParseError]    = useState(null)
 
   const isRunning = runState === 'running'
 
-  // Current silva group subtypes
-  const currentGroup = SILVA_DATA[silvaGroup]
-  const currentSubtypes = currentGroup.subtypes
+  // Auto-derive path, twist length and orient length whenever the user
+  // modifies sequence/structure or selects a different subtype.
+  // Mirrors the algorithm in backend Domain/SilvaTopology.cs.
+  useEffect(() => {
+    if (!silvaData) return
+    const seq = seqVal.trim().toLowerCase()
+    const struct = structVal.trim()
+    // Determine tetrads: prefer structure-based count, fall back to G-content.
+    let n = 0
+    if (struct) n = countTetrads(struct)
+    else if (seq) n = Math.max(1, Math.round((seq.match(/g/g) || []).length / 4))
+    if (n < 1 || n > 4) return
 
-  // Auto-select first subtype when group changes
+    const grp = silvaData.find(g => g.code === silvaGroup)
+    const sub = grp?.subtypes?.find(s => s.code === subtype)
+    if (!sub?.loop) return
+
+    try {
+      setPathVal(buildPath(sub.loop, n))
+    } catch {
+      // notation might be unparseable for some theoretical entries — leave path empty
+    }
+
+    // Auto-scale twist (N-1 values) and orient (N values) to the current tetrad count.
+    // Only scale — never overwrite user-customised values that already match.
+    setTwist(prev => {
+      const stepsNeeded = Math.max(1, n - 1)
+      const currentSteps = prev.split(';').filter(Boolean).length
+      return currentSteps === stepsNeeded ? prev : buildDefaultTwist(n)
+    })
+    setOrientVal(prev => scaleOrientToTetrads(prev, n))
+  }, [silvaData, silvaGroup, subtype, seqVal, structVal])
+
+  // Derive current group/subtypes from DB data (fall back to empty while loading)
+  const currentGroup    = silvaData?.find(g => g.code === silvaGroup)
+  const currentSubtypes = currentGroup?.subtypes ?? []
+
   function handleGroupChange(g) {
     setSilvaGroup(g)
-    setSubtype(SILVA_DATA[g].subtypes[0].code)
-    setShowExamples(false)
+    const grp = silvaData?.find(x => x.code === g)
+    if (grp?.subtypes?.length) setSubtype(grp.subtypes[0].code)
   }
 
-  // Computed values from current input
-  const sequence  = seqVal.trim().toLowerCase()
-  const structure = structVal.trim()
-  const hasInput  = sequence.length > 0
-
+  const sequence    = seqVal.trim().toLowerCase()
+  const structure   = structVal.trim()
+  const hasInput    = sequence.length > 0
   const tetradCount = hasInput && structure
     ? countTetrads(structure)
-    : (hasInput ? Math.floor(sequence.length / 4) : null)
+    : (hasInput ? Math.floor(sequence.length / 8) : null)
 
-  const polarityLabel = tetradCount ? defaultPolarityLabel(tetradCount) : '–'
+  const polarityLabel  = tetradCount ? defaultPolarityLabel(tetradCount) : '–'
   const detectedPucker = /[A-Z]/.test(seqVal) ? 'N' : 'S'
 
   const defaults = {
     tetrads:  tetradCount ?? '–',
     type:     hasInput ? (detectedPucker === 'N' ? 'RNA' : 'DNA') : '–',
     polarity: twist === 29 ? '>>' : twist === 27 ? '<<' : twist === 19 ? '<>' : '><',
-    label:    tetradCount ? defaultPolarityLabel(tetradCount) : '–',
+    label:    polarityLabel,
     twist:    hasInput ? twist : '–',
     rise:     hasInput ? rise : '–',
-    pucker:   hasInput ? detectedPucker : '–',
+    pucker:   hasInput ? (advOpen ? pucker : detectedPucker) : '–',
   }
 
-  // Load an example into form
-  function loadExample(pdbId, subtypeCode) {
-    const data = getExampleInp(pdbId, subtypeCode)
-    setNameVal(data.name)
-    setSeqVal(data.sequence)
-    setStructVal(data.structure)
-    setTwist(data.twist)
-    setRise(data.rise)
-    setPucker(/[A-Z]/.test(data.sequence) ? 'N' : 'S')
-    setShowExamples(false)
+  async function loadExample(pdbId) {
     setParseError(null)
+    const data = await fetchExampleDetail(pdbId)
+    if (!data) {
+      setParseError(`Could not load example '${pdbId}' from server.`)
+      return
+    }
+    setNameVal(data.inpName ?? '')
+    setSeqVal(data.sequence ?? '')
+    setStructVal(data.structure ?? '')
+    setChiVal(data.chi ?? '')
+    setPathVal(data.path ?? '')
+    setOrientVal(data.orient ?? orientFromGroup(silvaGroup))
+    setTwist(String(data.twist ?? '29'))
+    setRise(data.rise ?? 3.4)
+    setPucker(/[A-Z]/.test(data.sequence ?? '') ? 'N' : 'S')
+    setIterations(data.iterations ?? 70)
+    setRmLevel(data.rmLevel ?? 0)
+    setIsTest(data.isTest ?? false)
   }
 
-  // Build payload and run
   function handleSubmit() {
     if (isRunning) return
-    const name = nameVal.trim() || 'structure'
-    const seq  = seqVal.trim()
-    const str  = structVal.trim()
+
+    const name   = nameVal.trim() || 'structure'
+    const seq    = seqVal.trim().toLowerCase()
+    const struct = structVal.trim()
 
     if (!seq) { setParseError('Sequence is required'); return }
     if (seq.length < 4) { setParseError('Sequence is too short (minimum 4 nucleotides)'); return }
-    if (!/^[ACGUTacgut]+$/.test(seq)) { setParseError('Invalid characters in sequence'); return }
+    if (!/^[acgutrykmbdhvnswACGUTRYKMBDHVNSW]+$/.test(seq)) {
+      setParseError('Sequence contains invalid characters (allowed: a c g u t — lowercase)'); return
+    }
+    if (!struct) { setParseError('Structure is required'); return }
 
     setParseError(null)
 
-    // Build path from structure if it contains strand labels
-    let path = null
-    const strandLabels = str.match(/[A-Z]\d+/g)
-    if (strandLabels && strandLabels.length > 0) {
-      path = strandLabels
-    }
+    // Path: user-supplied raw string → split on semicolons, or null if empty
+    const pathList = pathVal.trim()
+      ? pathVal.trim().split(';').map(s => s.trim()).filter(Boolean)
+      : null
 
     const payload = {
       name,
-      sequence:   seq.toLowerCase(),
-      structure:  str,
-      chi:        '',
-      orient:     'A+;B+',
-      rise:       advOpen ? rise  : 3.4,
-      twist:      advOpen ? twist : 29,
-      path,
-      isTest:     true,
-      RM_Level:   5,
-      Iterations: 100,
+      sequence:    seq,
+      structure:   struct,
+      chi:         chiVal.trim(),  // if empty, backend auto-generates all-dot chi
+      orient:      orientVal.trim() || orientFromGroup(silvaGroup),
+      rise:        rise,
+      twist:       twist.trim() || '29',
+      path:        pathList,
+      isTest:      isTest,
+      RM_Level:    rmLevel,
+      Iterations:  iterations,
       sugarPucker: advOpen ? pucker : detectedPucker,
     }
 
     onRun([payload])
   }
-
-  const examples = EXAMPLES_DB[subtype] || []
 
   return (
     <div>
@@ -259,8 +177,8 @@ export default function SequenceForm({ onRun, runState }) {
           Sequence &amp; Structure Input
         </div>
 
-        {/* Three separate fields — no visual dividers between them */}
         <div className={styles.threeLineBlock}>
+          {/* Line 1 — name */}
           <div className={styles.inlineField}>
             <span className={styles.lineNum}>1</span>
             <span className={styles.linePrefix}>&gt;</span>
@@ -269,10 +187,12 @@ export default function SequenceForm({ onRun, runState }) {
               className={styles.inlineInput}
               value={nameVal}
               onChange={e => setNameVal(e.target.value)}
-              placeholder="Structure name"
+              placeholder="Structure name (e.g. pz74_mp_G14L)"
               spellCheck={false}
             />
           </div>
+
+          {/* Line 2 — sequence */}
           <div className={styles.inlineField}>
             <span className={styles.lineNum}>2</span>
             <input
@@ -280,10 +200,12 @@ export default function SequenceForm({ onRun, runState }) {
               className={`${styles.inlineInput} ${styles.seqFont}`}
               value={seqVal}
               onChange={e => setSeqVal(e.target.value)}
-              placeholder="nucleotide sequence (e.g. ggttggtgtggttgg)"
+              placeholder="nucleotide sequence — lowercase (e.g. agggttagggttaggg)"
               spellCheck={false}
             />
           </div>
+
+          {/* Line 3 — structure (14L format) */}
           <div className={styles.inlineField}>
             <span className={styles.lineNum}>3</span>
             <input
@@ -291,10 +213,11 @@ export default function SequenceForm({ onRun, runState }) {
               className={`${styles.inlineInput} ${styles.seqFont}`}
               value={structVal}
               onChange={e => setStructVal(e.target.value)}
-              placeholder="dot-bracket / strand structure (e.g. AB..BA...AB..BA)"
+              placeholder="dot-bracket + ^ markers, length must match sequence (e.g. (((^^.^^.)))....)"
               spellCheck={false}
             />
           </div>
+
         </div>
 
         <div className={styles.legend}>
@@ -304,12 +227,13 @@ export default function SequenceForm({ onRun, runState }) {
           </span>
           <span className={styles.legendItem}>
             <span className={styles.ldot} style={{ background: 'var(--teal)' }} />
-            Line 2: Sequence (lowercase = DNA, UPPERCASE = RNA)
+            Line 2: Nucleotide sequence (lowercase)
           </span>
           <span className={styles.legendItem}>
             <span className={styles.ldot} style={{ background: '#B45309' }} />
-            Line 3: Strand structure (A/B labels or dot-bracket)
+            Line 3: 14L structure — dot-bracket + <code>^</code> (length = sequence length)
           </span>
+
         </div>
 
         {parseError && (
@@ -324,7 +248,6 @@ export default function SequenceForm({ onRun, runState }) {
           Silva Loop Classification
         </div>
 
-        {/* Group selector */}
         <div className={styles.row}>
           <div className={styles.label}>
             Strand topology
@@ -332,27 +255,34 @@ export default function SequenceForm({ onRun, runState }) {
           </div>
           <div className={styles.control}>
             <div className={styles.silvaGrid}>
-              {SILVA_GROUPS.map(g => (
+              {(silvaData ?? []).map(g => (
                 <button
-                  key={g}
-                  className={`${styles.silvaBtn} ${silvaGroup === g ? styles.silvaBtnActive : ''}`}
-                  onClick={() => handleGroupChange(g)}
-                  title={`Group ${SILVA_DATA[g].group} · ${SILVA_DATA[g].name}`}
+                  key={g.code}
+                  className={`${styles.silvaBtn} ${silvaGroup === g.code ? styles.silvaBtnActive : ''}`}
+                  onClick={() => handleGroupChange(g.code)}
+                  title={`Group ${g.groupNumber} · ${g.name}`}
                 >
-                  <Beads code={g} active={silvaGroup === g} />
-                  <span className={styles.silvaBtnLabel}>{g}</span>
+                  <Beads code={g.code} active={silvaGroup === g.code} />
+                  <span className={styles.silvaBtnLabel}>{g.code}</span>
                 </button>
               ))}
             </div>
             <div className={styles.silvaGroupInfo}>
-              <span className={styles.groupBadge}>Group {currentGroup.group}</span>
-              <span className={styles.groupName}>{currentGroup.name}</span>
-              <span className={styles.groupGroove}>groove: <code>{currentGroup.groove}</code></span>
+              {currentGroup ? (
+                <>
+                  <span className={styles.groupBadge}>Group {currentGroup.groupNumber}</span>
+                  <span className={styles.groupName}>{currentGroup.name}</span>
+                  <span className={styles.groupGroove}>groove: <code>{currentGroup.groove}</code></span>
+                </>
+              ) : silvaError ? (
+                <span style={{ color: 'var(--err-text)', fontSize: 13 }}>Failed to load classification data</span>
+              ) : (
+                <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Loading…</span>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Subtype selector — updates dynamically per group */}
         <div className={styles.row}>
           <div className={styles.label}>
             Loop subtype
@@ -360,18 +290,18 @@ export default function SequenceForm({ onRun, runState }) {
           </div>
           <div className={styles.control}>
             <div className={styles.subtypeList}>
-              {currentSubtypes.map(({ code, loop, silva, onz, note }) => (
+              {currentSubtypes.map(s => (
                 <div
-                  key={code}
-                  className={`${styles.subRow} ${subtype === code ? styles.subRowActive : ''}`}
-                  onClick={() => { setSubtype(code); setShowExamples(false) }}
+                  key={s.code}
+                  className={`${styles.subRow} ${subtype === s.code ? styles.subRowActive : ''}`}
+                  onClick={() => setSubtype(s.code)}
                 >
-                  <span className={`${styles.subDot} ${subtype === code ? styles.subDotActive : ''}`} />
-                  <code className={`${styles.subCode} ${subtype === code ? styles.subCodeActive : ''}`}>{code}</code>
-                  <code className={styles.subLoop}>{loop}</code>
-                  <span className={styles.subSilva}>{silva}</span>
-                  <span className={styles.subOnz} data-onz={onz}>{onz}</span>
-                  {note && <span className={styles.subNote}>{note}</span>}
+                  <span className={`${styles.subDot} ${subtype === s.code ? styles.subDotActive : ''}`} />
+                  <code className={`${styles.subCode} ${subtype === s.code ? styles.subCodeActive : ''}`}>{s.code}</code>
+                  <code className={styles.subLoop}>{s.loop}</code>
+                  <span className={styles.subSilva}>{s.silva}</span>
+                  <span className={styles.subOnz} data-onz={s.onz}>{s.onz}</span>
+                  {s.note && <span className={styles.subNote}>{s.note}</span>}
                 </div>
               ))}
             </div>
@@ -385,25 +315,30 @@ export default function SequenceForm({ onRun, runState }) {
             <small>Known structures for {subtype}</small>
           </div>
           <div className={styles.control}>
-            {examples.length === 0 ? (
-              <span className={styles.noExamples}>No deposited examples for subtype {subtype}</span>
-            ) : (
-              <div className={styles.examplesList}>
-                {examples.map(ex => (
-                  <button
-                    key={ex.pdbId}
-                    className={styles.exampleBtn}
-                    onClick={() => loadExample(ex.pdbId, subtype)}
-                    title={`Load ${ex.pdbId} — ${ex.note}`}
-                  >
-                    <span className={styles.exPdb}>{ex.pdbId.toUpperCase()}</span>
-                    <span className={styles.exTetrads}>{ex.tetrads}T</span>
-                    <span className={styles.exNote}>{ex.note}</span>
-                    <span className={styles.exArrow}>→ Load</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            {(() => {
+              const currentSub = currentSubtypes.find(s => s.code === subtype)
+              const examples = currentSub?.examples ?? []
+              return examples.length === 0 ? (
+                <span className={styles.noExamples}>No deposited examples for subtype {subtype}</span>
+              ) : (
+                <div className={styles.examplesList}>
+                  {examples.map(ex => (
+                    <button
+                      key={ex.pdbId}
+                      className={styles.exampleBtn}
+                      onClick={() => loadExample(ex.pdbId)}
+                      title={`Load ${ex.pdbId} — ${ex.note}`}
+                    >
+                      <span className={styles.exPdb}>{ex.pdbId.toUpperCase().replace(/^_/, '')}</span>
+                      <span className={styles.exTetrads}>{ex.tetrads}T</span>
+                      <span className={styles.exNote}>{ex.note}</span>
+                      {ex.isTheoretical && <span className={styles.subNote}>theoretical</span>}
+                      <span className={styles.exArrow}>→ Load</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
         </div>
       </div>
@@ -416,13 +351,13 @@ export default function SequenceForm({ onRun, runState }) {
         </div>
         <div className={styles.defaultsBar}>
           {[
-            { lbl: 'Tetrads',  val: defaults.tetrads,                             active: true  },
-            { lbl: 'Type',     val: defaults.type,                                active: false },
-            { lbl: 'Polarity', val: defaults.polarity,                            active: true  },
-            { lbl: 'Label',    val: defaults.label,                               active: false },
-            { lbl: 'Twist',    val: defaults.twist !== '–' ? `${defaults.twist}°` : '–', active: true  },
-            { lbl: 'Rise',     val: defaults.rise  !== '–' ? `${defaults.rise} Å` : '–', active: false },
-            { lbl: 'Pucker',   val: defaults.pucker,                              active: true  },
+            { lbl: 'Tetrads',  val: defaults.tetrads,                                        active: true  },
+            { lbl: 'Type',     val: defaults.type,                                            active: false },
+            { lbl: 'Polarity', val: defaults.polarity,                                        active: true  },
+            { lbl: 'Label',    val: defaults.label,                                           active: false },
+            { lbl: 'Twist',    val: defaults.twist !== '–' ? `${defaults.twist}°` : '–',     active: true  },
+            { lbl: 'Rise',     val: defaults.rise  !== '–' ? `${defaults.rise} Å` : '–',     active: false },
+            { lbl: 'Pucker',   val: defaults.pucker,                                          active: true  },
           ].map(({ lbl, val, active }) => (
             <div key={lbl} className={`${styles.defCell} ${active ? styles.defActive : ''}`}>
               <div className={styles.defLbl}>{lbl}</div>
@@ -431,7 +366,7 @@ export default function SequenceForm({ onRun, runState }) {
           ))}
         </div>
         <p className={styles.defaultsNote}>
-          Polarity defaults: 2T→RL · 3T→RLL · 4T→RLRL · 5T+→alternating (no experimental references for 5+ tetrads)
+          Polarity defaults: 2T→RL · 3T→RLL · 4T→RLRL · 5T+→alternating
         </p>
       </div>
 
@@ -451,29 +386,73 @@ export default function SequenceForm({ onRun, runState }) {
 
         {advOpen && (
           <div>
+            {/* Orient */}
             <div className={styles.row}>
-              <div className={styles.label}>Polarity direction<small>Affects helical twist</small></div>
-              <div className={styles.polBtns}>
-                {[['>>',29,'Parallel'],['<<',27,'Antiparallel'],['<>',19,'Hybrid'],['><',37,'Mixed']].map(([sym, deg, lbl]) => (
-                  <button
-                    key={sym}
-                    className={`${styles.polBtn} ${twist === deg ? styles.polBtnActive : ''}`}
-                    onClick={() => setTwist(deg)}
-                  >
-                    <span className={styles.polSym}>{sym}</span>
-                    <span className={styles.polDeg}>{deg}°</span>
-                    <span className={styles.polLbl}>{lbl}</span>
-                  </button>
-                ))}
+              <div className={styles.label}>
+                Strand orientation
+                <small>orient field in .inp (auto-set from topology)</small>
               </div>
+              <input
+                type="text"
+                style={{ maxWidth: 220 }}
+                value={orientVal}
+                onChange={e => setOrientVal(e.target.value)}
+                placeholder="e.g. A+;B- or A-;B-"
+                spellCheck={false}
+              />
             </div>
 
+            {/* Path — auto-derived from Silva loop notation, editable */}
             <div className={styles.row}>
-              <div className={styles.label}>Twist angle<small>Override computed value</small></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input type="number" value={twist} min="0" max="180" step="0.5" style={{ width: 100 }}
-                  onChange={e => setTwist(+e.target.value)} />
-                <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>degrees</span>
+              <div className={styles.label}>
+                Tetrad path
+                <small>auto-derived from subtype loop + tetrad count</small>
+              </div>
+              <input
+                type="text"
+                className={styles.seqFont}
+                style={{ width: '100%', fontFamily: 'var(--mono)' }}
+                value={pathVal}
+                onChange={e => setPathVal(e.target.value)}
+                placeholder="e.g. A1;B1;C1;C2;B2;A2;C3;B3;A3;A4;B4;C4"
+                spellCheck={false}
+              />
+            </div>
+
+            {/* Helical twist — dynamic, one input per inter-tetrad transition */}
+            <div className={styles.row}>
+              <div className={styles.label}>
+                Helical twist
+                <small>one value per inter-tetrad transition (in degrees)</small>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12 }}>
+                {(() => {
+                  const tetrads = Math.max(1, countTetrads(structVal.trim()) || 1)
+                  const steps   = Math.max(1, tetrads - 1)
+                  const parts   = twist.split(';').map(s => s.trim())
+                  while (parts.length < steps) parts.push('29')
+                  if (parts.length > steps) parts.length = steps
+
+                  return parts.map((val, i) => (
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
+                        T{i + 1}→T{i + 2}
+                      </span>
+                      <input
+                        type="text"
+                        value={val}
+                        onChange={e => {
+                          const next = [...parts]
+                          next[i] = e.target.value.replace(/[^0-9.]/g, '')
+                          setTwist(next.join(';'))
+                        }}
+                        placeholder="29"
+                        style={{ width: 72, fontFamily: 'var(--mono)', textAlign: 'center' }}
+                      />
+                    </div>
+                  ))
+                })()}
+                <span style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>°</span>
               </div>
             </div>
 
@@ -489,7 +468,7 @@ export default function SequenceForm({ onRun, runState }) {
             <div className={styles.row}>
               <div className={styles.label}>Sugar pucker<small>Ribose conformation</small></div>
               <div className={styles.puckerBtns}>
-                {[['S','C2′-endo / DNA'],['N','C3′-endo / RNA']].map(([sym, label]) => (
+                {[['S',"C2′-endo / DNA"],['N',"C3′-endo / RNA"]].map(([sym, label]) => (
                   <button
                     key={sym}
                     className={`${styles.puckBtn} ${pucker === sym ? styles.puckBtnActive : ''}`}
@@ -500,6 +479,42 @@ export default function SequenceForm({ onRun, runState }) {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Iterations */}
+            <div className={styles.row}>
+              <div className={styles.label}>Iterations<small>CYANA iteration count</small></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="number" value={iterations} min="1" max="10000" step="10" style={{ width: 100 }}
+                  onChange={e => setIterations(Math.max(1, +e.target.value))} />
+                <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>cycles</span>
+              </div>
+            </div>
+
+            {/* RM Level */}
+            <div className={styles.row}>
+              <div className={styles.label}>RM Level<small>rm_level in .inp (0 = skip)</small></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="number" value={rmLevel} min="0" max="10" step="1" style={{ width: 100 }}
+                  onChange={e => setRmLevel(Math.max(0, +e.target.value))} />
+              </div>
+            </div>
+
+            {/* Test mode */}
+            <div className={styles.row}>
+              <div className={styles.label}>
+                Test mode
+                <small>test y/n in .inp — skips full CYANA run</small>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  checked={isTest}
+                  onChange={e => setIsTest(e.target.checked)}
+                  style={{ width: 'auto' }}
+                />
+                Enable test mode (faster, no real structure output)
+              </label>
             </div>
           </div>
         )}
@@ -535,13 +550,19 @@ function Beads({ code, active }) {
   )
 }
 
-const PlayIcon = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><polygon points="2,1 13,7 2,13"/></svg>
+const PlayIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+    <polygon points="2,1 13,7 2,13"/>
+  </svg>
+)
+
 const SpinIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ animation: 'spin .8s linear infinite' }}>
     <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="20" strokeDashoffset="5"/>
     <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
   </svg>
 )
+
 const WarnIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
     <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>

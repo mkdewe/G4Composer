@@ -18,10 +18,13 @@ async function parseErrorBody(response) {
   if (ct.includes('application/json')) {
     try {
       const json = await response.json()
-      return json?.detail ?? json?.message ?? json?.Message ?? JSON.stringify(json)
+      const message = json?.detail ?? json?.message ?? json?.Message ?? JSON.stringify(json)
+      const details = json?.details ?? json?.Details ?? null
+      return { message, details }
     } catch { /* fall through */ }
   }
-  return await response.text().catch(() => `HTTP ${response.status}`)
+  const text = await response.text().catch(() => `HTTP ${response.status}`)
+  return { message: text, details: null }
 }
 
 /**
@@ -52,18 +55,18 @@ export async function runQuadro11(inputs, onProgress) {
     clearTimeout(timeoutId)
 
     if (!response.ok) {
-      const details = await parseErrorBody(response)
+      const { message: errorMsg, details: errorDetails } = await parseErrorBody(response)
       const messages = {
-        400: `Invalid input: ${details}`,
+        400: `Invalid input: ${errorMsg}`,
         404: 'API endpoint not found — check Vite proxy configuration',
-        422: `Validation error: ${details}`,
-        500: `Server error (Docker/CYANA): ${details}`,
+        422: `Validation error: ${errorMsg}`,
+        500: `Server error (Docker/CYANA): ${errorMsg}`,
         503: 'Server unavailable — is the backend running?',
       }
       throw new ApiError(
-        messages[response.status] ?? `HTTP ${response.status}: ${details}`,
+        messages[response.status] ?? `HTTP ${response.status}: ${errorMsg}`,
         response.status,
-        details
+        errorDetails
       )
     }
 
@@ -125,6 +128,41 @@ export async function checkHealth() {
 export async function fetchExample() {
   try {
     const response = await fetch('/api/quadro11/example')
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch all Silva groups with subtypes and example summaries.
+ * Used to populate the classification picker and examples list.
+ * @returns {Promise<Array|null>}
+ */
+export async function fetchSilvaGroups() {
+  try {
+    const response = await fetch('/api/structures/groups', {
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch full .inp data for a single example by PDB ID.
+ * Called when user clicks "Load" on an example button.
+ * @param {string} pdbId
+ * @returns {Promise<object|null>}
+ */
+export async function fetchExampleDetail(pdbId) {
+  try {
+    const response = await fetch(`/api/structures/examples/${encodeURIComponent(pdbId)}`, {
+      signal: AbortSignal.timeout(5000),
+    })
     if (!response.ok) return null
     return await response.json()
   } catch {

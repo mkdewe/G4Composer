@@ -180,8 +180,8 @@ export function ContactSection() {
             { name: 'Dariusz Dziel',       role: 'Server development, G4 modelling' },
             { name: 'Mariusz Popęda',      role: 'Computational biology' },
             { name: 'Joanna Szarzyńska',   role: 'G-quadruplex structural analysis' },
-            { name: 'Tomasz Żok',          role: 'RNA/DNA structure informatics' },
-            { name: 'Marta Szachniuk',     role: 'Principal investigator' },
+            { name: 'Tomasz Żok',          role: 'RNA structure informatics' },
+            { name: 'Marta Szachniuk',     role: 'Supervisor' },
           ].map(({ name, role }) => (
             <div key={name} style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',

@@ -162,3 +162,97 @@
   padding: 0;
 }
 .footerBtn:hover { text-decoration: underline; }
+
+
+/* Drop zone active state (drag-over) */
+.dropZoneActive {
+  background: var(--teal-light);
+  border-color: var(--teal);
+  color: var(--teal-dark);
+}
+
+/* Status badges — extra states for batch processing */
+.badgePending {
+  font-size: 11px; padding: 4px 10px; border-radius: 10px; font-weight: 600;
+  background: var(--surface2); color: var(--text-dim);
+}
+.badgeRunning {
+  font-size: 11px; padding: 4px 10px; border-radius: 10px; font-weight: 600;
+  background: #FEF3C7; color: #92400E;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* ── Action icon buttons inside table rows ─────────────────────────── */
+.iconBtn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  padding: 0;
+}
+.iconBtn svg { width: 15px; height: 15px; display: block; }
+.iconBtn:hover:not(:disabled) {
+  background: var(--surface2);
+  border-color: var(--border-med);
+  color: var(--text-sub);
+}
+.iconBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Variants — same shape, accent on hover */
+.iconBtnDownload:hover:not(:disabled) {
+  background: var(--teal-light);
+  border-color: var(--teal);
+  color: var(--teal-dark);
+}
+.iconBtnDanger:hover:not(:disabled) {
+  background: var(--err-bg);
+  border-color: var(--err-border);
+  color: var(--err-text);
+}
+
+/* ── Secondary action buttons (Clear all, Download all) ────────────── */
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-sub);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--sans);
+  border: 1px solid var(--border-med);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btnGhost svg { width: 14px; height: 14px; }
+.btnGhost:hover:not(:disabled) {
+  background: var(--surface2);
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+.btnGhost:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Accent variant — used by "Download all" once results exist */
+.btnGhostAccent {
+  background: var(--teal-light);
+  color: var(--teal-dark);
+  border-color: var(--teal);
+}
+.btnGhostAccent:hover:not(:disabled) {
+  background: var(--teal);
+  color: white;
+  border-color: var(--teal-dark);
+}

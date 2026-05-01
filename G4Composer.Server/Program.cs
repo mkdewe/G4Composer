@@ -1,3 +1,4 @@
+using G4Composer.Server;
 using G4Composer.Server.Examples;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi;
@@ -10,6 +11,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
+// ── Database (EF Core + SQLite dev / PostgreSQL prod) ────────────────────────
+// SQLite lokalnie (plik g4composer.db w katalogu projektu), PostgreSQL na serwerze.
+// Zmiana: appsettings.Production.json → ConnectionStrings:Default + UseNpgsql w kodzie.
+builder.Services.AddDatabase(builder.Configuration, builder.Environment);
+
+// ── Quadro (engines, validation, docker, job runner) ──────────────────────────
+// Rejestracja całej warstwy Quadro w jednym miejscu — patrz QuadroServiceCollectionExtensions.
+// Wersję silnika (14G / 14L / ...) przełącza się w appsettings.json → "Quadro:Version".
+builder.Services.AddQuadro(builder.Configuration);
+
 // ── Swagger / OpenAPI ─────────────────────────────────────────────────────────
 builder.Services.AddSwaggerGen(options =>
 {
@@ -17,11 +28,12 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title       = "G4Composer API",
         Version     = "v1",
-        Description = "API do obliczeń struktury G-kwadrupleksu za pomocą kontenera Docker Quadro11 (CYANA/Xplor-NIH)",
+        Description = "API do obliczeń struktury G-kwadrupleksu za pomocą kontenera Docker Quadro (CYANA/Xplor-NIH). " +
+                      "Aktywna wersja silnika konfigurowana przez sekcję 'Quadro' w appsettings.json.",
         Contact     = new() { Name = "G4Composer" },
     });
 
-    // Przykładowe dane wejściowe z Quadro11InputListExample
+    // Przykładowe dane wejściowe z QuadroInputListExample
     options.ExampleFilters();
 
     // Obsługa XML-docstrings (wymaga <GenerateDocumentationFile> w .csproj)
@@ -39,7 +51,7 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // Rejestracja przykładów
-builder.Services.AddSwaggerExamplesFromAssemblyOf<Quadro11InputListExample>();
+builder.Services.AddSwaggerExamplesFromAssemblyOf<QuadroInputListExample>();
 
 // ── CORS (Vite dev server na porcie 5173) ─────────────────────────────────────
 builder.Services.AddCors(options =>
@@ -62,6 +74,9 @@ builder.Services.Configure<RouteOptions>(opt => opt.LowercaseUrls = true);
 // ─────────────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Apply migrations + seed on startup (safe to call every time — skips if up to date).
+await app.InitialiseDatabaseAsync();
 
 if (app.Environment.IsDevelopment())
 {

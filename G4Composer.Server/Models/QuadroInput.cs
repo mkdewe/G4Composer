@@ -1,73 +1,55 @@
-using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
-namespace G4Composer.Api.Models
+namespace G4Composer.Server.Models;
+
+/// <summary>
+/// Wejście dla obliczeń Quadro (14G / 14L). Format pliku .inp jest generowany
+/// przez odpowiedni <see cref="Engines.IQuadroEngine"/> wybierany na podstawie
+/// konfiguracji aplikacji.
+/// </summary>
+public class QuadroInput
 {
-    public class QuadroInput
-    {
-        /// <summary>Nazwa struktury</summary>
-        public string? Name { get; set; }
+    /// <summary>Nazwa struktury (używana w polu <c>name</c> pliku .inp).</summary>
+    public string? Name { get; set; }
 
-        /// <summary>
-        /// Sekwencja nukleotydowa. Używaj małych liter (ggttgg...).
-        /// Program rozróżnia małe 't' (tymidyna RNA) od wielkiego 'T' (T3, tymidyna DNA).
-        /// </summary>
-        public required string Sequence { get; set; }
+    /// <summary>
+    /// Sekwencja nukleotydowa. Wymagane małe litery (np. "ggttgg...").
+    /// Quadro rozróżnia małe 't' (tymidyna RNA) od wielkiego 'T' (T3, tymidyna DNA);
+    /// duże 'T' powoduje błąd parsera, dlatego walidator je odrzuca.
+    /// </summary>
+    public required string Sequence { get; set; }
 
-        /// <summary>Struktura dot-bracket, np. AB..BA...AB..BA</summary>
-        public string? Structure { get; set; }
+    /// <summary>Struktura w notacji dot-bracket / etykiet nici, np. "AB..BA...AB..BA".</summary>
+    public string? Structure { get; set; }
 
-        /// <summary>Konformacja cukru na pozycjach G, np. S...S....S...S.</summary>
-        public string? Chi { get; set; }
+    /// <summary>Konformacja cukru na pozycjach G, np. "S...S....S...S.".</summary>
+    public string? Chi { get; set; }
 
-        /// <summary>Sugar pucker: N (RNA/North) lub S (DNA/South) — używany tylko do walidacji</summary>
-        public string SugarPucker { get; set; } = "N";
+    /// <summary>Sugar pucker: "N" (RNA / North) lub "S" (DNA / South). Używany tylko do walidacji.</summary>
+    public string SugarPucker { get; set; } = "N";
 
-        /// <summary>Orientacja nici, np. A+;B-</summary>
-        public string? Orient { get; set; }
+    /// <summary>Orientacja nici, np. "A+;B-".</summary>
+    public string? Orient { get; set; }
 
-        /// <summary>Skok helisy (Å), domyślnie 3.4</summary>
-        public float Rise { get; set; } = 3.4f;
+    /// <summary>Skok helisy w Å. Domyślnie 3.4.</summary>
+    public float Rise { get; set; } = 3.4f;
 
-        /// <summary>Kąt skrętu helisy (°). &gt;&gt;=29, &lt;&lt;=27, &lt;&gt;=19, &gt;&lt;=37</summary>
-        public double Twist { get; set; } = 29.0;
+    /// <summary>Kąt skrętu helisy w stopniach. Może być wielokrokowy, np. "19;29" dla różnych przejść między tetradami.</summary>
+    public string Twist { get; set; } = "29";
 
-        /// <summary>Ścieżka tetrad, np. ["A1","B1","B4","A4","A3","B3","B2","A2"]</summary>
-        public List<string>? Path { get; set; }
+    /// <summary>Ścieżka tetrad, np. ["A1","B1","B4","A4","A3","B3","B2","A2"].</summary>
+    public List<string>? Path { get; set; }
 
-        public bool isTest { get; set; } = true;
+    /// <summary>
+    /// Tryb testowy generatora (mapowany na pole <c>test</c> w .inp jako "y"/"n").
+    /// </summary>
+    [JsonPropertyName("isTest")] // zgodność wsteczna z istniejącym kontraktem JSON
+    public bool IsTest { get; set; } = true;
 
-        public int RM_Level { get; set; } = 5;
+    /// <summary>Poziom RMSD (pole <c>rm_level</c>).</summary>
+    [JsonPropertyName("RM_Level")] // zgodność wsteczna z istniejącym kontraktem JSON
+    public int RmLevel { get; set; } = 5;
 
-        /// <summary>Liczba iteracji CYANA</summary>
-        public int Iterations { get; set; } = 1000;
-    }
-
-    public record ErrorDto(string Message, string? Details = null)
-    {
-        public string Message { get; init; } = Message;
-        public string? Details { get; init; } = Details;
-        public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
-    }
-
-    public record ErrorDtoWithValidationErrors(string Message, List<string> ValidationErrors)
-    {
-        public string Message { get; init; } = Message;
-        public List<string> ValidationErrors { get; init; } = ValidationErrors;
-    }
-
-    public record HealthDto
-    {
-        public required string Status { get; init; }
-        public bool DockerAvailable { get; init; }
-        public bool ImageExists { get; init; }
-        public required string ImageName { get; init; }
-        public DateTimeOffset Timestamp { get; init; }
-    }
-
-    public class DockerException : Exception
-    {
-        public string DockerOutput { get; }
-        public DockerException(string message, string dockerOutput) : base(message)
-            => DockerOutput = dockerOutput;
-    }
+    /// <summary>Liczba iteracji CYANA (pole <c>iteration</c>).</summary>
+    public int Iterations { get; set; } = 1000;
 }

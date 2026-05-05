@@ -36,17 +36,20 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
     private readonly IQuadroEngineSelector _engineSelector;
     private readonly QuadroOptions _options;
     private readonly ILogger<QuadroJobRunner> _logger;
+    private readonly IJobLogStore _logStore;
 
     public QuadroJobRunner(
         IDockerCommandRunner docker,
         IQuadroEngineSelector engineSelector,
         IOptions<QuadroOptions> options,
-        ILogger<QuadroJobRunner> logger)
+        ILogger<QuadroJobRunner> logger,
+        IJobLogStore logStore)
     {
         _docker = docker;
         _engineSelector = engineSelector;
         _options = options.Value;
         _logger = logger;
+        _logStore = logStore;
     }
 
     public async Task<byte[]?> RunAsync(
@@ -79,6 +82,7 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         var engine = _engineSelector.Active;
 
         var containerName = $"{_options.ContainerNamePrefix}_{jobId}_{Path.GetFileNameWithoutExtension(inpFileName)}";
+        _logStore.Append(jobId, $"=== Job {jobId} | {inpFileName} | engine {engine.Version} ===");
         var mountPath     = jobDir.Replace('\\', '/');
         var dataDir       = _options.ContainerDataDirectory;
         var workDir       = _options.ContainerWorkDirectory;
@@ -282,12 +286,21 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         _logger.LogDebug("Job {JobId} [{Container}] ▶ {Step} → exit {Code}",
             jobId, containerName, step, result.ExitCode);
 
+        // Also persist to IJobLogStore so the frontend can fetch full Docker output.
+        _logStore.Append(jobId, $"▶ [{containerName}] {step} → exit {result.ExitCode}");
+
         if (result.Stdout.Length > 0)
+        {
             _logger.LogDebug("Job {JobId} [{Container}] ▶ {Step} STDOUT:\n{Out}",
                 jobId, containerName, step, result.Stdout.TrimEnd());
+            _logStore.Append(jobId, $"STDOUT:\n{result.Stdout.TrimEnd()}");
+        }
 
         if (result.Stderr.Length > 0)
+        {
             _logger.LogWarning("Job {JobId} [{Container}] ▶ {Step} STDERR:\n{Err}",
                 jobId, containerName, step, result.Stderr.TrimEnd());
+            _logStore.Append(jobId, $"STDERR:\n{result.Stderr.TrimEnd()}");
+        }
     }
 }

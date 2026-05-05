@@ -61,12 +61,15 @@ export default function SequenceForm({ onRun, runState }) {
     } else if (seq.length < 4) {
       errs.push('Sequence is too short (minimum 4 nucleotides)')
     } else {
-      const hasLower = /[acgut]/.test(rawSeq)
-      const hasUpper = /[ACGUT]/.test(rawSeq)
-      if (hasLower && hasUpper)
-        errs.push('Sequence mixes lowercase (RNA) and UPPERCASE (DNA) — use one case consistently')
-      else if (!/^[acgutACGUT]+$/.test(rawSeq))
-        errs.push('Sequence contains invalid characters (a–t lowercase for RNA, A–T uppercase for DNA)')
+      // UPPERCASE = RNA (A,C,G,U) · lowercase = DNA (a,c,g,t)
+      // Mixed RNA/DNA sequences are allowed.
+      // Invalid: uppercase T, lowercase u
+      if (/T/.test(rawSeq))
+        errs.push("Sequence contains uppercase 'T' — RNA residues use 'U' (uppercase)")
+      if (/u/.test(rawSeq))
+        errs.push("Sequence contains lowercase 'u' — DNA residues use 't' (lowercase)")
+      if (!/^[ACGUacgt]+$/.test(rawSeq))
+        errs.push('Sequence contains invalid characters — allowed: A C G U (RNA uppercase) · a c g t (DNA lowercase)')
     }
 
     if (!struct)
@@ -151,11 +154,15 @@ export default function SequenceForm({ onRun, runState }) {
     : (hasInput ? Math.floor(sequence.length / 8) : null)
 
   const polarityLabel  = tetradCount ? defaultPolarityLabel(tetradCount) : '–'
-  const detectedPucker = /[A-Z]/.test(seqVal) ? 'N' : 'S'
+  const detectedPucker = /[U]/.test(seqVal) ? 'N' : 'S'
+  const detectedType = !hasInput ? '–'
+    : (/[U]/.test(seqVal) && /[t]/.test(seqVal)) ? 'Mixed'
+    : /[U]/.test(seqVal) ? 'RNA'
+    : 'DNA'
 
   const defaults = {
     tetrads:  tetradCount ?? '–',
-    type:     hasInput ? (detectedPucker === 'N' ? 'RNA' : 'DNA') : '–',
+    type:     detectedType,
     polarity: twist === 29 ? '>>' : twist === 27 ? '<<' : twist === 19 ? '<>' : '><',
     label:    polarityLabel,
     twist:    hasInput ? twist : '–',
@@ -260,24 +267,26 @@ export default function SequenceForm({ onRun, runState }) {
               onBlur={() => {
                 const seq = seqVal.trim()
                 if (!seq || !silvaData) return
-                const hasLower = /[acgut]/.test(seq)
-                const hasUpper = /[ACGUT]/.test(seq)
-                // Only auto-detect when unambiguous (all-lower or all-upper)
-                if (hasLower && !hasUpper) {
-                  // RNA — default UUUU (parallel), subtype 1a
+                // Detect type: U present (uppercase) → RNA, t present (lowercase) → DNA
+                // Mixed sequences: if U is present → treat as RNA, otherwise DNA
+                const hasRNA = /[U]/.test(seq)   // uppercase U = RNA
+                const hasDNA = /[t]/.test(seq)   // lowercase t = DNA
+                if (hasRNA && !hasDNA) {
+                  // Pure RNA — default UUUU (parallel), subtype 1a
                   if (silvaGroup !== 'UUUU') {
                     handleGroupChange('UUUU')
                     setSubtype('1a')
                   }
-                } else if (hasUpper && !hasLower) {
-                  // DNA — default UDUD (antiparallel chair), subtype 6a
+                } else if (hasDNA && !hasRNA) {
+                  // Pure DNA — default UDUD (antiparallel chair), subtype 6a
                   if (silvaGroup !== 'UDUD') {
                     handleGroupChange('UDUD')
                     setSubtype('6a')
                   }
                 }
+                // Mixed RNA/DNA: no auto-select, leave user's choice
               }}
-              placeholder="lowercase = RNA · UPPERCASE = DNA (e.g. agggttaggg or AGGGTTAGGG)"
+              placeholder="e.g. UPPERCASE AGGGUUAGGG (RNA)  · lowercase agggttaggg (DNA) · or mixed"
               spellCheck={false}
             />
           </div>
@@ -304,7 +313,7 @@ export default function SequenceForm({ onRun, runState }) {
           </span>
           <span className={styles.legendItem}>
             <span className={styles.ldot} style={{ background: 'var(--teal)' }} />
-            Line 2: Nucleotide sequence (lowercase)
+            Line 2: Nucleotide sequence (UPPERCASE = RNA · lowercase = DNA)
           </span>
           <span className={styles.legendItem}>
             <span className={styles.ldot} style={{ background: '#B45309' }} />

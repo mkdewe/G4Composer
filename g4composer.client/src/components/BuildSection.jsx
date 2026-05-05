@@ -136,6 +136,7 @@ export default function BuildSection({
                     runState={activeRun.state}
                     jobInfo={activeRun.jobInfo}
                     runStatus={activeRun.status}
+                    dockerLog={activeRun.dockerLog || ''}
                   />
                 )}
               </div>

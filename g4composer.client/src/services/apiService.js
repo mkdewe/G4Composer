@@ -28,6 +28,21 @@ async function parseErrorBody(response) {
 }
 
 /**
+ * Fetch Docker execution log for a completed job.
+ * @param {string} jobId
+ * @returns {Promise<string>} log text or empty string if not found
+ */
+export async function fetchDockerLog(jobId) {
+  try {
+    const res = await fetch(`/api/quadro11/log/${jobId}`)
+    if (!res.ok) return ''
+    return await res.text()
+  } catch {
+    return ''
+  }
+}
+
+/**
  * Run Quadro11 computation.
  * @param {Array<object>} inputs        – Quadro11Input objects
  * @param {function}      onProgress    – callback(string) for status messages
@@ -81,8 +96,12 @@ export async function runQuadro11(inputs, onProgress) {
       ? blob
       : new Blob([blob], { type: 'chemical/x-pdb' })
 
+    // Fetch Docker execution log (best-effort, non-blocking)
+    const jobId = response.headers.get('X-Job-Id')
+    const dockerLog = jobId ? await fetchDockerLog(jobId) : ''
+
     onProgress?.('Loading structure into Mol*…')
-    return { blob: finalBlob, headers: response.headers }
+    return { blob: finalBlob, headers: response.headers, dockerLog }
 
   } catch (err) {
     clearTimeout(timeoutId)

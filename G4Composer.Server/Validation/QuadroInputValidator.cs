@@ -26,10 +26,9 @@ public sealed class ValidationResult
 /// </summary>
 public sealed class QuadroInputValidator : IValidator<QuadroInput>
 {
-    // RNA: lowercase a,c,g,u,t — DNA: UPPERCASE A,C,G,U,T
-    // Mixed case (e.g. "aggGTT") is rejected.
-    private static readonly HashSet<char> AllowedLower  = ['a', 'c', 'g', 'u', 't'];
-    private static readonly HashSet<char> AllowedUpper  = ['A', 'C', 'G', 'U', 'T'];
+    // UPPERCASE = RNA (A,C,G,U) · lowercase = DNA (a,c,g,t) · mixed sequences allowed.
+    // Invalid: uppercase T, lowercase u.
+    private static readonly HashSet<char> AllowedChars = ['A','C','G','U','a','c','g','t'];
     private static readonly HashSet<char> AllowedPucker = ['N', 'S'];
 
     private const double MaxRise  = 10.0;
@@ -117,20 +116,16 @@ public sealed class QuadroInputValidator : IValidator<QuadroInput>
             return;
         }
 
-        bool hasLower = sequence.Any(c => AllowedLower.Contains(c));
-        bool hasUpper = sequence.Any(c => AllowedUpper.Contains(c));
+        // Uppercase T is invalid (RNA uses U); lowercase u is invalid (DNA uses t).
+        if (sequence.Contains('T'))
+            errors.Add("Sequence contains uppercase 'T' — RNA residues must use 'U' (uppercase).");
+        if (sequence.Contains('u'))
+            errors.Add("Sequence contains lowercase 'u' — DNA residues must use 't' (lowercase).");
 
-        if (hasLower && hasUpper)
-        {
-            errors.Add("Sequence cannot mix lowercase (RNA) and uppercase (DNA). Use all-lowercase for RNA or all-UPPERCASE for DNA.");
-            return;
-        }
-
-        var allowed = hasUpper ? AllowedUpper : AllowedLower;
-        var invalid = sequence.Where(c => !allowed.Contains(c)).Distinct().ToArray();
+        var invalid = sequence.Where(c => !AllowedChars.Contains(c)).Distinct().ToArray();
         if (invalid.Length > 0)
             errors.Add($"Sequence contains invalid characters: '{string.Join("', '", invalid)}'. " +
-                "Use lowercase for RNA (a,c,g,u,t) or UPPERCASE for DNA (A,C,G,U,T).");
+                "Use UPPERCASE for RNA (A,C,G,U) or lowercase for DNA (a,c,g,t). Mixed sequences are allowed.");
     }
 
     private static void ValidateOrient(string orient, List<string> errors)

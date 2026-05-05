@@ -47,7 +47,8 @@ import { buildPath, buildDefaultTwist, scaleOrientToTetrads } from './silvaTopol
 
 const MINIMAL_LINES_COUNT = 5
 const FULL_LINES_COUNT    = 11
-const ALLOWED_SEQ_CHARS   = /^[acgut]+$/i
+// UPPERCASE=RNA(A,C,G,U), lowercase=DNA(a,c,g,t), mixed allowed. Invalid: T (uppercase), u (lowercase).
+const ALLOWED_SEQ_CHARS = /^[ACGUacgt]+$/
 const KNOWN_KEYS = new Set([
   'name', 'sequence', 'structure', 'chi', 'orient',
   'rise', 'twist', 'path', 'test', 'rm_level', 'iteration',
@@ -165,7 +166,7 @@ function parseMinimal(lines, silvaData) {
     isTest:      false,
     RM_Level:    0,
     Iterations:  100,
-    sugarPucker: /[A-Z]/.test(sequenceRaw) ? 'N' : 'S',
+    sugarPucker: /[U]/.test(sequenceRaw) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
 }
 
@@ -203,7 +204,7 @@ function parseFull(lines) {
     isTest:      test === 'y',
     RM_Level:    rmLevel,
     Iterations:  iterations,
-    sugarPucker: /[A-Z]/.test(sequenceRaw) ? 'N' : 'S',
+    sugarPucker: /[U]/.test(sequenceRaw) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
 }
 
@@ -261,15 +262,19 @@ function parseKeyValue(raw) {
     isTest:      test === 'y',
     RM_Level:    rmLevel,
     Iterations:  iterations,
-    sugarPucker: /[A-Z]/.test(fields.sequence) ? 'N' : 'S',
+    sugarPucker: /[U]/.test(fields.sequence) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
 }
 
 // ── Shared validators ────────────────────────────────────────────────────
 function validateSequence(sequence) {
   if (!sequence) throw new Error('Sequence is empty.')
+  if (/T/.test(sequence))
+    throw new Error("Sequence contains uppercase 'T' — RNA residues use 'U' (uppercase).")
+  if (/u/.test(sequence))
+    throw new Error("Sequence contains lowercase 'u' — DNA residues use 't' (lowercase).")
   if (!ALLOWED_SEQ_CHARS.test(sequence))
-    throw new Error('Sequence has invalid characters; allowed: a, c, g, u, t.')
+    throw new Error('Sequence contains invalid characters — allowed: A C G U (RNA uppercase) · a c g t (DNA lowercase) · mixed sequences are OK.')
 }
 
 function validateTopology(topology, subtype, topologyRaw, subtypeRaw, silvaData) {

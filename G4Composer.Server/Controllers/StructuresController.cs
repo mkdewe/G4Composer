@@ -32,31 +32,38 @@ public sealed class StructuresController : ControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<SilvaGroupDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<SilvaGroupDto>>> GetGroups(CancellationToken ct)
     {
-        var groups = await _db.SilvaGroups
-            .AsNoTracking()
-            .OrderBy(g => g.GroupNumber)
-            .Include(g => g.Subtypes)
-                .ThenInclude(s => s.Examples)
-            .ToListAsync(ct);
+        try
+        {
+            var groups = await _db.SilvaGroups
+                .AsNoTracking()
+                .OrderBy(g => g.GroupNumber)
+                .Include(g => g.Subtypes)
+                    .ThenInclude(s => s.Examples)
+                .ToListAsync(ct);
 
-        var result = groups.Select(g => new SilvaGroupDto(
-            g.Code,
-            g.GroupNumber,
-            g.Name,
-            g.Groove,
-            g.Subtypes.OrderBy(s => s.Code).Select(s => new SilvaSubtypeDto(
-                s.Code,
-                s.Loop,
-                s.Silva,
-                s.Onz,
-                s.Note,
-                s.Examples.OrderBy(e => e.PdbId).Select(e => new StructureExampleSummaryDto(
-                    e.PdbId, e.Note, e.Tetrads, e.IsTheoretical
+            var result = groups.Select(g => new SilvaGroupDto(
+                g.Code,
+                g.GroupNumber,
+                g.Name,
+                g.Groove,
+                g.Subtypes.OrderBy(s => s.Code).Select(s => new SilvaSubtypeDto(
+                    s.Code,
+                    s.Loop,
+                    s.Silva,
+                    s.Onz,
+                    s.Note,
+                    s.Examples.OrderBy(e => e.PdbId).Select(e => new StructureExampleSummaryDto(
+                        e.PdbId, e.Note, e.Tetrads, e.IsTheoretical
+                    )).ToList()
                 )).ToList()
-            )).ToList()
-        )).ToList();
+            )).ToList();
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch (OperationCanceledException)
+        {
+            return NoContent(); // Client cancelled the request — not an error
+        }
     }
 
     // ── GET /api/structures/examples/{pdbId} ─────────────────────────────
@@ -70,19 +77,26 @@ public sealed class StructuresController : ControllerBase
     public async Task<ActionResult<StructureExampleDetailDto>> GetExample(
         string pdbId, CancellationToken ct)
     {
-        var e = await _db.StructureExamples
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.PdbId == pdbId, ct);
+        try
+        {
+            var e = await _db.StructureExamples
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.PdbId == pdbId, ct);
 
-        if (e is null)
-            return NotFound(new ErrorDto($"Example '{pdbId}' not found."));
+            if (e is null)
+                return NotFound(new ErrorDto($"Example '{pdbId}' not found."));
 
-        return Ok(new StructureExampleDetailDto(
-            e.PdbId, e.Note, e.Tetrads, e.IsTheoretical,
-            e.InpName, e.Sequence, e.Structure, e.Chi,
-            e.Orient, e.Rise, e.Twist, e.Path,
-            e.IsTest, e.RmLevel, e.Iterations
-        ));
+            return Ok(new StructureExampleDetailDto(
+                e.PdbId, e.Note, e.Tetrads, e.IsTheoretical,
+                e.InpName, e.Sequence, e.Structure, e.Chi,
+                e.Orient, e.Rise, e.Twist, e.Path,
+                e.IsTest, e.RmLevel, e.Iterations
+            ));
+        }
+        catch (OperationCanceledException)
+        {
+            return NoContent();
+        }
     }
 
     // ── GET /api/structures/subtypes/{code}/examples ──────────────────────
@@ -96,20 +110,27 @@ public sealed class StructuresController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<StructureExampleSummaryDto>>> GetSubtypeExamples(
         string code, CancellationToken ct)
     {
-        var subtype = await _db.SilvaSubtypes
-            .AsNoTracking()
-            .Include(s => s.Examples)
-            .FirstOrDefaultAsync(s => s.Code == code, ct);
+        try
+        {
+            var subtype = await _db.SilvaSubtypes
+                .AsNoTracking()
+                .Include(s => s.Examples)
+                .FirstOrDefaultAsync(s => s.Code == code, ct);
 
-        if (subtype is null)
-            return NotFound(new ErrorDto($"Subtype '{code}' not found."));
+            if (subtype is null)
+                return NotFound(new ErrorDto($"Subtype '{code}' not found."));
 
-        var examples = subtype.Examples
-            .OrderBy(e => e.PdbId)
-            .Select(e => new StructureExampleSummaryDto(e.PdbId, e.Note, e.Tetrads, e.IsTheoretical))
-            .ToList();
+            var examples = subtype.Examples
+                .OrderBy(e => e.PdbId)
+                .Select(e => new StructureExampleSummaryDto(e.PdbId, e.Note, e.Tetrads, e.IsTheoretical))
+                .ToList();
 
-        return Ok(examples);
+            return Ok(examples);
+        }
+        catch (OperationCanceledException)
+        {
+            return NoContent();
+        }
     }
 
     // ── GET /api/structures/derive ────────────────────────────────────────

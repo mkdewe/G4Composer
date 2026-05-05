@@ -33,6 +33,7 @@ public sealed class QuadroController : ControllerBase
     private readonly IQuadroJobRunner _jobRunner;
     private readonly IValidator<QuadroInput> _validator;
     private readonly QuadroOptions _options;
+    private readonly IJobLogStore _logStore;
 
     public QuadroController(
         ILogger<QuadroController> logger,
@@ -40,7 +41,8 @@ public sealed class QuadroController : ControllerBase
         IDockerHealthService healthService,
         IQuadroJobRunner jobRunner,
         IValidator<QuadroInput> validator,
-        IOptions<QuadroOptions> options)
+        IOptions<QuadroOptions> options,
+        IJobLogStore logStore)
     {
         _logger = logger;
         _engineSelector = engineSelector;
@@ -48,6 +50,7 @@ public sealed class QuadroController : ControllerBase
         _jobRunner = jobRunner;
         _validator = validator;
         _options = options.Value;
+        _logStore = logStore;
     }
 
     // ── Health ───────────────────────────────────────────────────────────────
@@ -167,6 +170,21 @@ public sealed class QuadroController : ControllerBase
             // Sprzątanie w tle — nie blokuje odpowiedzi.
             _ = Task.Run(() => CleanupJobDir(jobDir));
         }
+    }
+
+    // ── Log ──────────────────────────────────────────────────────────────────
+
+    [HttpGet("log/{jobId}")]
+    [SwaggerOperation(Summary = "Get Docker execution log for a completed job", Tags = [SwaggerTag])]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK, "text/plain")]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult<string> GetLog(string jobId)
+    {
+        var log = _logStore.Get(jobId);
+        if (string.IsNullOrEmpty(log))
+            return NotFound(new ErrorDto($"Log for job '{jobId}' not found (may have expired)."));
+
+        return Content(log, "text/plain");
     }
 
     // ── Utility ──────────────────────────────────────────────────────────────

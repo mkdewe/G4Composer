@@ -31,6 +31,7 @@ public static class QuadroServiceCollectionExtensions
         // ── Docker / job runner ─────────────────────────────────────────────
         services.AddSingleton<IDockerCommandRunner, DockerCommandRunner>();
         services.AddSingleton<IDockerHealthService, DockerHealthService>();
+        services.AddSingleton<IJobLogStore, InMemoryJobLogStore>();
         services.AddSingleton<IQuadroJobRunner, QuadroJobRunner>();
 
         return services;

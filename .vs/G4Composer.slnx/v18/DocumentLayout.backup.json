@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "D:\\Studia\\Projekty\\G4Composer\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|d:\\studia\\projekty\\g4composer\\g4composer.client\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|solutionrelative:g4composer.client\\index.html||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\g4composer\\g4composer.server\\services\\quadrojobrunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\services\\quadrojobrunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -128,11 +132,24 @@
         },
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 10,
+          "SelectedChildIndex": 0,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
+              "Title": "index.html",
+              "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\index.html",
+              "RelativeDocumentMoniker": "g4composer.client\\index.html",
+              "ToolTip": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\index.html",
+              "RelativeToolTip": "g4composer.client\\index.html",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
+              "WhenOpened": "2026-05-05T16:11:55.974Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "Dtos.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Models\\Dtos.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Models\\Dtos.cs",
@@ -144,7 +161,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "RunLog.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\RunLog.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\RunLog.jsx",
@@ -156,7 +173,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "PdbPreview.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\PdbPreview.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\PdbPreview.jsx",
@@ -164,11 +181,12 @@
               "RelativeToolTip": "g4composer.client\\src\\components\\PdbPreview.jsx",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
-              "WhenOpened": "2026-05-01T14:38:49.798Z"
+              "WhenOpened": "2026-05-01T14:38:49.798Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "Nav.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\Nav.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\Nav.jsx",
@@ -176,11 +194,12 @@
               "RelativeToolTip": "g4composer.client\\src\\components\\Nav.jsx",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
-              "WhenOpened": "2026-05-01T14:38:44.373Z"
+              "WhenOpened": "2026-05-01T14:38:44.373Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "MolstarViewer.module.css",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\MolstarViewer.module.css",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\MolstarViewer.module.css",
@@ -192,7 +211,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "MolstarViewer.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\MolstarViewer.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\MolstarViewer.jsx",
@@ -204,7 +223,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 10,
               "Title": "InputPanel.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\InputPanel.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\InputPanel.jsx",
@@ -216,7 +235,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 11,
               "Title": "Hero.module.css",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\Hero.module.css",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\Hero.module.css",
@@ -228,7 +247,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 12,
               "Title": "Hero.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\Hero.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\Hero.jsx",
@@ -240,7 +259,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 13,
               "Title": "BuildSection.module.css",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\BuildSection.module.css",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\BuildSection.module.css",
@@ -252,20 +271,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "QuadroJobRunner.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Services\\QuadroJobRunner.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Services\\QuadroJobRunner.cs",
               "ToolTip": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Services\\QuadroJobRunner.cs",
               "RelativeToolTip": "G4Composer.Server\\Services\\QuadroJobRunner.cs",
-              "ViewState": "AgIAAN4AAAAAAAAAAAAuwPUAAAAKAAAAAAAAAA==",
+              "ViewState": "AgIAAMcAAAAAAAAAAAAowPIAAAAGAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-04-30T00:20:19.042Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "SectionPages.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\SectionPages.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\SectionPages.jsx",
@@ -277,7 +296,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "SequenceForm.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\SequenceForm.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\SequenceForm.jsx",
@@ -289,7 +308,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 14,
               "Title": "BuildSection.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\BuildSection.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\BuildSection.jsx",
@@ -301,7 +320,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 15,
               "Title": "BatchSection.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\BatchSection.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\BatchSection.jsx",
@@ -313,7 +332,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 15,
+              "DocumentIndex": 16,
               "Title": "apiService.js",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\services\\apiService.js",
               "RelativeDocumentMoniker": "g4composer.client\\src\\services\\apiService.js",
@@ -325,7 +344,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 16,
+              "DocumentIndex": 17,
               "Title": "index.css",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\index.css",
               "RelativeDocumentMoniker": "g4composer.client\\src\\index.css",
@@ -337,7 +356,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 17,
+              "DocumentIndex": 18,
               "Title": "main.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\main.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\main.jsx",
@@ -349,7 +368,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 18,
+              "DocumentIndex": 19,
               "Title": "App.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\App.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\App.jsx",
@@ -361,7 +380,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 19,
+              "DocumentIndex": 20,
               "Title": "sequenceParser.js",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\utils\\sequenceParser.js",
               "RelativeDocumentMoniker": "g4composer.client\\src\\utils\\sequenceParser.js",
@@ -373,7 +392,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 20,
+              "DocumentIndex": 21,
               "Title": "QuadroInputListExample.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Examples\\QuadroInputListExample.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Examples\\QuadroInputListExample.cs",
@@ -385,7 +404,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 21,
+              "DocumentIndex": 22,
               "Title": "appsettings.json",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\appsettings.json",
               "RelativeDocumentMoniker": "G4Composer.Server\\appsettings.json",
@@ -397,7 +416,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 22,
+              "DocumentIndex": 23,
               "Title": "QuadroOptions.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Configuration\\QuadroOptions.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Configuration\\QuadroOptions.cs",
@@ -409,7 +428,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 23,
+              "DocumentIndex": 24,
               "Title": "QuadroEngineSelector.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Engines\\QuadroEngineSelector.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Engines\\QuadroEngineSelector.cs",
@@ -421,7 +440,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 24,
+              "DocumentIndex": 25,
               "Title": "QuadroEngines.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Engines\\QuadroEngines.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Engines\\QuadroEngines.cs",
@@ -433,7 +452,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 26,
+              "DocumentIndex": 27,
               "Title": "IQuadroEngine.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Engines\\IQuadroEngine.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Engines\\IQuadroEngine.cs",
@@ -445,7 +464,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 25,
+              "DocumentIndex": 26,
               "Title": "QuadroInput.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Models\\QuadroInput.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Models\\QuadroInput.cs",

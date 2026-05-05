@@ -34,15 +34,6 @@ export default function Hero({ onNavigate }) {
         Silva (2020) loop-type classification to generate energy-minimised 3D models, serving as
         starting points for molecular docking, dynamic simulations, and other computational studies.
       </p>
-
-      <div className={styles.heroCtas}>
-        <button className={styles.ctaPrimary} onClick={() => onNavigate('build')}>
-          Build a structure
-        </button>
-        <button className={styles.ctaSecondary} onClick={() => onNavigate('docs')}>
-          Documentation
-        </button>
-      </div>
     </div>
   )
 }

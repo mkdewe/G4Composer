@@ -25,14 +25,14 @@ public class QuadroInput
     /// <summary>Konformacja cukru na pozycjach G, np. "S...S....S...S.".</summary>
     public string? Chi { get; set; }
 
-    /// <summary>Sugar pucker: "N" (RNA / North) lub "S" (DNA / South). Używany tylko do walidacji.</summary>
-    public string SugarPucker { get; set; } = "N";
+    /// <summary>Sugar pucker per inter-tetrad step e.g. "S;S" (DNA) or "N;N" (RNA). Can be multi-step.</summary>
+    public string SugarPucker { get; set; } = "S";
 
     /// <summary>Orientacja nici, np. "A+;B-".</summary>
     public string? Orient { get; set; }
 
-    /// <summary>Skok helisy w Å. Domyślnie 3.4.</summary>
-    public float Rise { get; set; } = 3.4f;
+    /// <summary>Helical rise in Å. Multi-step e.g. "3.4;3.4" for 3 tetrads (N-1 values).</summary>
+    public string Rise { get; set; } = "3.4";
 
     /// <summary>Kąt skrętu helisy w stopniach. Może być wielokrokowy, np. "19;29" dla różnych przejść między tetradami.</summary>
     public string Twist { get; set; } = "29";
@@ -44,12 +44,12 @@ public class QuadroInput
     /// Tryb testowy generatora (mapowany na pole <c>test</c> w .inp jako "y"/"n").
     /// </summary>
     [JsonPropertyName("isTest")] // zgodność wsteczna z istniejącym kontraktem JSON
-    public bool IsTest { get; set; } = true;
+    public bool IsTest { get; set; } = false;
 
     /// <summary>Poziom RMSD (pole <c>rm_level</c>).</summary>
     [JsonPropertyName("RM_Level")] // zgodność wsteczna z istniejącym kontraktem JSON
-    public int RmLevel { get; set; } = 5;
+    public int RmLevel { get; set; } = 0;
 
     /// <summary>Liczba iteracji CYANA (pole <c>iteration</c>).</summary>
-    public int Iterations { get; set; } = 1000;
+    public int Iterations { get; set; } = 100;
 }

@@ -13,17 +13,19 @@ public sealed class QuadroInputListExample : IExamplesProvider<List<QuadroInput>
     [
         new QuadroInput
         {
-            Name       = "1hap_js12B",
-            Sequence   = "ggttggtgtggttgg", // małe litery — wymagane przez quadro.exe
-            Structure  = "AB..BA...AB..BA",
-            Chi        = "S...S....S...S.",
-            Orient     = "A+;B-",
-            Rise       = 3.4f,
-            Twist      = "19.0",
-            Path       = ["A1", "B1", "B4", "A4", "A3", "B3", "B2", "A2"],
-            IsTest     = true,
-            RmLevel    = 5,
-            Iterations = 50,
+            Name        = "1hap_js12B",
+            Sequence    = "ggttggtgtggttgg",
+            Structure   = "AB..BA...AB..BA",
+            Chi         = "S...S....S...S.",
+            Orient      = "A+;B-",
+            Rise        = "3.4",
+            Twist       = "19",
+            Path        = ["A1", "B1", "B4", "A4", "A3", "B3", "B2", "A2"],
+            IsTest      = false,
+            RmLevel     = 0,
+            Iterations  = 100,
+            SugarPucker = "S",
         },
     ];
 }
+

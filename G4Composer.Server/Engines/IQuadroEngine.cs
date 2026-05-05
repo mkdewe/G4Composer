@@ -47,7 +47,8 @@ public abstract class QuadroEngineBase : IQuadroEngine
         var structure = string.IsNullOrWhiteSpace(input.Structure) ? BuildDefaultStructure(sequence)   : input.Structure;
         var chi       = string.IsNullOrWhiteSpace(input.Chi)       ? BuildDefaultChi(sequence)         : input.Chi;
         var orient    = string.IsNullOrWhiteSpace(input.Orient)    ? "A+;B+"                           : input.Orient;
-        var rise  = FormatFloat(input.Rise > 0 ? input.Rise : 3.4f);
+        // Rise can be multi-step (e.g. "3.4;3.4") — write as-is; quadro14L.exe parses semicolons.
+        var rise  = string.IsNullOrWhiteSpace(input.Rise) ? "3.4" : input.Rise.Trim();
         // Twist can be multi-step (e.g. "19;29") — write as-is; quadro14L.exe parses the semicolons.
         var twist = string.IsNullOrWhiteSpace(input.Twist) ? "29" : input.Twist.Trim();
         var pathStr   = input.Path is { Count: > 0 } ? string.Join(';', input.Path) : string.Empty;
@@ -95,9 +96,5 @@ public abstract class QuadroEngineBase : IQuadroEngine
     protected static string BuildDefaultChi(string lowercaseSequence)
         => new string('.', lowercaseSequence.Length);
 
-    // Zawsze separator '.' (nie ',') niezależnie od regionu OS — quadro.exe nie zna
-    // polskiego locale.
-    protected static string FormatFloat(double value)
-        => value.ToString("F1", CultureInfo.InvariantCulture);
 
 }

@@ -36,7 +36,7 @@ export default function SequenceForm({ onRun, runState }) {
   const [subtype,       setSubtype]       = useState('6a')
   const [advOpen,       setAdvOpen]       = useState(false)
   const [twist,         setTwist]         = useState('29')
-  const [rise,          setRise]          = useState(3.4)
+  const [rise,          setRise]          = useState('3.4')
   const [pucker,        setPucker]        = useState('S')
   const [iterations,    setIterations]    = useState(100)
   const [rmLevel,       setRmLevel]       = useState(0)
@@ -68,12 +68,31 @@ export default function SequenceForm({ onRun, runState }) {
       // notation might be unparseable for some theoretical entries — leave path empty
     }
 
-    // Auto-scale twist (N-1 values) and orient (N values) to the current tetrad count.
+    // Auto-scale twist, rise, pucker (N-1 values) and orient (N values).
     // Only scale — never overwrite user-customised values that already match.
+    const scaleNMinus1 = (prev, defaultVal) => {
+      const stepsNeeded = Math.max(1, n - 1)
+      const parts = prev.split(';').filter(Boolean)
+      if (parts.length === stepsNeeded) return prev
+      while (parts.length < stepsNeeded) parts.push(defaultVal)
+      parts.length = stepsNeeded
+      return parts.join(';')
+    }
     setTwist(prev => {
       const stepsNeeded = Math.max(1, n - 1)
       const currentSteps = prev.split(';').filter(Boolean).length
       return currentSteps === stepsNeeded ? prev : buildDefaultTwist(n)
+    })
+    setRise(prev => scaleNMinus1(prev, '3.4'))
+    setPucker(prev => {
+      // Preserve user-set pucker values, extend with same pattern
+      const stepsNeeded = Math.max(1, n - 1)
+      const parts = prev.split(';').filter(Boolean)
+      if (parts.length === stepsNeeded) return prev
+      const defaultPucker = parts[0] || 'S'
+      while (parts.length < stepsNeeded) parts.push(defaultPucker)
+      parts.length = stepsNeeded
+      return parts.join(';')
     })
     setOrientVal(prev => scaleOrientToTetrads(prev, n))
   }, [silvaData, silvaGroup, subtype, seqVal, structVal])
@@ -122,7 +141,7 @@ export default function SequenceForm({ onRun, runState }) {
     setPathVal(data.path ?? '')
     setOrientVal(data.orient ?? orientFromGroup(silvaGroup))
     setTwist(String(data.twist ?? '29'))
-    setRise(data.rise ?? 3.4)
+    setRise(String(data.rise ?? '3.4'))
     setPucker(/[A-Z]/.test(data.sequence ?? '') ? 'N' : 'S')
     setIterations(data.iterations ?? 70)
     setRmLevel(data.rmLevel ?? 0)
@@ -138,8 +157,14 @@ export default function SequenceForm({ onRun, runState }) {
 
     if (!seq) { setParseError('Sequence is required'); return }
     if (seq.length < 4) { setParseError('Sequence is too short (minimum 4 nucleotides)'); return }
-    if (!/^[acgutrykmbdhvnswACGUTRYKMBDHVNSW]+$/.test(seq)) {
-      setParseError('Sequence contains invalid characters (allowed: a c g u t — lowercase)'); return
+    // RNA = lowercase, DNA = UPPERCASE, mixed = error
+    const seqHasLower = /[acgut]/.test(seq)
+    const seqHasUpper = /[ACGUT]/.test(seq)
+    if (seqHasLower && seqHasUpper) {
+      setParseError('Sequence mixes lowercase (RNA) and UPPERCASE (DNA) — use one case consistently'); return
+    }
+    if (!/^[acgutACGUT]+$/.test(seq)) {
+      setParseError('Sequence contains invalid characters (allowed: a,c,g,u,t lowercase for RNA or A,C,G,U,T uppercase for DNA)'); return
     }
     if (!struct) { setParseError('Structure is required'); return }
 
@@ -156,13 +181,13 @@ export default function SequenceForm({ onRun, runState }) {
       structure:   struct,
       chi:         chiVal.trim(),  // if empty, backend auto-generates all-dot chi
       orient:      orientVal.trim() || orientFromGroup(silvaGroup),
-      rise:        rise,
+      rise:        rise.trim() || '3.4',
       twist:       twist.trim() || '29',
       path:        pathList,
       isTest:      isTest,
       RM_Level:    rmLevel,
       Iterations:  iterations,
-      sugarPucker: advOpen ? pucker : detectedPucker,
+      sugarPucker: pucker,  // multi-step e.g. 'S;S' or 'N;N'
     }
 
     onRun([payload])
@@ -200,7 +225,27 @@ export default function SequenceForm({ onRun, runState }) {
               className={`${styles.inlineInput} ${styles.seqFont}`}
               value={seqVal}
               onChange={e => setSeqVal(e.target.value)}
-              placeholder="nucleotide sequence — lowercase (e.g. agggttagggttaggg)"
+              onBlur={() => {
+                const seq = seqVal.trim()
+                if (!seq || !silvaData) return
+                const hasLower = /[acgut]/.test(seq)
+                const hasUpper = /[ACGUT]/.test(seq)
+                // Only auto-detect when unambiguous (all-lower or all-upper)
+                if (hasLower && !hasUpper) {
+                  // RNA — default UUUU (parallel), subtype 1a
+                  if (silvaGroup !== 'UUUU') {
+                    handleGroupChange('UUUU')
+                    setSubtype('1a')
+                  }
+                } else if (hasUpper && !hasLower) {
+                  // DNA — default UDUD (antiparallel chair), subtype 6a
+                  if (silvaGroup !== 'UDUD') {
+                    handleGroupChange('UDUD')
+                    setSubtype('6a')
+                  }
+                }
+              }}
+              placeholder="lowercase = RNA · UPPERCASE = DNA (e.g. agggttaggg or AGGGTTAGGG)"
               spellCheck={false}
             />
           </div>
@@ -402,6 +447,23 @@ export default function SequenceForm({ onRun, runState }) {
               />
             </div>
 
+            {/* Chi — glycosidic bond conformation */}
+            <div className={styles.row}>
+              <div className={styles.label}>Chi (χ)<small>S=syn · N/A=anti · .=default · length must match sequence</small></div>
+              <div style={{ width: '100%' }}>
+                <input type="text"
+                  style={{ width: '100%', fontFamily: 'var(--mono)', fontSize: 13 }}
+                  value={chiVal} onChange={e => setChiVal(e.target.value)}
+                  placeholder={`${seqVal.trim().length || 0} chars — e.g. S.....S.....SS.......SS.`}
+                  spellCheck={false} />
+                {chiVal && seqVal && chiVal.length !== seqVal.trim().length && (
+                  <div style={{ fontSize: 12, color: 'var(--warn-text)', marginTop: 4 }}>
+                    Chi length ({chiVal.length}) ≠ sequence length ({seqVal.trim().length})
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Path — auto-derived from Silva loop notation, editable */}
             <div className={styles.row}>
               <div className={styles.label}>
@@ -456,66 +518,59 @@ export default function SequenceForm({ onRun, runState }) {
               </div>
             </div>
 
+            {/* Rise — dynamic per inter-tetrad step */}
             <div className={styles.row}>
-              <div className={styles.label}>Rise per residue<small>Axial translation (Å)</small></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input type="number" value={rise} min="2.0" max="6.0" step="0.1" style={{ width: 100 }}
-                  onChange={e => setRise(+e.target.value)} />
-                <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>Å</span>
+              <div className={styles.label}>Helical rise<small>axial translation per step (Å)</small></div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12 }}>
+                {(() => {
+                  const tetrads = Math.max(1, countTetrads(structVal.trim()) || 1)
+                  const steps   = Math.max(1, tetrads - 1)
+                  const parts   = rise.split(';').map(s => s.trim())
+                  while (parts.length < steps) parts.push('3.4')
+                  if (parts.length > steps) parts.length = steps
+                  return parts.map((val, i) => (
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
+                        T{i+1}→T{i+2}
+                      </span>
+                      <input type="text" value={val}
+                        onChange={e => { const n=[...parts]; n[i]=e.target.value.replace(/[^0-9.]/g,''); setRise(n.join(';')) }}
+                        placeholder="3.4" style={{ width: 72, fontFamily: 'var(--mono)', textAlign: 'center' }} />
+                    </div>
+                  ))
+                })()}
+                <span style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Å</span>
               </div>
             </div>
 
+            {/* Sugar pucker — dynamic per inter-tetrad step */}
             <div className={styles.row}>
-              <div className={styles.label}>Sugar pucker<small>Ribose conformation</small></div>
-              <div className={styles.puckerBtns}>
-                {[['S',"C2′-endo / DNA"],['N',"C3′-endo / RNA"]].map(([sym, label]) => (
-                  <button
-                    key={sym}
-                    className={`${styles.puckBtn} ${pucker === sym ? styles.puckBtnActive : ''}`}
-                    onClick={() => setPucker(sym)}
-                  >
-                    {sym}
-                    <span className={styles.puckSub}>{label}</span>
-                  </button>
-                ))}
+              <div className={styles.label}>Sugar pucker<small>S=C2′-endo/DNA · N=C3′-endo/RNA</small></div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12 }}>
+                {(() => {
+                  const tetrads = Math.max(1, countTetrads(structVal.trim()) || 1)
+                  const steps   = Math.max(1, tetrads - 1)
+                  const parts   = pucker.split(';').map(s => s.trim())
+                  while (parts.length < steps) parts.push(parts[0] || 'S')
+                  if (parts.length > steps) parts.length = steps
+                  return parts.map((val, i) => (
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
+                        T{i+1}→T{i+2}
+                      </span>
+                      <select value={val}
+                        onChange={e => { const n=[...parts]; n[i]=e.target.value; setPucker(n.join(';')) }}
+                        style={{ width: 72, fontFamily: 'var(--mono)' }}>
+                        <option value="S">S</option>
+                        <option value="N">N</option>
+                      </select>
+                    </div>
+                  ))
+                })()}
               </div>
             </div>
 
-            {/* Iterations */}
-            <div className={styles.row}>
-              <div className={styles.label}>Iterations<small>CYANA iteration count</small></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input type="number" value={iterations} min="1" max="10000" step="10" style={{ width: 100 }}
-                  onChange={e => setIterations(Math.max(1, +e.target.value))} />
-                <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>cycles</span>
-              </div>
-            </div>
 
-            {/* RM Level */}
-            <div className={styles.row}>
-              <div className={styles.label}>RM Level<small>rm_level in .inp (0 = skip)</small></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input type="number" value={rmLevel} min="0" max="10" step="1" style={{ width: 100 }}
-                  onChange={e => setRmLevel(Math.max(0, +e.target.value))} />
-              </div>
-            </div>
-
-            {/* Test mode */}
-            <div className={styles.row}>
-              <div className={styles.label}>
-                Test mode
-                <small>test y/n in .inp — skips full CYANA run</small>
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
-                <input
-                  type="checkbox"
-                  checked={isTest}
-                  onChange={e => setIsTest(e.target.checked)}
-                  style={{ width: 'auto' }}
-                />
-                Enable test mode (faster, no real structure output)
-              </label>
-            </div>
           </div>
         )}
       </div>

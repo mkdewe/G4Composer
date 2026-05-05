@@ -126,3 +126,20 @@ export function scaleOrientToTetrads(orient, tetrads) {
   // Default sign for missing planes: '-' (matches the most common pattern)
   return letters.map(L => `${L}${signByLetter[L] ?? '-'}`).join(';')
 }
+
+/**
+ * Default multi-step rise for N tetrads (N-1 values, all 3.4).
+ */
+export function buildDefaultRise(tetrads) {
+  const steps = Math.max(1, tetrads - 1)
+  return Array(steps).fill('3.4').join(';')
+}
+
+/**
+ * Default multi-step sugar pucker for N tetrads.
+ * @param {'S'|'N'} type - 'S' for DNA, 'N' for RNA
+ */
+export function buildDefaultPucker(tetrads, type = 'S') {
+  const steps = Math.max(1, tetrads - 1)
+  return Array(steps).fill(type).join(';')
+}

@@ -159,7 +159,7 @@ function parseMinimal(lines, silvaData) {
     structure,
     chi:         '',
     orient,
-    rise:        3.4,
+    rise:        '3.4',
     twist,
     path:        path ? path.split(';') : null,
     isTest:      false,
@@ -176,9 +176,13 @@ function parseFull(lines) {
   const sequence = sequenceRaw.toLowerCase()
   validateSequence(sequence)
 
-  const rise = parseFloat(riseRaw)
-  if (!Number.isFinite(rise) || rise <= 0)
-    throw new Error(`Line 6 (rise) must be a positive number; got '${riseRaw}'.`)
+  // Rise can be multi-step e.g. "3.4;3.4" — keep as string, validate each part
+  const riseStr = riseRaw.trim()
+  for (const part of riseStr.split(';')) {
+    const v = parseFloat(part.trim())
+    if (!Number.isFinite(v) || v <= 0)
+      throw new Error(`Line 6 (rise): '${part.trim()}' is not a valid positive number.`)
+  }
 
   const rmLevel = parseInt(rmRaw, 10)
   if (!Number.isInteger(rmLevel) || rmLevel < 0)
@@ -193,7 +197,7 @@ function parseFull(lines) {
     throw new Error(`Line 9 (test) must be 'y' or 'n'; got '${testRaw}'.`)
 
   return {
-    name, sequence, structure, chi, orient, rise,
+    name, sequence, structure, chi, orient, rise: riseStr,
     twist:       twistRaw,
     path:        pathRaw ? pathRaw.split(';').map(s => s.trim()).filter(Boolean) : null,
     isTest:      test === 'y',
@@ -223,9 +227,13 @@ function parseKeyValue(raw) {
   const sequence = fields.sequence.toLowerCase()
   validateSequence(sequence)
 
-  const rise = fields.rise ? parseFloat(fields.rise) : 3.4
-  if (!Number.isFinite(rise) || rise <= 0)
-    throw new Error(`Field 'rise' must be a positive number; got '${fields.rise}'.`)
+  // Rise can be multi-step e.g. "3.4;3.4" — keep as string, validate each part
+  const riseStr = fields.rise?.trim() ?? '3.4'
+  for (const part of riseStr.split(';')) {
+    const v = parseFloat(part.trim())
+    if (!Number.isFinite(v) || v <= 0)
+      throw new Error(`Field 'rise': '${part.trim()}' is not a valid positive number.`)
+  }
 
   const rmLevel = fields.rm_level ? parseInt(fields.rm_level, 10) : 0
   if (!Number.isInteger(rmLevel) || rmLevel < 0)
@@ -245,7 +253,7 @@ function parseKeyValue(raw) {
     structure:   fields.structure,
     chi:         fields.chi ?? '',
     orient:      fields.orient ?? 'A+;B-',
-    rise,
+    rise:        riseStr,
     twist:       fields.twist ?? '29',
     path:        fields.path
                    ? fields.path.split(';').map(s => s.trim()).filter(Boolean)

@@ -4,16 +4,34 @@ import MolstarViewer from './MolstarViewer.jsx'
 import PdbPreview from './PdbPreview.jsx'
 import RunLog from './RunLog.jsx'
 import styles from './BuildSection.module.css'
+import { downloadInp } from '../utils/inpSerializer.js'
 
-export default function BuildSection({ pdbUrl, pdbBlob, runState, runStatus, jobInfo, onRun, onReset }) {
+export default function BuildSection({
+  runs,
+  activeRunId,
+  activeRun,
+  currentStatus,
+  onRun,
+  onReset,
+  onSelectRun,
+  onRemoveRun,
+}) {
   const [activeTab, setActiveTab] = useState('viewer')
 
+  const isRunning = activeRun?.state === 'running' ||
+    runs.some(r => r.state === 'running')
+
   function downloadPdb() {
-    if (!pdbBlob) return
+    if (!activeRun?.pdbBlob) return
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(pdbBlob)
-    a.download = `g4_${jobInfo?.jobId ?? 'result'}.pdb`
+    a.href = URL.createObjectURL(activeRun.pdbBlob)
+    a.download = `${sanitiseName(activeRun.name)}_g4.pdb`
     a.click()
+  }
+
+  function handleDownloadInp() {
+    if (!activeRun?.inpContent) return
+    downloadInp(activeRun.inpContent, activeRun.name)
   }
 
   return (
@@ -24,80 +42,129 @@ export default function BuildSection({ pdbUrl, pdbBlob, runState, runStatus, job
         from the input; use the Advanced panel to override individual values.
       </p>
 
-      {/* Form cards */}
-      <SequenceForm onRun={onRun} runState={runState} jobInfo={jobInfo} />
+      {/* Form */}
+      <SequenceForm onRun={onRun} runState={activeRun?.state ?? 'idle'} />
 
-      {/* Viewer panel — only shown once a run has started or completed */}
-      {runState !== 'idle' && (
+      {/* Results panel — shown when there is at least one run */}
+      {runs.length > 0 && (
         <div className={styles.viewerPanel}>
 
-          {/* Tab bar */}
-          <div className={styles.tabBar}>
-            <div className={styles.tabs}>
-              {[
-                { id: 'viewer', label: '3D Viewer (Mol*)' },
-                { id: 'pdb',    label: 'PDB source' },
-                { id: 'log',    label: 'Run log' },
-              ].map(({ id, label }) => (
+          {/* Run tabs (browser-tab style) */}
+          <div className={styles.runTabBar}>
+            <div className={styles.runTabs}>
+              {runs.map(run => (
                 <button
-                  key={id}
-                  className={`${styles.tab} ${activeTab === id ? styles.tabActive : ''}`}
-                  onClick={() => setActiveTab(id)}
+                  key={run.id}
+                  className={`${styles.runTab} ${run.id === activeRunId ? styles.runTabActive : ''}`}
+                  onClick={() => onSelectRun(run.id)}
+                  title={run.name}
                 >
-                  {label}
+                  {/* State indicator dot */}
+                  <span className={`${styles.runDot} ${
+                    run.state === 'running' ? styles.runDotPulse :
+                    run.state === 'done'    ? styles.runDotGreen :
+                    run.state === 'error'   ? styles.runDotRed   : styles.runDotGrey
+                  }`} />
+                  <span className={styles.runTabName}>{run.name}</span>
+                  <button
+                    className={styles.runTabClose}
+                    onClick={e => { e.stopPropagation(); onRemoveRun(run.id) }}
+                    title="Close"
+                  >×</button>
                 </button>
               ))}
             </div>
-            <div className={styles.tabActions}>
-              <button className={styles.actionBtn} onClick={onReset}>
-                Reset
-              </button>
-              <button
-                className={`${styles.actionBtn} ${styles.actionPrimary}`}
-                disabled={!pdbBlob}
-                onClick={downloadPdb}
-              >
-                ↓ Download .pdb
-              </button>
-            </div>
+            <button className={styles.resetBtn} onClick={onReset} title="Close all runs">
+              Clear all
+            </button>
           </div>
 
-          {/* Tab bodies */}
-          <div className={styles.tabBody}>
-            {activeTab === 'viewer' && (
-              <MolstarViewer pdbUrl={pdbUrl} runState={runState} runStatus={runStatus} />
-            )}
-            {activeTab === 'pdb' && (
-              <PdbPreview pdbBlob={pdbBlob} jobInfo={jobInfo} />
-            )}
-            {activeTab === 'log' && (
-              <RunLog runState={runState} jobInfo={jobInfo} runStatus={runStatus} />
-            )}
-          </div>
-
-          {/* Status bar */}
-          <div className={styles.statusBar}>
-            <div className={styles.statusLeft}>
-              <span className={`${styles.dot} ${
-                runState === 'running' ? styles.dotPulse :
-                runState === 'done'    ? styles.dotGreen :
-                runState === 'error'   ? styles.dotRed   : styles.dotGrey
-              }`} />
-              <span className={styles.statusText}>{runStatus}</span>
-            </div>
-            <div className={styles.statusRight}>
-              {jobInfo && (
-                <>
-                  <StatusItem label="Job"   value={jobInfo.jobId} mono />
-                  <StatusItem label="Atoms" value={jobInfo.atoms} />
-                  {jobInfo.elapsed && (
-                    <StatusItem label="Time" value={`${(+jobInfo.elapsed / 1000).toFixed(1)}s`} />
+          {/* Content tab bar */}
+          {activeRun && (
+            <>
+              <div className={styles.tabBar}>
+                <div className={styles.tabs}>
+                  {[
+                    { id: 'viewer', label: '3D Viewer (Mol*)' },
+                    { id: 'pdb',    label: 'PDB source' },
+                    { id: 'log',    label: 'Run log' },
+                  ].map(({ id, label }) => (
+                    <button
+                      key={id}
+                      className={`${styles.tab} ${activeTab === id ? styles.tabActive : ''}`}
+                      onClick={() => setActiveTab(id)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.tabActions}>
+                  {activeRun.inpContent && (
+                    <button
+                      className={styles.actionBtn}
+                      onClick={handleDownloadInp}
+                      title="Download .inp input file"
+                    >
+                      ↓ .inp
+                    </button>
                   )}
-                </>
-              )}
-              <StatusItem label="Backend" value="localhost:7112" />
-            </div>
-          </div>
+                  <button
+                    className={`${styles.actionBtn} ${styles.actionPrimary}`}
+                    disabled={!activeRun.pdbBlob}
+                    onClick={downloadPdb}
+                  >
+                    ↓ .pdb
+                  </button>
+                </div>
+              </div>
+
+              {/* Tab content */}
+              <div className={styles.tabBody}>
+                {activeTab === 'viewer' && (
+                  <MolstarViewer
+                    pdbUrl={activeRun.pdbUrl}
+                    runState={activeRun.state}
+                    runStatus={activeRun.status}
+                    structureName={activeRun.name}
+                  />
+                )}
+                {activeTab === 'pdb' && (
+                  <PdbPreview pdbBlob={activeRun.pdbBlob} jobInfo={activeRun.jobInfo} />
+                )}
+                {activeTab === 'log' && (
+                  <RunLog
+                    runState={activeRun.state}
+                    jobInfo={activeRun.jobInfo}
+                    runStatus={activeRun.status}
+                  />
+                )}
+              </div>
+
+              {/* Status bar */}
+              <div className={styles.statusBar}>
+                <div className={styles.statusLeft}>
+                  <span className={`${styles.dot} ${
+                    activeRun.state === 'running' ? styles.dotPulse :
+                    activeRun.state === 'done'    ? styles.dotGreen :
+                    activeRun.state === 'error'   ? styles.dotRed   : styles.dotGrey
+                  }`} />
+                  <span className={styles.statusText}>{activeRun.status}</span>
+                </div>
+                <div className={styles.statusRight}>
+                  {activeRun.jobInfo && (
+                    <>
+                      <StatusItem label="Job"   value={activeRun.jobInfo.jobId} mono />
+                      <StatusItem label="Atoms" value={activeRun.jobInfo.atoms} />
+                      {activeRun.jobInfo.elapsed && (
+                        <StatusItem label="Time" value={`${(+activeRun.jobInfo.elapsed / 1000).toFixed(1)}s`} />
+                      )}
+                    </>
+                  )}
+                  <StatusItem label="Backend" value="localhost:7112" />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -111,4 +178,8 @@ function StatusItem({ label, value, mono }) {
       <span style={{ color: '#555', fontWeight: mono ? 600 : 400 }}>{value}</span>
     </span>
   )
+}
+
+function sanitiseName(name) {
+  return (name || 'structure').replace(/[^a-z0-9._-]/gi, '_').slice(0, 80)
 }

@@ -11,7 +11,7 @@ const STEPS = [
   ['Loading into Mol*…',            'chemical/x-pdb → viewer'],
 ]
 
-export default function MolstarViewer({ pdbUrl, runState, runStatus }) {
+export default function MolstarViewer({ pdbUrl, runState, runStatus, structureName }) {
   const containerRef = useRef(null)
   const viewerRef    = useRef(null)   // holds the Mol* Viewer instance
   const [molReady, setMolReady] = useState(false)
@@ -95,36 +95,47 @@ export default function MolstarViewer({ pdbUrl, runState, runStatus }) {
     }
   }, [])
 
-  // Load PDB when URL arrives
+  // Load PDB when URL or active run changes.
+  // Always clears previous structure first so tab switching shows only the
+  // currently selected run (not an overlay of multiple structures).
+  // Uses builders API for both Viewer.create() and createPluginUI paths
+  // because it supports a 'label' option — fixing the blob:https name issue.
   useEffect(() => {
     if (!viewerRef.current || !pdbUrl || !molReady) return
+
+    let cancelled = false
 
     async function load() {
       try {
         const viewer = viewerRef.current
-
-        // Viewer.create() API: use viewer.loadStructureFromUrl
-        if (viewer.loadStructureFromUrl) {
-          await viewer.loadStructureFromUrl(pdbUrl, 'pdb', false)
-          return
-        }
-
-        // Plugin API (createPluginUI fallback)
+        // viewer.plugin = PluginContext from Viewer.create()
+        // viewer itself  = PluginContext from createPluginUI()
         const plugin = viewer.plugin ?? viewer
+
+        // Clear previous structure — essential for tab switching
         await plugin.clear()
-        const data = await plugin.builders.data.download(
-          { url: pdbUrl, isBinary: false },
+        if (cancelled) return
+
+        // Load via builders so we can set a human-readable label
+        const label = structureName || 'G4 Structure'
+        const data  = await plugin.builders.data.download(
+          { url: pdbUrl, isBinary: false, label },
           { state: { isGhost: true } }
         )
+        if (cancelled) return
+
         const traj = await plugin.builders.structure.parseTrajectory(data, 'pdb')
+        if (cancelled) return
+
         await plugin.builders.structure.hierarchy.applyPreset(traj, 'default')
       } catch (err) {
-        console.error('Mol* load error:', err)
+        if (!cancelled) console.error('Mol* load error:', err)
       }
     }
 
     load()
-  }, [pdbUrl, molReady])
+    return () => { cancelled = true }
+  }, [pdbUrl, molReady, structureName])
 
   const loaded  = pdbUrl && molReady && !molError
   const loading = runState === 'running'

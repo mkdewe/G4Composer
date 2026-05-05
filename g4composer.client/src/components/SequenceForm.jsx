@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   parseInputLines,
   validateEntry,
@@ -26,6 +26,9 @@ export default function SequenceForm({ onRun, runState }) {
     })
   }, [])
 
+  // ── Canonical vs Non-canonical mode ─────────────────────────────────────
+  const [mode, setMode] = useState('canonical')  // 'canonical' | 'noncanonical'
+
   const [nameVal,       setNameVal]       = useState('')
   const [seqVal,        setSeqVal]        = useState('')
   const [structVal,     setStructVal]     = useState('')
@@ -44,6 +47,39 @@ export default function SequenceForm({ onRun, runState }) {
   const [parseError,    setParseError]    = useState(null)
 
   const isRunning = runState === 'running'
+  const errorRef = useRef(null)  // ref for scroll-to-error
+
+  // ── Live validation — computed on every render ───────────────────────────
+  const validationErrors = useCallback(() => {
+    const errs = []
+    const rawSeq = seqVal.trim()
+    const seq    = rawSeq.toLowerCase()
+    const struct = structVal.trim()
+
+    if (!seq) {
+      errs.push('Sequence is required')
+    } else if (seq.length < 4) {
+      errs.push('Sequence is too short (minimum 4 nucleotides)')
+    } else {
+      const hasLower = /[acgut]/.test(rawSeq)
+      const hasUpper = /[ACGUT]/.test(rawSeq)
+      if (hasLower && hasUpper)
+        errs.push('Sequence mixes lowercase (RNA) and UPPERCASE (DNA) — use one case consistently')
+      else if (!/^[acgutACGUT]+$/.test(rawSeq))
+        errs.push('Sequence contains invalid characters (a–t lowercase for RNA, A–T uppercase for DNA)')
+    }
+
+    if (!struct)
+      errs.push('Structure is required')
+
+    if (chiVal.trim() && seqVal.trim() && chiVal.trim().length !== seqVal.trim().length)
+      errs.push(`Chi length (${chiVal.trim().length}) must match sequence length (${seqVal.trim().length})`)
+
+    return errs
+  }, [seqVal, structVal, chiVal])
+
+  const currentErrors = validationErrors()
+  const hasErrors = currentErrors.length > 0
 
   // Auto-derive path, twist length and orient length whenever the user
   // modifies sequence/structure or selects a different subtype.
@@ -151,24 +187,20 @@ export default function SequenceForm({ onRun, runState }) {
   function handleSubmit() {
     if (isRunning) return
 
+    // If there are validation errors — show them and scroll to error block
+    if (hasErrors) {
+      setParseError(currentErrors[0])
+      setTimeout(() => {
+        errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 50)
+      return
+    }
+
+    setParseError(null)
+
     const name   = nameVal.trim() || 'structure'
     const seq    = seqVal.trim().toLowerCase()
     const struct = structVal.trim()
-
-    if (!seq) { setParseError('Sequence is required'); return }
-    if (seq.length < 4) { setParseError('Sequence is too short (minimum 4 nucleotides)'); return }
-    // RNA = lowercase, DNA = UPPERCASE, mixed = error
-    const seqHasLower = /[acgut]/.test(seq)
-    const seqHasUpper = /[ACGUT]/.test(seq)
-    if (seqHasLower && seqHasUpper) {
-      setParseError('Sequence mixes lowercase (RNA) and UPPERCASE (DNA) — use one case consistently'); return
-    }
-    if (!/^[acgutACGUT]+$/.test(seq)) {
-      setParseError('Sequence contains invalid characters (allowed: a,c,g,u,t lowercase for RNA or A,C,G,U,T uppercase for DNA)'); return
-    }
-    if (!struct) { setParseError('Structure is required'); return }
-
-    setParseError(null)
 
     // Path: user-supplied raw string → split on semicolons, or null if empty
     const pathList = pathVal.trim()
@@ -282,12 +314,55 @@ export default function SequenceForm({ onRun, runState }) {
         </div>
 
         {parseError && (
-          <div className={styles.errorMsg}><WarnIcon /> {parseError}</div>
+          <div ref={errorRef} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            margin: '12px 0 0', padding: '10px 14px',
+            background: 'var(--err-bg)', border: '1px solid var(--err-border)',
+            borderRadius: 'var(--r-md)', color: 'var(--err-text)',
+            fontSize: 13, lineHeight: 1.5,
+          }}>
+            <WarnIcon />
+            <div>
+              <strong>{parseError}</strong>
+              {currentErrors.length > 1 && (
+                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                  {currentErrors.slice(1).map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
-      {/* ── Step 2: Silva Loop Classification ── */}
-      <div className={styles.card}>
+      {/* ── Mode toggle: Canonical / Non-canonical ── */}
+      <div style={{ display: 'flex', gap: 0, margin: '16px 0 0', borderRadius: 'var(--r-md)', overflow: 'hidden', border: '1px solid var(--border-med)', alignSelf: 'flex-start', width: 'fit-content' }}>
+        {[
+          { id: 'canonical',    label: 'Canonical',     desc: 'Auto-derive parameters from Silva classification' },
+          { id: 'noncanonical', label: 'Non-canonical', desc: 'Manually specify all structural parameters' },
+        ].map(({ id, label, desc }) => (
+          <button
+            key={id}
+            onClick={() => setMode(id)}
+            title={desc}
+            style={{
+              padding: '8px 20px',
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: 'var(--sans)',
+              border: 'none',
+              cursor: 'pointer',
+              background: mode === id ? 'var(--teal)' : 'var(--surface)',
+              color:      mode === id ? 'white'       : 'var(--text-dim)',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Step 2: Silva Loop Classification (canonical only) ── */}
+      {mode === 'canonical' && <div className={styles.card}>
         <div className={styles.cardTitle}>
           <span className={styles.badge}>2</span>
           Silva Loop Classification
@@ -388,8 +463,10 @@ export default function SequenceForm({ onRun, runState }) {
         </div>
       </div>
 
-      {/* ── Step 3: Computed Default Parameters ── */}
-      <div className={styles.card}>
+      }
+
+      {/* ── Step 3: Computed Default Parameters (canonical only) ── */}
+      {mode === 'canonical' && <div className={styles.card}>
         <div className={styles.cardTitle}>
           <span className={styles.badge}>3</span>
           Computed Default Parameters
@@ -415,21 +492,28 @@ export default function SequenceForm({ onRun, runState }) {
         </p>
       </div>
 
+      }
+
       {/* ── Step 4: Advanced Parameters ── */}
+      {/* In non-canonical mode: always expanded and not collapsible */}
       <div className={styles.card}>
         <div className={styles.cardTitle}>
-          <span className={styles.badge}>4</span>
-          Advanced Parameters
-          <span className={styles.cardTitleNote}>Optional — overrides computed defaults</span>
-          <button
-            className={`${styles.toggleBtn} ${advOpen ? styles.toggleBtnOpen : ''}`}
-            onClick={() => setAdvOpen(v => !v)}
-          >
-            {advOpen ? 'Collapse' : 'Expand'}
-          </button>
+          <span className={styles.badge}>{mode === 'canonical' ? '4' : '2'}</span>
+          {mode === 'canonical' ? 'Advanced Parameters' : 'Structural Parameters'}
+          {mode === 'canonical' && (
+            <>
+              <span className={styles.cardTitleNote}>Optional — overrides computed defaults</span>
+              <button
+                className={`${styles.toggleBtn} ${advOpen ? styles.toggleBtnOpen : ''}`}
+                onClick={() => setAdvOpen(v => !v)}
+              >
+                {advOpen ? 'Collapse' : 'Expand'}
+              </button>
+            </>
+          )}
         </div>
 
-        {advOpen && (
+        {(advOpen || mode === 'noncanonical') && (
           <div>
             {/* Orient */}
             <div className={styles.row}>
@@ -576,8 +660,22 @@ export default function SequenceForm({ onRun, runState }) {
       </div>
 
       {/* Submit */}
-      <div className={styles.submitArea}>
-        <button className={styles.btnRun} onClick={handleSubmit} disabled={isRunning || !hasInput}>
+      <div className={styles.submitArea} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        {hasErrors && hasInput && (
+          <div style={{ fontSize: 12, color: 'var(--err-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <WarnIcon />
+            {currentErrors.length === 1
+              ? currentErrors[0]
+              : `${currentErrors.length} validation errors — fix before running`}
+          </div>
+        )}
+        <button
+          className={styles.btnRun}
+          onClick={handleSubmit}
+          disabled={isRunning}
+          style={{ opacity: hasErrors ? 0.45 : 1, cursor: hasErrors ? 'not-allowed' : 'pointer' }}
+          title={hasErrors ? currentErrors[0] : undefined}
+        >
           {isRunning
             ? <><SpinIcon /> Computing…</>
             : <><PlayIcon /> Submit (RUN)</>

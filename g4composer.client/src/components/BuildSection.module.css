@@ -137,3 +137,120 @@
   animation: pulse 1s ease-in-out infinite;
 }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── Run tabs (browser-tab style) ────────────────────────────────────────── */
+.runTabBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.runTabs {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.runTabs::-webkit-scrollbar { display: none; }
+
+.runTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--mono);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 180px;
+  transition: background 0.12s, color 0.12s;
+  position: relative;
+  top: 1px;
+}
+.runTab:hover { background: var(--surface); color: var(--text); }
+
+.runTabActive {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border);
+  border-bottom-color: var(--surface);
+  z-index: 1;
+}
+
+.runTabName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.runTabClose {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 3px;
+  opacity: 0.55;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+.runTabClose:hover {
+  opacity: 1;
+  background: var(--err-bg);
+  color: var(--err-text);
+}
+
+/* State indicator dots inside run tabs */
+.runDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.runDotGrey  { background: var(--border-med); }
+.runDotGreen { background: var(--ok-border); }
+.runDotRed   { background: var(--err-border); }
+.runDotPulse {
+  background: #F59E0B;
+  animation: runPulse 1.2s ease-in-out infinite;
+}
+@keyframes runPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+.resetBtn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: var(--sans);
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.resetBtn:hover {
+  background: var(--err-bg);
+  color: var(--err-text);
+  border-color: var(--err-border);
+}

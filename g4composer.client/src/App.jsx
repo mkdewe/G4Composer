@@ -1,21 +1,20 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import Nav from './components/Nav.jsx'
 import Hero from './components/Hero.jsx'
 import BuildSection from './components/BuildSection.jsx'
 import BatchSection from './components/BatchSection.jsx'
 import { RetrieveSection, DocsSection, ContactSection, Footer } from './components/SectionPages.jsx'
 import { runQuadro11 } from './services/apiService.js'
+import { serializeInp } from './utils/inpSerializer.js'
 
 export default function App() {
   const [activeSection, setActiveSection] = useState('home')
 
-  // ── Run state ─────────────────────────────────────────────────────────────
-  const [runState, setRunState]   = useState('idle')
-  const [runStatus, setRunStatus] = useState('')
-  const [pdbBlob, setPdbBlob]     = useState(null)
-  const [pdbUrl, setPdbUrl]       = useState(null)
-  const [jobInfo, setJobInfo]     = useState(null)
-  const prevUrlRef                = useRef(null)
+  // ── Multi-run state ────────────────────────────────────────────────────────
+  // Each run: { id, name, state, status, pdbBlob, pdbUrl, jobInfo, inpContent }
+  const [runs,          setRuns]          = useState([])
+  const [activeRunId,   setActiveRunId]   = useState(null)
+  const [currentStatus, setCurrentStatus] = useState('')
 
   // Ref to the page content area — used for scrolling to top on section change
   const pageRef = useRef(null)
@@ -23,8 +22,6 @@ export default function App() {
   // ── Navigation ────────────────────────────────────────────────────────────
   const navigate = useCallback((section) => {
     setActiveSection(section)
-    // Scroll the window to the top; use requestAnimationFrame so the DOM
-    // has time to re-render before we measure scroll position.
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     })
@@ -32,49 +29,85 @@ export default function App() {
 
   // ── Run handler ───────────────────────────────────────────────────────────
   const handleRun = useCallback(async (inputs) => {
-    setRunState('running')
-    setRunStatus('Starting Quadro11 container…')
-    setJobInfo(null)
+    const runId   = crypto.randomUUID()
+    const runName = inputs[0]?.name || 'Structure'
 
-    if (prevUrlRef.current) {
-      URL.revokeObjectURL(prevUrlRef.current)
-      prevUrlRef.current = null
-    }
-    setPdbBlob(null)
-    setPdbUrl(null)
+    // Generate .inp content from payload before sending (always have it)
+    const inpContent = serializeInp(inputs[0])
+
+    // Create new run entry in state — becomes the active tab immediately
+    setRuns(prev => [...prev, {
+      id:         runId,
+      name:       runName,
+      state:      'running',
+      status:     'Starting Quadro container…',
+      pdbBlob:    null,
+      pdbUrl:     null,
+      jobInfo:    null,
+      inpContent,
+    }])
+    setActiveRunId(runId)
+    setCurrentStatus('Starting Quadro container…')
+
+    const updateRun = (patch) =>
+      setRuns(prev => prev.map(r => r.id === runId ? { ...r, ...patch } : r))
 
     try {
-      const { blob, headers } = await runQuadro11(inputs, (msg) => setRunStatus(msg))
+      const { blob, headers } = await runQuadro11(inputs, (msg) => {
+        setCurrentStatus(msg)
+        updateRun({ status: msg })
+      })
 
-      const url = URL.createObjectURL(blob)
-      prevUrlRef.current = url
-      setPdbBlob(blob)
-      setPdbUrl(url)
-
-      const jobId   = headers.get('X-Job-Id')     || '–'
-      const atoms   = headers.get('X-Atom-Count') || '?'
+      const url    = URL.createObjectURL(blob)
+      const jobId  = headers.get('X-Job-Id')     || '–'
+      const atoms  = headers.get('X-Atom-Count') || '?'
       const elapsed = headers.get('X-Elapsed-Ms') || null
 
-      setJobInfo({ jobId, atoms, elapsed, structures: inputs.length, name: inputs[0]?.name || 'Structure' })
-      setRunState('done')
-      setRunStatus(`Model generated successfully · ${atoms} atoms · Job ${jobId}`)
+      updateRun({
+        state:   'done',
+        status:  `Model generated · ${atoms} atoms · Job ${jobId}`,
+        pdbBlob: blob,
+        pdbUrl:  url,
+        jobInfo: {
+          jobId,
+          atoms,
+          elapsed,
+          structures: inputs.length,
+          name: runName,
+        },
+      })
+      setCurrentStatus(`Model generated · ${atoms} atoms · Job ${jobId}`)
     } catch (err) {
-      setRunState('error')
-      setRunStatus(err?.details || err?.message || 'Unknown server error')
+      updateRun({
+        state:  'error',
+        status: err?.details || err?.message || 'Unknown server error',
+      })
+      setCurrentStatus(err?.details || err?.message || 'Unknown server error')
     }
   }, [])
 
+  const handleRemoveRun = useCallback((runId) => {
+    setRuns(prev => {
+      const next = prev.filter(r => r.id !== runId)
+      // Revoke URL to free memory
+      const removed = prev.find(r => r.id === runId)
+      if (removed?.pdbUrl) URL.revokeObjectURL(removed.pdbUrl)
+      return next
+    })
+    setActiveRunId(prev => {
+      if (prev !== runId) return prev
+      // Switch to last remaining run or null
+      const remaining = runs.filter(r => r.id !== runId)
+      return remaining.length ? remaining[remaining.length - 1].id : null
+    })
+  }, [runs])
+
   const handleReset = useCallback(() => {
-    if (prevUrlRef.current) {
-      URL.revokeObjectURL(prevUrlRef.current)
-      prevUrlRef.current = null
-    }
-    setPdbBlob(null)
-    setPdbUrl(null)
-    setRunState('idle')
-    setRunStatus('')
-    setJobInfo(null)
-  }, [])
+    runs.forEach(r => { if (r.pdbUrl) URL.revokeObjectURL(r.pdbUrl) })
+    setRuns([])
+    setActiveRunId(null)
+    setCurrentStatus('')
+  }, [runs])
 
   // ── Render ────────────────────────────────────────────────────────────────
   const showHome     = activeSection === 'home'
@@ -84,22 +117,23 @@ export default function App() {
   const showDocs     = activeSection === 'docs'
   const showContact  = activeSection === 'contact'
 
+  const activeRun = runs.find(r => r.id === activeRunId) ?? null
+
   return (
     <>
       <Nav activeSection={activeSection} onNavigate={navigate} />
-
       {showHome && <Hero onNavigate={navigate} />}
-
       <div className="page" ref={pageRef}>
         {showBuild && (
           <BuildSection
-            pdbUrl={pdbUrl}
-            pdbBlob={pdbBlob}
-            runState={runState}
-            runStatus={runStatus}
-            jobInfo={jobInfo}
+            runs={runs}
+            activeRunId={activeRunId}
+            activeRun={activeRun}
+            currentStatus={currentStatus}
             onRun={handleRun}
             onReset={handleReset}
+            onSelectRun={setActiveRunId}
+            onRemoveRun={handleRemoveRun}
           />
         )}
         {showBatch    && <BatchSection />}
@@ -107,9 +141,7 @@ export default function App() {
         {showDocs     && <DocsSection />}
         {showContact  && <ContactSection />}
       </div>
-
       <Footer onNavigate={navigate} />
-
       <style>{`
         .page {
           max-width: 1060px;

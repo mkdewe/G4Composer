@@ -13,7 +13,9 @@
  */
 export function serializeInp(input) {
   const name      = input.name      || 'structure'
-  const sequence  = (input.sequence || '').toLowerCase()
+  // Preserve original sequence case — backend IQuadroEngine.SerializeInput already
+  // lowercases for quadro14L.exe. Keeping original case allows round-trip uploads.
+  const sequence  = input.sequence || ''
   const structure = input.structure || ''
   const chi       = input.chi       || '.' .repeat(sequence.length)
   const orient    = input.orient    || 'A+;B-'

@@ -225,8 +225,10 @@ function parseKeyValue(raw) {
   if (!fields.sequence)  throw new Error(`Missing required field 'sequence'.`)
   if (!fields.structure) throw new Error(`Missing required field 'structure'.`)
 
-  const sequence = fields.sequence.toLowerCase()
-  validateSequence(sequence)
+  // Key/value .inp files always have lowercase sequences (quadro14L format).
+  // Accept lowercase u and any valid nucleotide — don't apply UI case convention.
+  const sequence = fields.sequence.trim()
+  validateSequenceInp(sequence)
 
   // Rise can be multi-step e.g. "3.4;3.4" — keep as string, validate each part
   const riseStr = fields.rise?.trim() ?? '3.4'
@@ -275,6 +277,14 @@ function validateSequence(sequence) {
     throw new Error("Sequence contains lowercase 'u' — DNA residues use 't' (lowercase).")
   if (!ALLOWED_SEQ_CHARS.test(sequence))
     throw new Error('Sequence contains invalid characters — allowed: A C G U (RNA uppercase) · a c g t (DNA lowercase) · mixed sequences are OK.')
+}
+
+// Lenient validation for .inp key/value files — quadro14L always stores sequences
+// in lowercase (including 'u' for RNA). Round-trip uploads must be accepted.
+function validateSequenceInp(sequence) {
+  if (!sequence) throw new Error('Sequence is empty.')
+  if (!/^[ACGUacgtu]+$/.test(sequence))
+    throw new Error('Sequence contains invalid characters — allowed: a c g t u (DNA/RNA lowercase) or A C G U (RNA uppercase).')
 }
 
 function validateTopology(topology, subtype, topologyRaw, subtypeRaw, silvaData) {

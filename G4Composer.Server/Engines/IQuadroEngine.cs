@@ -39,9 +39,10 @@ public abstract class QuadroEngineBase : IQuadroEngine
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        // Małe litery są wymagane — wielkie 'T' jest parsowane jako T3 i powoduje ERROR 2.
-        // Walidator powinien już to wyłapać, ale bronimy się też tutaj na wszelki wypadek.
-        var sequence = input.Sequence.ToLowerInvariant();
+        // Sequence is passed as-is — quadro14L.exe distinguishes between uppercase (RNA)
+        // and lowercase (DNA). Do not normalize case here; validation ensures only valid
+        // characters are accepted before reaching this point.
+        var sequence = input.Sequence ?? string.Empty;
 
         var name      = string.IsNullOrWhiteSpace(input.Name)      ? "structure"                       : input.Name;
         var structure = string.IsNullOrWhiteSpace(input.Structure) ? BuildDefaultStructure(sequence)   : input.Structure;
@@ -77,14 +78,14 @@ public abstract class QuadroEngineBase : IQuadroEngine
     /// Buduje domyślną strukturę z naprzemiennymi etykietami nici A/B
     /// dla każdej guaniny w sekwencji. Pozostałe pozycje to '.'.
     /// </summary>
-    protected static string BuildDefaultStructure(string lowercaseSequence)
+    protected static string BuildDefaultStructure(string sequence)
     {
-        var sb = new StringBuilder(lowercaseSequence.Length);
+        var sb = new StringBuilder(sequence.Length);
         var strandIdx = 0;
         ReadOnlySpan<char> labels = ['A', 'B'];
 
-        foreach (var c in lowercaseSequence)
-            sb.Append(c == 'g' ? labels[strandIdx++ % 2] : '.');
+        foreach (var c in sequence)
+            sb.Append(char.ToLowerInvariant(c) == 'g' ? labels[strandIdx++ % 2] : '.');
 
         return sb.ToString();
     }
@@ -93,8 +94,8 @@ public abstract class QuadroEngineBase : IQuadroEngine
     /// Default chi: a dot for every position. Empty chi means "use program defaults"
     /// for sugar conformation — pz74 reference .inp uses all-dot chi and it works.
     /// </summary>
-    protected static string BuildDefaultChi(string lowercaseSequence)
-        => new string('.', lowercaseSequence.Length);
+    protected static string BuildDefaultChi(string sequence)
+        => new string('.', sequence.Length);
 
 
 }

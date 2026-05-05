@@ -146,7 +146,7 @@ export default function SequenceForm({ onRun, runState }) {
     if (grp?.subtypes?.length) setSubtype(grp.subtypes[0].code)
   }
 
-  const sequence    = seqVal.trim().toLowerCase()
+  const sequence    = seqVal.trim()  // original case — do NOT lowercase
   const structure   = structVal.trim()
   const hasInput    = sequence.length > 0
   const tetradCount = hasInput && structure
@@ -206,7 +206,7 @@ export default function SequenceForm({ onRun, runState }) {
     setParseError(null)
 
     const name   = nameVal.trim() || 'structure'
-    const seq    = seqVal.trim().toLowerCase()
+    const seq    = seqVal.trim()  // original case — quadro14L.exe handles RNA/DNA distinction
     const struct = structVal.trim()
 
     // Path: user-supplied raw string → split on semicolons, or null if empty
@@ -322,7 +322,8 @@ export default function SequenceForm({ onRun, runState }) {
 
         </div>
 
-        {parseError && (
+        {/* Live validation errors — shown as soon as they exist, no Run needed */}
+        {hasInput && hasErrors && (
           <div ref={errorRef} style={{
             display: 'flex', alignItems: 'flex-start', gap: 8,
             margin: '12px 0 0', padding: '10px 14px',
@@ -332,7 +333,7 @@ export default function SequenceForm({ onRun, runState }) {
           }}>
             <WarnIcon />
             <div>
-              <strong>{parseError}</strong>
+              <strong>{currentErrors[0]}</strong>
               {currentErrors.length > 1 && (
                 <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
                   {currentErrors.slice(1).map((e, i) => <li key={i}>{e}</li>)}

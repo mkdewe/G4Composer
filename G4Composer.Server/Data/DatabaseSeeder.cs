@@ -183,7 +183,7 @@ public static class DatabaseSeeder
                             "4b_6r9k", "gcgtgggtcagggtgggtgggacgc", "((((^^^...^^^.^^^.^^^))))", "....SSS..................",
                             "A+;B+;C+", 3.4f, "27;27", "A1;B1;C1;C2;B2;A2;C3;B3;A3;C4;B4;A4", false, 5, 70),
                         Ex("6r9l", "3T UDDD hybrid4, full sequence (variant orient)", 3,
-                            "4b_6r9l", "gcgtgggtcagggtgggtgggacgc", "((((^^^...^^^.^^^.^^^))))", "....SS....S...S...S.....",
+                            "4b_6r9l", "gcgtgggtcagggtgggtgggacgc", "((((^^^...^^^.^^^.^^^))))", "....SS....S...S...S......",
                             "A+;B+;C-", 3.4f, "27;19", "A1;B1;C1;C2;B2;A2;C3;B3;A3;C4;B4;A4", false, 5, 70),
                         Ex("6r9k_g4", "3T UDDD hybrid4, G4 core only", 3,
                             "4b_6r9k_g4", "gggtcagggtgggtggg", "^^^...^^^.^^^.^^^", "SSS..............",

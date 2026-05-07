@@ -105,6 +105,10 @@ public sealed class StructureExample
     public int RmLevel { get; set; } = 0;
     public int Iterations { get; set; } = 70;
 
-    public int SilvaSubtypeId { get; set; }
-    public SilvaSubtype Subtype { get; set; } = null!;
+    /// <summary>
+    /// FK to SilvaSubtype. Nullable — non-canonical structures that don't fit
+    /// any Silva topology classification have this set to null.
+    /// </summary>
+    public int? SilvaSubtypeId { get; set; }
+    public SilvaSubtype? Subtype { get; set; }
 }

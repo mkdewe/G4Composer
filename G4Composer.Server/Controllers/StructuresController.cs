@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
 using G4Composer.Server.Data;
@@ -126,6 +127,39 @@ public sealed class StructuresController : ControllerBase
                 .ToList();
 
             return Ok(examples);
+        }
+        catch (OperationCanceledException)
+        {
+            return NoContent();
+        }
+    }
+
+    // ── GET /api/structures/noncanonical ─────────────────────────────────
+    /// <summary>
+    /// Returns all structure examples that are not assigned to any Silva subtype
+    /// (non-canonical structures that don't fit the standard topology classification).
+    /// </summary>
+    [HttpGet("noncanonical")]
+    [SwaggerOperation(Summary = "Non-canonical structure examples", Tags = [SwaggerTag])]
+    [ProducesResponseType(typeof(IReadOnlyList<StructureExampleDetailDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<StructureExampleDetailDto>>> GetNonCanonical(CancellationToken ct)
+    {
+        try
+        {
+            var examples = await _db.StructureExamples
+                .AsNoTracking()
+                .Where(e => e.SilvaSubtypeId == null)
+                .OrderBy(e => e.PdbId)
+                .ToListAsync(ct);
+
+            var result = examples.Select(e => new StructureExampleDetailDto(
+                e.PdbId, e.Note, e.Tetrads, e.IsTheoretical,
+                e.InpName, e.Sequence, e.Structure, e.Chi,
+                e.Orient, e.Rise, e.Twist, e.Path,
+                e.IsTest, e.RmLevel, e.Iterations
+            )).ToList();
+
+            return Ok(result);
         }
         catch (OperationCanceledException)
         {

@@ -49,7 +49,7 @@
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 16px;
-  align-items: start;
+  align-items: center;
   margin-bottom: 20px;
 }
 .row:last-child { margin-bottom: 0; }
@@ -57,7 +57,6 @@
 .label {
   font-size: 14px;
   color: var(--text-sub);
-  padding-top: 9px;
   line-height: 1.4;
 }
 .label small {
@@ -560,3 +559,16 @@
   margin-top: 2px;
 }
 
+
+/* ── Multi-line rows (Chi, Sugar pucker — have warning below input) ── */
+.rowTop {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+.rowTop:last-child { margin-bottom: 0; }
+.rowTop .label {
+  padding-top: 9px;
+}

@@ -17,7 +17,10 @@ export function serializeInp(input) {
   // lowercases for quadro14L.exe. Keeping original case allows round-trip uploads.
   const sequence  = input.sequence || ''
   const structure = input.structure || ''
-  const chi       = input.chi       || '.' .repeat(sequence.length)
+  const chi       = input.chi    || '.' .repeat(sequence.length)
+  // Shugar: per-residue sugar pucker. Auto-generate from sequence case if empty.
+  const shugar    = input.Shugar || input.shugar
+    || sequence.split('').map(c => /[A-Z]/.test(c) ? 'N' : 'S').join('')
   const orient    = input.orient    || 'A+;B-'
   const rise      = String(input.rise  ?? '3.4').trim() || '3.4'
   const twist     = String(input.twist ?? '29').trim()  || '29'
@@ -34,6 +37,7 @@ export function serializeInp(input) {
     `sequence    ${sequence}`,
     `structure    ${structure}`,
     `chi        ${chi}`,
+    `shugar     ${shugar}`,
     `orient        ${orient}`,
     `rise                ${rise}`,
     `twist        ${twist}`,

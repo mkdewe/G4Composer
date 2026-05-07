@@ -18,8 +18,26 @@ async function parseErrorBody(response) {
   if (ct.includes('application/json')) {
     try {
       const json = await response.json()
-      const message = json?.detail ?? json?.message ?? json?.Message ?? JSON.stringify(json)
-      const details = json?.details ?? json?.Details ?? null
+
+      // ASP.NET Core ValidationProblemDetails: { title, errors: { field: [msgs] } }
+      if (json?.errors && typeof json.errors === 'object' && !Array.isArray(json.errors)) {
+        const fieldErrors = Object.entries(json.errors)
+          .flatMap(([field, msgs]) => msgs.map(m => `${field}: ${m}`))
+          .join('\n')
+        return { message: json.title ?? 'Validation failed', details: fieldErrors }
+      }
+
+      // Our ValidationErrorDto: { message: "Validation failed.", details: ["err1", "err2"] }
+      const rawDetails = json?.details ?? json?.Details ?? null
+      const details = Array.isArray(rawDetails)
+        ? rawDetails.join('\n')   // join list of validation errors into readable string
+        : rawDetails
+
+      // If details contains the actual errors, use them as the message for clarity
+      const message = details
+        ? `${json?.message ?? json?.Message ?? 'Error'}:\n${details}`
+        : (json?.detail ?? json?.message ?? json?.Message ?? JSON.stringify(json))
+
       return { message, details }
     } catch { /* fall through */ }
   }
@@ -159,6 +177,16 @@ export async function fetchExample() {
  * Used to populate the classification picker and examples list.
  * @returns {Promise<Array|null>}
  */
+export async function fetchNonCanonicalExamples() {
+  try {
+    const res = await fetch('/api/structures/noncanonical')
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
 export async function fetchSilvaGroups() {
   try {
     const response = await fetch('/api/structures/groups', {

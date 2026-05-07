@@ -283,8 +283,10 @@ function validateSequence(sequence) {
 // in lowercase (including 'u' for RNA). Round-trip uploads must be accepted.
 function validateSequenceInp(sequence) {
   if (!sequence) throw new Error('Sequence is empty.')
-  if (!/^[ACGUacgtu]+$/.test(sequence))
-    throw new Error('Sequence contains invalid characters — allowed: a c g t u (DNA/RNA lowercase) or A C G U (RNA uppercase).')
+  if (/u/.test(sequence))
+    throw new Error("Sequence contains lowercase 'u' — invalid: DNA uses 't', RNA uses 'U' (uppercase).")
+  if (!/^[ACGUacgt]+$/.test(sequence))
+    throw new Error('Sequence contains invalid characters — allowed: a c g t (DNA) or A C G U (RNA).')
 }
 
 function validateTopology(topology, subtype, topologyRaw, subtypeRaw, silvaData) {

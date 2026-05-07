@@ -24,7 +24,7 @@ public sealed class QuadroInputListExample : IExamplesProvider<List<QuadroInput>
             IsTest      = false,
             RmLevel     = 0,
             Iterations  = 100,
-            SugarPucker = "S",
+            Sugar = "S",
         },
     ];
 }

@@ -25,8 +25,12 @@ public class QuadroInput
     /// <summary>Konformacja cukru na pozycjach G, np. "S...S....S...S.".</summary>
     public string? Chi { get; set; }
 
-    /// <summary>Sugar pucker per inter-tetrad step e.g. "S;S" (DNA) or "N;N" (RNA). Can be multi-step.</summary>
-    public string SugarPucker { get; set; } = "S";
+    /// <summary>
+    /// Sugar pucker per residue — same length as Sequence. Each character:
+    ///   N / n = North (C3'-endo, RNA), S / s = South (C2'-endo, DNA), . = default.
+    /// If empty, quadro14L.exe uses its own defaults (all-dot).
+    /// </summary>
+    public string Sugar { get; set; } = "";
 
     /// <summary>Orientacja nici, np. "A+;B-".</summary>
     public string? Orient { get; set; }

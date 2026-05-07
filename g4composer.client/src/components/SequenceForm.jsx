@@ -6,7 +6,7 @@ import {
   countTetrads,
   orientFromGroup,
 } from '../utils/sequenceParser.js'
-import { fetchSilvaGroups, fetchExampleDetail } from '../services/apiService.js'
+import { fetchSilvaGroups, fetchExampleDetail, fetchNonCanonicalExamples } from '../services/apiService.js'
 import { buildPath, buildDefaultTwist, scaleOrientToTetrads } from '../utils/silvaTopology.js'
 import styles from './SequenceForm.module.css'
 
@@ -24,16 +24,21 @@ export default function SequenceForm({ onRun, runState }) {
       if (data) setSilvaData(data)
       else setSilvaError(true)
     })
+    fetchNonCanonicalExamples().then(data => {
+      if (data?.length) setNonCanonical(data)
+    })
   }, [])
 
   // ── Canonical vs Non-canonical mode ─────────────────────────────────────
   const [mode, setMode] = useState('canonical')  // 'canonical' | 'noncanonical'
+  const [nonCanonical, setNonCanonical] = useState([])  // non-canonical examples from DB
 
   const [nameVal,       setNameVal]       = useState('')
   const [seqVal,        setSeqVal]        = useState('')
   const [structVal,     setStructVal]     = useState('')
   const [pathVal,       setPathVal]       = useState('')
   const [chiVal,        setChiVal]        = useState('')
+  const [sugarVal,      setShugarVal]     = useState('')  // named setShugarVal for quadro compat
   const [orientVal,     setOrientVal]     = useState('A+;B-')
   const [silvaGroup,    setSilvaGroup]    = useState('UDUD')
   const [subtype,       setSubtype]       = useState('6a')
@@ -45,6 +50,7 @@ export default function SequenceForm({ onRun, runState }) {
   const [rmLevel,       setRmLevel]       = useState(0)
   const [isTest,        setIsTest]        = useState(false)
   const [parseError,    setParseError]    = useState(null)
+  const [touched,       setTouched]       = useState(new Set())  // fields user has visited
 
   const isRunning = runState === 'running'
   const errorRef = useRef(null)  // ref for scroll-to-error
@@ -67,7 +73,7 @@ export default function SequenceForm({ onRun, runState }) {
       if (/T/.test(rawSeq))
         errs.push("Sequence contains uppercase 'T' — RNA residues use 'U' (uppercase)")
       if (/u/.test(rawSeq))
-        errs.push("Sequence contains lowercase 'u' — DNA residues use 't' (lowercase)")
+        errs.push("Sequence contains lowercase 'u' — invalid: DNA uses 't', RNA uses 'U' (uppercase)")
       if (!/^[ACGUacgt]+$/.test(rawSeq))
         errs.push('Sequence contains invalid characters — allowed: A C G U (RNA uppercase) · a c g t (DNA lowercase)')
     }
@@ -83,6 +89,66 @@ export default function SequenceForm({ onRun, runState }) {
 
   const currentErrors = validationErrors()
   const hasErrors = currentErrors.length > 0
+
+  // Mark a field as touched when user leaves it
+  const markTouched = useCallback((field) => {
+    setTouched(prev => new Set([...prev, field]))
+  }, [])
+
+  // Per-field errors — only shown for touched fields
+  const seqError = touched.has('seq') ? (() => {
+    const raw = seqVal.trim()
+    if (!raw) return 'Sequence is required'
+    if (raw.length < 4) return 'Sequence is too short (minimum 4 nucleotides)'
+    if (/T/.test(raw)) return "Sequence contains uppercase 'T' — RNA residues use 'U'"
+    if (/u/.test(raw)) return "Sequence contains lowercase 'u' — invalid: use 't' for DNA or 'U' for RNA"
+    if (!/^[ACGUacgt]+$/.test(raw)) return 'Sequence contains invalid characters'
+    return null
+  })() : null
+
+  const structError = touched.has('struct') ? (() => {
+    const struct = structVal.trim()
+    if (!struct) return 'Structure is required'
+    return null
+  })() : null
+
+  // Length mismatch — shown once under Step 1 card when either field was touched
+  const lengthMismatchError = (touched.has('seq') || touched.has('struct'))
+    && seqVal.trim() && structVal.trim()
+    && seqVal.trim().length !== structVal.trim().length
+    ? `Sequence and structure length mismatch (seq: ${seqVal.trim().length}, struct: ${structVal.trim().length})`
+    : null
+
+  const nameError = touched.has('name') && !nameVal.trim()
+    ? 'Structure name is required' : null
+
+  const chiError = touched.has('chi') && chiVal.trim() && seqVal.trim()
+    && chiVal.trim().length !== seqVal.trim().length
+    ? `Chi length (${chiVal.trim().length}) must match sequence length (${seqVal.trim().length})` : null
+
+  const sugarError = touched.has('sugar') && sugarVal.trim() && seqVal.trim()
+    && sugarVal.trim().length !== seqVal.trim().length
+    ? `Sugar pucker length (${sugarVal.trim().length}) must match sequence length (${seqVal.trim().length})` : null
+
+  // Auto-fill chiVal with dots when sequence length changes
+  useEffect(() => {
+    const len = seqVal.trim().length
+    if (len === 0) return
+    setChiVal(prev => {
+      if (prev && prev.length === len) return prev  // preserve user edits
+      return '.'.repeat(len)
+    })
+  }, [seqVal])
+
+  // Auto-generate shugarVal from sequence case: UPPERCASE→N, lowercase→S
+  useEffect(() => {
+    const seq = seqVal.trim()
+    if (!seq) { setShugarVal(''); return }
+    setShugarVal(prev => {
+      if (prev && prev.length === seq.length) return prev  // preserve user edits
+      return seq.split('').map(c => /[A-Z]/.test(c) ? 'N' : 'S').join('')
+    })
+  }, [seqVal])
 
   // Auto-derive path, twist length and orient length whenever the user
   // modifies sequence/structure or selects a different subtype.
@@ -146,7 +212,7 @@ export default function SequenceForm({ onRun, runState }) {
     if (grp?.subtypes?.length) setSubtype(grp.subtypes[0].code)
   }
 
-  const sequence    = seqVal.trim()  // original case — do NOT lowercase
+  const sequence    = seqVal.trim().toLowerCase()
   const structure   = structVal.trim()
   const hasInput    = sequence.length > 0
   const tetradCount = hasInput && structure
@@ -206,7 +272,7 @@ export default function SequenceForm({ onRun, runState }) {
     setParseError(null)
 
     const name   = nameVal.trim() || 'structure'
-    const seq    = seqVal.trim()  // original case — quadro14L.exe handles RNA/DNA distinction
+    const seq    = seqVal.trim()  // NO toLowerCase — quadro14L distinguishes case (RNA/DNA)
     const struct = structVal.trim()
 
     // Path: user-supplied raw string → split on semicolons, or null if empty
@@ -226,7 +292,7 @@ export default function SequenceForm({ onRun, runState }) {
       isTest:      isTest,
       RM_Level:    rmLevel,
       Iterations:  iterations,
-      sugarPucker: pucker,  // multi-step e.g. 'S;S' or 'N;N'
+      Shugar:      sugarVal.trim(), // per-residue sugar pucker for quadro14L .inp
     }
 
     onRun([payload])
@@ -243,17 +309,25 @@ export default function SequenceForm({ onRun, runState }) {
 
         <div className={styles.threeLineBlock}>
           {/* Line 1 — name */}
-          <div className={styles.inlineField}>
-            <span className={styles.lineNum}>1</span>
-            <span className={styles.linePrefix}>&gt;</span>
-            <input
-              type="text"
-              className={styles.inlineInput}
-              value={nameVal}
-              onChange={e => setNameVal(e.target.value)}
-              placeholder="Structure name (e.g. pz74_mp_G14L)"
-              spellCheck={false}
-            />
+          <div className={styles.inlineField} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span className={styles.lineNum}>1</span>
+              <span className={styles.linePrefix}>&gt;</span>
+              <input
+                type="text"
+                className={styles.inlineInput}
+                value={nameVal}
+                onChange={e => setNameVal(e.target.value)}
+                onBlur={() => markTouched('name')}
+                placeholder="Structure name (e.g. pz74_mp_G14L)"
+                spellCheck={false}
+              />
+            </div>
+            {nameError && (
+              <div style={{ fontSize: 12, color: 'var(--err-text)', padding: '3px 12px 5px 40px', display: 'flex', gap: 5 }}>
+                <WarnIcon />{nameError}
+              </div>
+            )}
           </div>
 
           {/* Line 2 — sequence */}
@@ -265,6 +339,7 @@ export default function SequenceForm({ onRun, runState }) {
               value={seqVal}
               onChange={e => setSeqVal(e.target.value)}
               onBlur={() => {
+                markTouched('seq')
                 const seq = seqVal.trim()
                 if (!seq || !silvaData) return
                 // Detect type: U present (uppercase) → RNA, t present (lowercase) → DNA
@@ -289,6 +364,11 @@ export default function SequenceForm({ onRun, runState }) {
               placeholder="e.g. UPPERCASE AGGGUUAGGG (RNA)  · lowercase agggttaggg (DNA) · or mixed"
               spellCheck={false}
             />
+            {seqError && (
+              <div style={{ fontSize: 12, color: 'var(--err-text)', marginTop: 3, display: 'flex', gap: 5 }}>
+                <WarnIcon />{seqError}
+              </div>
+            )}
           </div>
 
           {/* Line 3 — structure (14L format) */}
@@ -299,9 +379,15 @@ export default function SequenceForm({ onRun, runState }) {
               className={`${styles.inlineInput} ${styles.seqFont}`}
               value={structVal}
               onChange={e => setStructVal(e.target.value)}
+              onBlur={() => markTouched('struct')}
               placeholder="dot-bracket + ^ markers, length must match sequence (e.g. (((^^.^^.)))....)"
               spellCheck={false}
             />
+            {structError && (
+              <div style={{ fontSize: 12, color: 'var(--err-text)', marginTop: 3, display: 'flex', gap: 5 }}>
+                <WarnIcon />{structError}
+              </div>
+            )}
           </div>
 
         </div>
@@ -322,8 +408,14 @@ export default function SequenceForm({ onRun, runState }) {
 
         </div>
 
-        {/* Live validation errors — shown as soon as they exist, no Run needed */}
-        {hasInput && hasErrors && (
+        {/* Length mismatch — shown once under Step 1, not duplicated under each field */}
+        {lengthMismatchError && (
+          <div style={{ fontSize: 12, color: 'var(--err-text)', marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <WarnIcon />{lengthMismatchError}
+          </div>
+        )}
+
+        {parseError && (
           <div ref={errorRef} style={{
             display: 'flex', alignItems: 'flex-start', gap: 8,
             margin: '12px 0 0', padding: '10px 14px',
@@ -333,7 +425,7 @@ export default function SequenceForm({ onRun, runState }) {
           }}>
             <WarnIcon />
             <div>
-              <strong>{currentErrors[0]}</strong>
+              <strong>{parseError}</strong>
               {currentErrors.length > 1 && (
                 <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
                   {currentErrors.slice(1).map((e, i) => <li key={i}>{e}</li>)}
@@ -370,6 +462,31 @@ export default function SequenceForm({ onRun, runState }) {
           </button>
         ))}
       </div>
+
+      {/* ── Non-canonical examples — small load buttons above Advanced ── */}
+      {mode === 'noncanonical' && nonCanonical.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 0' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)', alignSelf: 'center' }}>Load example:</span>
+          {nonCanonical.map(ex => (
+            <button
+              key={ex.pdbId}
+              onClick={() => loadExample(ex.pdbId)}
+              title={ex.note}
+              style={{
+                padding: '4px 12px', fontSize: 12, fontFamily: 'var(--mono)',
+                fontWeight: 600, cursor: 'pointer',
+                border: '1px solid var(--border-med)', borderRadius: 'var(--r-sm)',
+                background: 'var(--surface)', color: 'var(--teal-dark)',
+                transition: 'background 0.12s, border-color 0.12s',
+              }}
+              onMouseOver={e => { e.currentTarget.style.background = 'var(--teal-light)'; e.currentTarget.style.borderColor = 'var(--teal)' }}
+              onMouseOut={e => { e.currentTarget.style.background = 'var(--surface)'; e.currentTarget.style.borderColor = 'var(--border-med)' }}
+            >
+              {ex.pdbId.toUpperCase()} · {ex.tetrads}T
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Step 2: Silva Loop Classification (canonical only) ── */}
       {mode === 'canonical' && <div className={styles.card}>
@@ -547,12 +664,12 @@ export default function SequenceForm({ onRun, runState }) {
               <div style={{ width: '100%' }}>
                 <input type="text"
                   style={{ width: '100%', fontFamily: 'var(--mono)', fontSize: 13 }}
-                  value={chiVal} onChange={e => setChiVal(e.target.value)}
+                  value={chiVal} onChange={e => setChiVal(e.target.value)} onBlur={() => markTouched('chi')}
                   placeholder={`${seqVal.trim().length || 0} chars — e.g. S.....S.....SS.......SS.`}
                   spellCheck={false} />
-                {chiVal && seqVal && chiVal.length !== seqVal.trim().length && (
-                  <div style={{ fontSize: 12, color: 'var(--warn-text)', marginTop: 4 }}>
-                    Chi length ({chiVal.length}) ≠ sequence length ({seqVal.trim().length})
+                {chiError && (
+                  <div style={{ fontSize: 12, color: 'var(--err-text)', marginTop: 4, display: 'flex', gap: 5 }}>
+                    <WarnIcon />{chiError}
                   </div>
                 )}
               </div>
@@ -637,30 +754,25 @@ export default function SequenceForm({ onRun, runState }) {
               </div>
             </div>
 
-            {/* Sugar pucker — dynamic per inter-tetrad step */}
-            <div className={styles.row}>
-              <div className={styles.label}>Sugar pucker<small>S=C2′-endo/DNA · N=C3′-endo/RNA</small></div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12 }}>
-                {(() => {
-                  const tetrads = Math.max(1, countTetrads(structVal.trim()) || 1)
-                  const steps   = Math.max(1, tetrads - 1)
-                  const parts   = pucker.split(';').map(s => s.trim())
-                  while (parts.length < steps) parts.push(parts[0] || 'S')
-                  if (parts.length > steps) parts.length = steps
-                  return parts.map((val, i) => (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
-                        T{i+1}→T{i+2}
-                      </span>
-                      <select value={val}
-                        onChange={e => { const n=[...parts]; n[i]=e.target.value; setPucker(n.join(';')) }}
-                        style={{ width: 72, fontFamily: 'var(--mono)' }}>
-                        <option value="S">S</option>
-                        <option value="N">N</option>
-                      </select>
-                    </div>
-                  ))
-                })()}
+            {/* Sugar pucker — per residue (like Chi), N=North/RNA, S=South/DNA */}
+            <div className={styles.rowTop}>
+              <div className={styles.label}>
+                Sugar pucker
+                <small>N = North / RNA · S = South / DNA · . = default · one char per residue</small>
+              </div>
+              <div style={{ width: '100%' }}>
+                <input type="text"
+                  style={{ width: '100%', fontFamily: 'var(--mono)', fontSize: 13 }}
+                  value={sugarVal}
+                  onChange={e => setShugarVal(e.target.value)}
+                  onBlur={() => markTouched('sugar')}
+                  placeholder={`${seqVal.trim().length || 0} chars — auto-generated (UPPERCASE=RNA→N, lowercase=DNA→S)`}
+                  spellCheck={false} />
+                {sugarError && (
+                  <div style={{ fontSize: 12, color: 'var(--err-text)', marginTop: 4, display: 'flex', gap: 5 }}>
+                    <WarnIcon />{sugarError}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -671,14 +783,7 @@ export default function SequenceForm({ onRun, runState }) {
 
       {/* Submit */}
       <div className={styles.submitArea} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-        {hasErrors && hasInput && (
-          <div style={{ fontSize: 12, color: 'var(--err-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <WarnIcon />
-            {currentErrors.length === 1
-              ? currentErrors[0]
-              : `${currentErrors.length} validation errors — fix before running`}
-          </div>
-        )}
+
         <button
           className={styles.btnRun}
           onClick={handleSubmit}

@@ -27,9 +27,8 @@ public sealed class ValidationResult
 public sealed class QuadroInputValidator : IValidator<QuadroInput>
 {
     // UPPERCASE = RNA (A,C,G,U) · lowercase = DNA (a,c,g,t) · mixed sequences allowed.
-    // Also accept lowercase 'u' from round-tripped .inp files (quadro14L stores sequences lowercase).
-    private static readonly HashSet<char> AllowedChars = ['A','C','G','U','a','c','g','t','u'];
-    private static readonly HashSet<char> AllowedPucker = ['N', 'S'];
+    // Invalid: uppercase T, lowercase u (quadro14L only accepts: a,c,g,t or A,C,G,U).
+    private static readonly HashSet<char> AllowedChars = ['A','C','G','U','a','c','g','t'];
 
     private const double MaxRise  = 10.0;
     private const double MinRise  = 1.0;
@@ -71,15 +70,20 @@ public sealed class QuadroInputValidator : IValidator<QuadroInput>
         // ── Twist (multi-step string) ─────────────────────────────────────────
         ValidateMultiValueField(input.Twist, "Twist", MinTwist, MaxTwist, errors);
 
-        // ── SugarPucker (multi-step string) ──────────────────────────────────
-        if (!string.IsNullOrWhiteSpace(input.SugarPucker))
+        // ── Shugar (per-residue, like Chi) ───────────────────────────────────
+        if (!string.IsNullOrEmpty(input.Sugar)
+            && !string.IsNullOrEmpty(input.Sequence)
+            && input.Sugar.Length != input.Sequence.Length)
         {
-            var parts = input.SugarPucker.Split(';', StringSplitOptions.TrimEntries);
-            foreach (var (part, idx) in parts.Select((p, i) => (p, i)))
-            {
-                if (part.Length != 1 || !AllowedPucker.Contains(part[0]))
-                    errors.Add($"SugarPucker step {idx + 1}: must be 'N' or 'S', got '{part}'.");
-            }
+            errors.Add($"Sugar length ({input.Sugar.Length}) must match sequence length ({input.Sequence.Length}).");
+        }
+        if (!string.IsNullOrEmpty(input.Sugar))
+        {
+            var invalidShugar = input.Sugar
+                .Where(c => c != 'N' && c != 'n' && c != 'S' && c != 's' && c != '.')
+                .Distinct().ToArray();
+            if (invalidShugar.Length > 0)
+                errors.Add($"Sugar contains invalid characters: '{string.Join("', '", invalidShugar)}'. Allowed: N, S, .");
         }
 
         // ── Path ──────────────────────────────────────────────────────────────
@@ -117,9 +121,12 @@ public sealed class QuadroInputValidator : IValidator<QuadroInput>
         }
 
         // Uppercase T is invalid (RNA uses U, not T).
-        // Lowercase 'u' is allowed — quadro14L .inp format stores sequences lowercase.
+        // Lowercase u is invalid — DNA uses t, RNA uses U (uppercase).
+        // quadro14L only accepts: a,c,g,t (DNA) and A,C,G,U (RNA).
         if (sequence.Contains('T'))
             errors.Add("Sequence contains uppercase 'T' — RNA residues must use 'U' (uppercase).");
+        if (sequence.Contains('u'))
+            errors.Add("Sequence contains lowercase 'u' — invalid: DNA uses 't', RNA uses 'U' (uppercase).");
 
         var invalid = sequence.Where(c => !AllowedChars.Contains(c)).Distinct().ToArray();
         if (invalid.Length > 0)

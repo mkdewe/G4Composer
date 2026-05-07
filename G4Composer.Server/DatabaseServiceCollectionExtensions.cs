@@ -19,7 +19,9 @@ public static class DatabaseServiceCollectionExtensions
             // and change the connection string in appsettings.Production.json.
             // Code below stays identical — only the provider changes.
             services.AddDbContext<AppDbContext>(opt =>
-                opt.UseNpgsql(connectionString));
+                opt.UseNpgsql(connectionString)
+                   .ConfigureWarnings(w => w.Ignore(
+                       Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
         }
         else
         {

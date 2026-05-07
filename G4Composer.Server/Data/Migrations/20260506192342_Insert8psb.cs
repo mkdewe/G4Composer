@@ -19,14 +19,14 @@ namespace G4Composer.Server.Data.Migrations
         VALUES
           ('8psb',
            '3T non-canonical, DNA/RNA mixed backbone, 3-prime snapback lateral, RMSD 4.0',
-           3, 0, '8psb_test',
+           3, false, '8psb_test',
            'agggtagggcggcggggacgggt',
            '.^^^..^^^.^^.^^^.....^.',
            '.......................',
            'A-;B-;C-',
            '3.4', '29;29',
            'A1;B1;C1;A4;B4;C4;A3;B3;A2;B2;C2;C3',
-           0, 0, 100,
+           false, 0, 100,
            NULL);
     ");
         }

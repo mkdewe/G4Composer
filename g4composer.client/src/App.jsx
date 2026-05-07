@@ -53,7 +53,7 @@ export default function App() {
       setRuns(prev => prev.map(r => r.id === runId ? { ...r, ...patch } : r))
 
     try {
-      const { blob, headers, dockerLog } = await runQuadro11(inputs, (msg) => {
+      const { blob, headers, dockerLog, stdEnergy, altEnergy, hasAlt, winner, altBlob, altUrl } = await runQuadro11(inputs, (msg) => {
         setCurrentStatus(msg)
         updateRun({ status: msg })
       })
@@ -64,11 +64,16 @@ export default function App() {
       const elapsed = headers.get('X-Elapsed-Ms') || null
 
       updateRun({
-        state:     'done',
-        status:    `Model generated · ${atoms} atoms · Job ${jobId}`,
-        pdbBlob:   blob,
-        pdbUrl:    url,
-        dockerLog: dockerLog || '',
+        state:      'done',
+        status:     `Model generated · ${atoms} atoms · Job ${jobId}`,
+        pdbBlob:    blob,
+        pdbUrl:     url,
+        dockerLog:  dockerLog || '',
+        stdEnergy,
+        altEnergy,
+        winner,
+        altBlob,
+        altUrl,
         jobInfo: {
           jobId,
           atoms,

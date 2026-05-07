@@ -34,6 +34,7 @@ public sealed class QuadroController : ControllerBase
     private readonly IValidator<QuadroInput> _validator;
     private readonly QuadroOptions _options;
     private readonly IJobLogStore _logStore;
+    private readonly IAltPdbStore _altPdbStore;
 
     public QuadroController(
         ILogger<QuadroController> logger,
@@ -42,7 +43,8 @@ public sealed class QuadroController : ControllerBase
         IQuadroJobRunner jobRunner,
         IValidator<QuadroInput> validator,
         IOptions<QuadroOptions> options,
-        IJobLogStore logStore)
+        IJobLogStore logStore,
+        IAltPdbStore altPdbStore)
     {
         _logger = logger;
         _engineSelector = engineSelector;
@@ -51,6 +53,7 @@ public sealed class QuadroController : ControllerBase
         _validator = validator;
         _options = options.Value;
         _logStore = logStore;
+        _altPdbStore = altPdbStore;
     }
 
     // ── Health ───────────────────────────────────────────────────────────────
@@ -133,19 +136,32 @@ public sealed class QuadroController : ControllerBase
                     InpContent: engine.SerializeInput(inp)))
                 .ToList();
 
-            var pdbContent = await _jobRunner.RunAsync(jobId, jobDir, items, jobCts.Token);
+            var result = await _jobRunner.RunAsync(jobId, jobDir, items, jobCts.Token);
 
-            if (pdbContent is null || pdbContent.Length == 0)
+            if (!result.Standard.Success || result.Standard.Pdb is null || result.Standard.Pdb.Length == 0)
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ErrorDto("Container did not produce a PDB file."));
 
-            _logger.LogInformation("Job {JobId}: success, {Bytes} bytes", jobId, pdbContent.Length);
+            _logger.LogInformation("Job {JobId}: success, {Bytes} bytes (std), altSuccess={AltOk}",
+                jobId, result.Standard.Pdb.Length, result.Alternative.Success);
 
-            Response.Headers["X-Job-Id"]                       = jobId;
-            Response.Headers["X-Atom-Count"]                   = CountPdbAtoms(pdbContent).ToString();
-            Response.Headers["Access-Control-Expose-Headers"]  = "X-Job-Id, X-Atom-Count";
+            // Store alt PDB for later retrieval via GET /alt-pdb/{jobId}
+            if (result.Alternative.Success && result.Alternative.Pdb is not null)
+                _altPdbStore.Store(jobId, result.Alternative.Pdb);
 
-            return File(pdbContent, "chemical/x-pdb", $"g4_{jobId}.pdb");
+            var stdEnergy = result.Standard.Etotal?.ToString("F3", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            var altEnergy = result.Alternative.Etotal?.ToString("F3", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+
+            Response.Headers["X-Job-Id"]      = jobId;
+            Response.Headers["X-Atom-Count"]  = CountPdbAtoms(result.Standard.Pdb).ToString();
+            Response.Headers["X-Std-Energy"]  = stdEnergy;
+            Response.Headers["X-Alt-Energy"]  = altEnergy;
+            Response.Headers["X-Has-Alt"]     = result.Alternative.Success ? "1" : "0";
+            Response.Headers["X-Winner"]      = result.Winner ?? "standard";
+            Response.Headers["Access-Control-Expose-Headers"] =
+                "X-Job-Id, X-Atom-Count, X-Std-Energy, X-Alt-Energy, X-Has-Alt, X-Winner";
+
+            return File(result.Standard.Pdb, "chemical/x-pdb", $"g4_{jobId}.pdb");
         }
         catch (OperationCanceledException) when (jobCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
@@ -170,6 +186,21 @@ public sealed class QuadroController : ControllerBase
             // Sprzątanie w tle — nie blokuje odpowiedzi.
             _ = Task.Run(() => CleanupJobDir(jobDir));
         }
+    }
+
+    // ── Alt PDB ──────────────────────────────────────────────────────────────
+
+    [HttpGet("alt-pdb/{jobId}")]
+    [SwaggerOperation(Summary = "Get alternative-engine PDB for a completed job", Tags = [SwaggerTag])]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "chemical/x-pdb")]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult GetAltPdb(string jobId)
+    {
+        var pdb = _altPdbStore.Get(jobId);
+        if (pdb is null)
+            return NotFound(new ErrorDto($"Alternative PDB for job '{jobId}' not found (may have expired or not been generated)."));
+
+        return File(pdb, "chemical/x-pdb", $"g4_{jobId}_alt.pdb");
     }
 
     // ── Log ──────────────────────────────────────────────────────────────────

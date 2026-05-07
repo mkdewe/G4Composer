@@ -3,6 +3,28 @@
   "WorkspaceRootPath": "D:\\Studia\\Projekty\\G4Composer\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\g4composer\\g4composer.server\\quadroservicecollectionextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\quadroservicecollectionextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\darek\\Downloads\\files (3)\\AltPdbStore.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\darek\\Downloads\\files (3)\\DualRunResult.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\g4composer\\g4composer.server\\models\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\models\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|d:\\studia\\projekty\\g4composer\\g4composer.client\\src\\components\\runlog.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|solutionrelative:g4composer.client\\src\\components\\runlog.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\g4composer\\g4composer.server\\services\\quadrojobrunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\services\\quadrojobrunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\g4composer\\g4composer.server\\data\\migrations\\20260506192342_insert8psb.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\data\\migrations\\20260506192342_insert8psb.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -21,18 +43,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|d:\\studia\\projekty\\g4composer\\g4composer.client\\src\\components\\sectionpages.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
       "RelativeMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|solutionrelative:g4composer.client\\src\\components\\sectionpages.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|d:\\studia\\projekty\\g4composer\\g4composer.client\\src\\components\\runlog.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
-      "RelativeMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|solutionrelative:g4composer.client\\src\\components\\runlog.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\g4composer\\g4composer.server\\services\\quadrojobrunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\services\\quadrojobrunner.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|d:\\studia\\projekty\\g4composer\\g4composer.server\\models\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CFF11BA4-16BA-961D-71F7-F8B7CA9D5695}|G4Composer.Server\\G4Composer.Server.csproj|solutionrelative:g4composer.server\\models\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{EDDC1676-B5A3-39CD-8643-1B10A0E01B59}|g4composer.client\\g4composer.client.esproj|d:\\studia\\projekty\\g4composer\\g4composer.client\\src\\utils\\sequenceparser.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
@@ -81,6 +91,41 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "QuadroServiceCollectionExtensions.cs",
+              "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\QuadroServiceCollectionExtensions.cs",
+              "RelativeDocumentMoniker": "G4Composer.Server\\QuadroServiceCollectionExtensions.cs",
+              "ToolTip": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\QuadroServiceCollectionExtensions.cs",
+              "RelativeToolTip": "G4Composer.Server\\QuadroServiceCollectionExtensions.cs",
+              "ViewState": "AgIAAA4AAAAAAAAAAAAIwCEAAABDAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-07T11:03:26.948Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "AltPdbStore.cs",
+              "DocumentMoniker": "C:\\Users\\darek\\Downloads\\files (3)\\AltPdbStore.cs",
+              "ToolTip": "C:\\Users\\darek\\Downloads\\files (3)\\AltPdbStore.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-07T11:00:05.188Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "DualRunResult.cs",
+              "DocumentMoniker": "C:\\Users\\darek\\Downloads\\files (3)\\DualRunResult.cs",
+              "ToolTip": "C:\\Users\\darek\\Downloads\\files (3)\\DualRunResult.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-07T10:59:59.468Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
               "Title": "20260506192342_Insert8psb.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Data\\Migrations\\20260506192342_Insert8psb.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Data\\Migrations\\20260506192342_Insert8psb.cs",
@@ -93,7 +138,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 7,
               "Title": "20260506192008_NullableSilvaSubtypeId.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Data\\Migrations\\20260506192008_NullableSilvaSubtypeId.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Data\\Migrations\\20260506192008_NullableSilvaSubtypeId.cs",
@@ -105,7 +150,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 9,
               "Title": "Entities.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Data\\Entities\\Entities.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Data\\Entities\\Entities.cs",
@@ -117,7 +162,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 4,
               "Title": "RunLog.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\RunLog.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\RunLog.jsx",
@@ -125,11 +170,12 @@
               "RelativeToolTip": "g4composer.client\\src\\components\\RunLog.jsx",
               "ViewState": "AgIAAAAAAAAAAAAAAAAswAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
-              "WhenOpened": "2026-05-01T14:38:52.207Z"
+              "WhenOpened": "2026-05-01T14:38:52.207Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 3,
               "Title": "Dtos.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Models\\Dtos.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Models\\Dtos.cs",
@@ -137,23 +183,25 @@
               "RelativeToolTip": "G4Composer.Server\\Models\\Dtos.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-01T15:13:50.173Z"
+              "WhenOpened": "2026-05-01T15:13:50.173Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 5,
               "Title": "QuadroJobRunner.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Services\\QuadroJobRunner.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Services\\QuadroJobRunner.cs",
               "ToolTip": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Services\\QuadroJobRunner.cs",
               "RelativeToolTip": "G4Composer.Server\\Services\\QuadroJobRunner.cs",
-              "ViewState": "AgIAAOAAAAAAAAAAAAAAAO0AAAAuAAAAAAAAAA==",
+              "ViewState": "AgIAAOAAAAAAAAAAAAAAAO0AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-30T00:20:19.042Z"
+              "WhenOpened": "2026-04-30T00:20:19.042Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 10,
               "Title": "SectionPages.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\SectionPages.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\SectionPages.jsx",
@@ -165,7 +213,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 8,
               "Title": "BatchSection.jsx",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\components\\BatchSection.jsx",
               "RelativeDocumentMoniker": "g4composer.client\\src\\components\\BatchSection.jsx",
@@ -177,7 +225,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 11,
               "Title": "sequenceParser.js",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\g4composer.client\\src\\utils\\sequenceParser.js",
               "RelativeDocumentMoniker": "g4composer.client\\src\\utils\\sequenceParser.js",
@@ -189,7 +237,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 12,
               "Title": "appsettings.json",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\appsettings.json",
               "RelativeDocumentMoniker": "G4Composer.Server\\appsettings.json",
@@ -201,7 +249,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 13,
               "Title": "QuadroOptions.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Configuration\\QuadroOptions.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Configuration\\QuadroOptions.cs",
@@ -213,7 +261,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 14,
               "Title": "QuadroEngineSelector.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Engines\\QuadroEngineSelector.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Engines\\QuadroEngineSelector.cs",
@@ -225,7 +273,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 15,
               "Title": "QuadroEngines.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Engines\\QuadroEngines.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Engines\\QuadroEngines.cs",
@@ -237,7 +285,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 16,
               "Title": "IQuadroEngine.cs",
               "DocumentMoniker": "D:\\Studia\\Projekty\\G4Composer\\G4Composer.Server\\Engines\\IQuadroEngine.cs",
               "RelativeDocumentMoniker": "G4Composer.Server\\Engines\\IQuadroEngine.cs",

@@ -114,12 +114,37 @@ export async function runQuadro11(inputs, onProgress) {
       ? blob
       : new Blob([blob], { type: 'chemical/x-pdb' })
 
+    // Read energy + dual-run headers
+    const jobId     = response.headers.get('X-Job-Id')
+    const stdEnergy = response.headers.get('X-Std-Energy')
+    const altEnergy = response.headers.get('X-Alt-Energy')
+    const hasAlt    = response.headers.get('X-Has-Alt') === '1'
+    const winner    = response.headers.get('X-Winner') || 'standard'
+
+    // Fetch alternative PDB if available
+    let altBlob = null
+    let altUrl  = null
+    if (hasAlt && jobId) {
+      try {
+        const altRes = await fetch(`/api/quadro11/alt-pdb/${jobId}`)
+        if (altRes.ok) {
+          const raw = await altRes.blob()
+          altBlob   = raw.type === 'chemical/x-pdb' ? raw : new Blob([raw], { type: 'chemical/x-pdb' })
+          altUrl    = URL.createObjectURL(altBlob)
+        }
+      } catch { /* alt PDB is best-effort, don't fail the whole run */ }
+    }
+
     // Fetch Docker execution log (best-effort, non-blocking)
-    const jobId = response.headers.get('X-Job-Id')
     const dockerLog = jobId ? await fetchDockerLog(jobId) : ''
 
     onProgress?.('Loading structure into Mol*…')
-    return { blob: finalBlob, headers: response.headers, dockerLog }
+    return {
+      blob: finalBlob, headers: response.headers, dockerLog,
+      stdEnergy: stdEnergy ? parseFloat(stdEnergy) : null,
+      altEnergy:  altEnergy  ? parseFloat(altEnergy)  : null,
+      hasAlt, winner, altBlob, altUrl,
+    }
 
   } catch (err) {
     clearTimeout(timeoutId)

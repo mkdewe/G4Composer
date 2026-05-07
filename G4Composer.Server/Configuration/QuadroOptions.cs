@@ -39,6 +39,13 @@ public sealed class QuadroOptions
     /// <summary>Katalog wewnątrz kontenera podmontowywany z hosta (mount target).</summary>
     public string ContainerDataDirectory { get; set; } = "/data";
 
+    /// <summary>
+    /// Executable name of the alternative engine run in parallel alongside the standard one.
+    /// Set to null to disable dual-run mode. Example: "alternatywa14L.exe".
+    /// The alternative engine uses the same Docker image as the active engine.
+    /// </summary>
+    public string? AlternativeExecutable { get; set; } = null;
+
     /// <summary>Słownik konfiguracji per-wersja silnika.</summary>
     public Dictionary<string, EngineConfig> Engines { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {

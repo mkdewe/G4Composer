@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import SequenceForm from './SequenceForm.jsx'
 import MolstarViewer from './MolstarViewer.jsx'
 import PdbPreview from './PdbPreview.jsx'
@@ -16,16 +16,37 @@ export default function BuildSection({
   onSelectRun,
   onRemoveRun,
 }) {
-  const [activeTab, setActiveTab] = useState('viewer')
+  const [activeTab,   setActiveTab]   = useState('viewer')
+  const [viewEngine,  setViewEngine]  = useState('standard')  // 'standard' | 'alternative'
+
+  // Auto-select the lower-energy model when a run completes.
+  // Runs on run-id change (new tab) or state→done transition.
+  // Does NOT reset when switching between existing tabs — user's choice is preserved.
+  const prevRunIdRef = useRef(null)
+  useEffect(() => {
+    if (!activeRun) return
+    const isNewRun = activeRun.id !== prevRunIdRef.current
+    prevRunIdRef.current = activeRun.id
+    if (isNewRun || activeRun.state === 'done') {
+      // Only auto-select on new run completion, not on tab switch
+      if (isNewRun && activeRun.state !== 'done') return
+      setViewEngine(activeRun.winner ?? 'standard')
+    }
+  }, [activeRun?.id, activeRun?.state, activeRun?.winner])
 
   const isRunning = activeRun?.state === 'running' ||
     runs.some(r => r.state === 'running')
 
+  // Resolve which PDB is currently displayed
+  const activePdbBlob = (viewEngine === 'alternative' && activeRun?.altBlob) ? activeRun.altBlob : activeRun?.pdbBlob
+  const activePdbUrl  = (viewEngine === 'alternative' && activeRun?.altUrl)  ? activeRun.altUrl  : activeRun?.pdbUrl
+  const activeEngineLabel = viewEngine === 'alternative' ? 'alt' : 'std'
+
   function downloadPdb() {
-    if (!activeRun?.pdbBlob) return
+    if (!activePdbBlob) return
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(activeRun.pdbBlob)
-    a.download = `${sanitiseName(activeRun.name)}_g4.pdb`
+    a.href = URL.createObjectURL(activePdbBlob)
+    a.download = `${sanitiseName(activeRun.name)}_${activeEngineLabel}.pdb`
     a.click()
   }
 
@@ -110,19 +131,51 @@ export default function BuildSection({
                   )}
                   <button
                     className={`${styles.actionBtn} ${styles.actionPrimary}`}
-                    disabled={!activeRun.pdbBlob}
+                    disabled={!activePdbBlob}
                     onClick={downloadPdb}
+                    title={`Download ${activeEngineLabel} PDB · Energy ${viewEngine === 'alternative' ? activeRun.altEnergy?.toFixed(1) : activeRun.stdEnergy?.toFixed(1)}`}
                   >
                     ↓ .pdb
                   </button>
                 </div>
               </div>
 
+              {/* Energy comparison bar — shown when both engines ran */}
+              {(activeRun.stdEnergy != null || activeRun.altEnergy != null) && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 16,
+                  padding: '8px 16px', borderBottom: '1px solid var(--border)',
+                  background: 'var(--surface2)', fontSize: 12,
+                  fontFamily: 'var(--mono)',
+                }}>
+                  <span style={{ color: 'var(--text-dim)', marginRight: 4 }}>Energy</span>
+                  <EnergyBadge
+                    label="Standard"
+                    energy={activeRun.stdEnergy}
+                    isWinner={activeRun.winner === 'standard'}
+                    isActive={viewEngine === 'standard'}
+                    onClick={() => setViewEngine('standard')}
+                  />
+                  {activeRun.altEnergy != null && (
+                    <EnergyBadge
+                      label="Alternative"
+                      energy={activeRun.altEnergy}
+                      isWinner={activeRun.winner === 'alternative'}
+                      isActive={viewEngine === 'alternative'}
+                      onClick={() => setViewEngine('alternative')}
+                    />
+                  )}
+                  <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 'auto' }}>
+                    lower = better minimization
+                  </span>
+                </div>
+              )}
+
               {/* Tab content */}
               <div className={styles.tabBody}>
                 {activeTab === 'viewer' && (
                   <MolstarViewer
-                    pdbUrl={activeRun.pdbUrl}
+                    pdbUrl={activePdbUrl}
                     runState={activeRun.state}
                     runStatus={activeRun.status}
                     structureName={activeRun.name}
@@ -177,6 +230,34 @@ function StatusItem({ label, value, mono }) {
     <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#888' }}>
       <span style={{ color: '#bbb', marginRight: 4 }}>{label}</span>
       <span style={{ color: '#555', fontWeight: mono ? 600 : 400 }}>{value}</span>
+    </span>
+  )
+}
+
+function EnergyBadge({ label, energy, isWinner, isActive, onClick }) {
+  return (
+    <span
+      onClick={onClick}
+      title={onClick ? `Click to view this model in Mol*` : undefined}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '3px 10px', borderRadius: 'var(--r-sm)',
+        border: `1px solid ${isActive ? 'var(--teal)' : 'var(--border-med)'}`,
+        background: isActive ? 'var(--teal-light)' : 'var(--surface)',
+        cursor: onClick ? 'pointer' : 'default',
+        outline: isActive ? '2px solid var(--teal)' : 'none',
+        outlineOffset: 1,
+        transition: 'background 0.12s, border-color 0.12s',
+      }}
+    >
+      <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{label}</span>
+      <span style={{
+        color: isWinner ? 'var(--teal-dark)' : 'var(--text)',
+        fontWeight: isWinner ? 700 : 400,
+      }}>
+        {energy != null ? energy.toFixed(1) : '—'}
+      </span>
+      {isWinner && <span style={{ fontSize: 10, color: 'var(--teal-dark)' }}>★</span>}
     </span>
   )
 }

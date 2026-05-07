@@ -23,7 +23,7 @@ export default function RunLog({ runState, jobInfo, runStatus, dockerLog }) {
       {jobInfo && (
         <div style={{
           display: 'flex', gap: 24, padding: '10px 16px',
-          background: 'var(--surface2)', borderBottom: '1px solid var(--border)',
+          background: 'var(--surface)', borderBottom: '1px solid var(--border)',
           fontSize: 12, fontFamily: 'var(--mono)', flexWrap: 'wrap',
         }}>
           <MetaItem label="Job ID"    value={jobInfo.jobId} />
@@ -124,8 +124,8 @@ export default function RunLog({ runState, jobInfo, runStatus, dockerLog }) {
 function MetaItem({ label, value, color }) {
   return (
     <span>
-      <span style={{ color: '#9ca3af', marginRight: 5 }}>{label}</span>
-      <span style={{ color: color || '#e5e7eb', fontWeight: 500 }}>{value}</span>
+      <span style={{ color: '#6b7280', marginRight: 5 }}>{label}</span>
+      <span style={{ color: color || '#111827', fontWeight: 600 }}>{value}</span>
     </span>
   )
 }

@@ -14,7 +14,7 @@ import { runQuadro11, fetchSilvaGroups } from '../services/apiService.js'
  * job, and parallelism would compete for the same image and easily hit timeouts.
  */
 export default function BatchSection() {
-  const [items, setItems]         = useState([])  // [{ id, name, source, input, status, error?, pdbBlob? }]
+  const [items, setItems]         = useState([])  // [{ id, name, source, input, status, error?, pdbBlob?, altBlob?, stdEnergy?, altEnergy?, winner? }]
   const [silvaData, setSilvaData] = useState(null)  // classification data for topology validation
   const [isRunning, setIsRunning] = useState(false)
   const [globalErr, setGlobalErr] = useState(null)
@@ -71,6 +71,10 @@ export default function BatchSection() {
           status:   p.error ? 'error' : 'pending',
           error:    p.error,
           pdbBlob:  null,
+          altBlob:  null,
+          stdEnergy: null,
+          altEnergy: null,
+          winner:   null,
         })
       }
     }
@@ -122,9 +126,9 @@ export default function BatchSection() {
         i.id === item.id ? { ...i, status: 'running', error: null } : i
       ))
       try {
-        const { blob } = await runQuadro11([item.input])
+        const { blob, altBlob, stdEnergy, altEnergy, winner } = await runQuadro11([item.input])
         setItems(prev => prev.map(i =>
-          i.id === item.id ? { ...i, status: 'done', pdbBlob: blob } : i
+          i.id === item.id ? { ...i, status: 'done', pdbBlob: blob, altBlob: altBlob || null, stdEnergy: stdEnergy || null, altEnergy: altEnergy || null, winner: winner || 'standard' } : i
         ))
       } catch (err) {
         setItems(prev => prev.map(i =>
@@ -140,11 +144,12 @@ export default function BatchSection() {
   }
 
   // ── Downloads ──────────────────────────────────────────────────────────
-  const downloadOne = (item) => {
-    if (!item.pdbBlob) return
+  const downloadOne = (item, variant = 'std') => {
+    const blob = variant === 'alt' ? item.altBlob : item.pdbBlob
+    if (!blob) return
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(item.pdbBlob)
-    a.download = `${sanitiseName(item.name)}.pdb`
+    a.href = URL.createObjectURL(blob)
+    a.download = `${sanitiseName(item.name)}_${variant}.pdb`
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 5000)
   }
@@ -157,8 +162,13 @@ export default function BatchSection() {
     const { default: JSZip } = await import('jszip')
     const zip = new JSZip()
     for (const item of successful) {
-      const text = await item.pdbBlob.text()
-      zip.file(`${sanitiseName(item.name)}.pdb`, text)
+      const stdText = await item.pdbBlob.text()
+      const name    = sanitiseName(item.name)
+      zip.file(`${name}_std.pdb`, stdText)
+      if (item.altBlob) {
+        const altText = await item.altBlob.text()
+        zip.file(`${name}_alt.pdb`, altText)
+      }
     }
     const blob = await zip.generateAsync({ type: 'blob' })
     const a = document.createElement('a')
@@ -245,7 +255,8 @@ export default function BatchSection() {
               <span style={{ flex: 1 }}>Name</span>
               <span style={{ width: 140 }}>Source</span>
               <span style={{ width: 110 }}>Status</span>
-              <span style={{ width: 90, textAlign: 'right' }}>Actions</span>
+              <span style={{ width: 130, fontFamily: 'var(--mono)', fontSize: 11 }}>Energy (Energy)</span>
+              <span style={{ width: 110, textAlign: 'right' }}>Actions</span>
             </div>
             {items.map((it, i) => (
               <div key={it.id} className={styles.entryRow} title={it.error || ''}>
@@ -259,16 +270,47 @@ export default function BatchSection() {
                 <span style={{ width: 110 }}>
                   <StatusBadge status={it.status} />
                 </span>
-                <span style={{ width: 90, textAlign: 'right', display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                <span style={{ width: 130, fontFamily: 'var(--mono)', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {it.stdEnergy != null && (
+                    <span title="Standard engine">
+                      <span style={{ color: 'var(--text-dim)', marginRight: 3 }}>std</span>
+                      <span style={{ color: it.winner === 'standard' ? 'var(--teal-dark)' : 'var(--text)', fontWeight: it.winner === 'standard' ? 700 : 400 }}>
+                        {it.stdEnergy.toFixed(1)}{it.winner === 'standard' ? ' ★' : ''}
+                      </span>
+                    </span>
+                  )}
+                  {it.altEnergy != null && (
+                    <span title="Alternative engine">
+                      <span style={{ color: 'var(--text-dim)', marginRight: 3 }}>alt</span>
+                      <span style={{ color: it.winner === 'alternative' ? 'var(--teal-dark)' : 'var(--text)', fontWeight: it.winner === 'alternative' ? 700 : 400 }}>
+                        {it.altEnergy.toFixed(1)}{it.winner === 'alternative' ? ' ★' : ''}
+                      </span>
+                    </span>
+                  )}
+                </span>
+                <span style={{ width: 110, textAlign: 'right', display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                   {it.status === 'done' && (
-                    <button
-                      onClick={() => downloadOne(it)}
-                      className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
-                      title="Download .pdb"
-                      aria-label="Download .pdb"
-                    >
-                      <DownloadIcon />
-                    </button>
+                    <>
+                      <button
+                        onClick={() => downloadOne(it, 'std')}
+                        className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
+                        title="Download standard .pdb"
+                        aria-label="Download standard .pdb"
+                      >
+                        <DownloadIcon />
+                      </button>
+                      {it.altBlob && (
+                        <button
+                          onClick={() => downloadOne(it, 'alt')}
+                          className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
+                          title="Download alternative .pdb"
+                          aria-label="Download alternative .pdb"
+                          style={{ opacity: 0.7 }}
+                        >
+                          <DownloadIcon />
+                        </button>
+                      )}
+                    </>
                   )}
                   {!isRunning && (
                     <button

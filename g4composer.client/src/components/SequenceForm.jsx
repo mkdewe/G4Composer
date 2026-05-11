@@ -760,7 +760,7 @@ export default function SequenceForm({ onRun, runState }) {
                 Sugar pucker
                 <small>N = North / RNA · S = South / DNA · . = default · one char per residue</small>
               </div>
-              <div style={{ width: '100%' }}>
+                <div style={{ width: '100%', paddingTop: 22 }}>
                 <input type="text"
                   style={{ width: '100%', fontFamily: 'var(--mono)', fontSize: 13 }}
                   value={sugarVal}

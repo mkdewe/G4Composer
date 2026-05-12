@@ -6,6 +6,6 @@
     <Import Project="$(NuGetPackageRoot)mono.texttemplating\3.0.0\buildTransitive\Mono.TextTemplating.targets" Condition="Exists('$(NuGetPackageRoot)mono.texttemplating\3.0.0\buildTransitive\Mono.TextTemplating.targets')" />
     <Import Project="$(NuGetPackageRoot)microsoft.visualstudio.azure.containers.tools.targets\1.23.0\build\Microsoft.VisualStudio.Azure.Containers.Tools.Targets.targets" Condition="Exists('$(NuGetPackageRoot)microsoft.visualstudio.azure.containers.tools.targets\1.23.0\build\Microsoft.VisualStudio.Azure.Containers.Tools.Targets.targets')" />
     <Import Project="$(NuGetPackageRoot)microsoft.codeanalysis.analyzers\3.11.0\buildTransitive\Microsoft.CodeAnalysis.Analyzers.targets" Condition="Exists('$(NuGetPackageRoot)microsoft.codeanalysis.analyzers\3.11.0\buildTransitive\Microsoft.CodeAnalysis.Analyzers.targets')" />
-    <Import Project="$(NuGetPackageRoot)microsoft.aspnetcore.spaproxy\10.0.7\build\Microsoft.AspNetCore.SpaProxy.targets" Condition="Exists('$(NuGetPackageRoot)microsoft.aspnetcore.spaproxy\10.0.7\build\Microsoft.AspNetCore.SpaProxy.targets')" />
+    <Import Project="$(NuGetPackageRoot)microsoft.aspnetcore.spaproxy\10.0.8\build\Microsoft.AspNetCore.SpaProxy.targets" Condition="Exists('$(NuGetPackageRoot)microsoft.aspnetcore.spaproxy\10.0.8\build\Microsoft.AspNetCore.SpaProxy.targets')" />
   </ImportGroup>
 </Project>

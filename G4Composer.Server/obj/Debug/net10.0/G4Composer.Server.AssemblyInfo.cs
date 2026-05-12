@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("G4Composer.Server")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b4c7c63071b54c58ba8f888ee8ff861b8aa09fbf")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4cdda9959652b9aed71ecf135185efa700bcb166")]
 [assembly: System.Reflection.AssemblyProductAttribute("G4Composer.Server")]
 [assembly: System.Reflection.AssemblyTitleAttribute("G4Composer.Server")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

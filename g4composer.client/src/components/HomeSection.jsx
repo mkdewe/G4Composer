@@ -170,7 +170,7 @@ export default function HomeSection() {
       <div className={styles.inputRow}>
         <div className={styles.seqWrapper}>
           <label className={styles.seqLabel} htmlFor="pipeline-seq">
-            RNA / G4 Sequence
+            G4 Sequence
           </label>
           <input
             id="pipeline-seq"

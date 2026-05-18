@@ -605,8 +605,8 @@ export default function SequenceForm({ onRun, runState }) {
 
                 {(advOpen || mode === 'noncanonical') && (
                     <div>
-                        {/* Sequence summary — reference while editing advanced fields */}
-                        {(nameVal || seqVal || structVal) && (
+                        {/* Sequence summary — shown in canonical mode only (in noncanonical it's visible directly above) */}
+                        {mode === 'canonical' && (nameVal || seqVal || structVal) && (
                             <div style={{
                                 padding: '8px 14px', background: 'var(--surface2)',
                                 border: '1px solid var(--border)', borderRadius: 'var(--r-md)',

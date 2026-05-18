@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import Nav from './components/Nav.jsx'
 import Hero from './components/Hero.jsx'
+import HomeSection from './components/HomeSection.jsx'
 import BuildSection from './components/BuildSection.jsx'
 import BatchSection from './components/BatchSection.jsx'
 import { RetrieveSection, DocsSection, ContactSection, Footer } from './components/SectionPages.jsx'
@@ -117,7 +118,7 @@ export default function App() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   const showHome     = activeSection === 'home'
-  const showBuild    = activeSection === 'home' || activeSection === 'build'
+  const showBuild    = activeSection === 'build'
   const showBatch    = activeSection === 'batch'
   const showRetrieve = activeSection === 'retrieve'
   const showDocs     = activeSection === 'docs'
@@ -130,6 +131,7 @@ export default function App() {
       <Nav activeSection={activeSection} onNavigate={navigate} />
       {showHome && <Hero onNavigate={navigate} />}
       <div className="page" ref={pageRef}>
+        {showHome && <HomeSection />}
         {showBuild && (
           <BuildSection
             runs={runs}

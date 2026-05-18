@@ -21,6 +21,12 @@ builder.Services.AddDatabase(builder.Configuration, builder.Environment);
 // Wersję silnika (14G / 14L / ...) przełącza się w appsettings.json → "Quadro:Version".
 builder.Services.AddQuadro(builder.Configuration);
 
+// ── Pipeline (RNA tools + Quadro 3D pipeline) ─────────────────────────────────
+builder.Services.AddSingleton<G4Composer.Server.Services.IRnaSecondaryStructureService,
+                               G4Composer.Server.Services.RnaSecondaryStructureService>();
+builder.Services.AddSingleton<G4Composer.Server.Services.IPipelinePdbStore,
+                               G4Composer.Server.Services.InMemoryPipelinePdbStore>();
+
 // ── Swagger / OpenAPI ─────────────────────────────────────────────────────────
 builder.Services.AddSwaggerGen(options =>
 {
@@ -64,7 +70,8 @@ builder.Services.AddCors(options =>
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .WithExposedHeaders("X-Job-Id", "X-Atom-Count", "Content-Disposition");
+            .WithExposedHeaders("X-Job-Id", "X-Atom-Count", "Content-Disposition",
+                "X-Std-Energy", "X-Alt-Energy", "X-Has-Alt", "X-Winner");
     });
 });
 

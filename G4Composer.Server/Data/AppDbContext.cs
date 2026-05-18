@@ -54,6 +54,7 @@ public sealed class AppDbContext : DbContext
             e.Property(x => x.Structure).HasMaxLength(512);
             e.Property(x => x.Chi).HasMaxLength(512);
             e.Property(x => x.Path).HasMaxLength(512);
+            e.Property(x => x.Rise).HasMaxLength(32);
 
             e.HasOne(x => x.Subtype)
              .WithMany(s => s.Examples)

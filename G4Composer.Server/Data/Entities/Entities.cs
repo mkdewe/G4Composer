@@ -89,8 +89,8 @@ public sealed class StructureExample
     /// <summary>Strand orientation, e.g. "A+;B-".</summary>
     public required string Orient { get; set; }
 
-    /// <summary>Helical rise in Å.</summary>
-    public float Rise { get; set; } = 3.4f;
+    /// <summary>Helical rise in Å. Multi-step e.g. "3.4;-6.8" for non-canonical G4.</summary>
+    public string Rise { get; set; } = "3.4";
 
     /// <summary>
     /// Helical twist in degrees. Can be multi-step, e.g. "19;29".

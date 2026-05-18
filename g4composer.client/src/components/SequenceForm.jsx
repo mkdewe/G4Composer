@@ -111,11 +111,11 @@ export default function SequenceForm({ onRun, runState }) {
         } else {
             // UPPERCASE = RNA (A,C,G,U) · lowercase = DNA (a,c,g,t)
             // Mixed RNA/DNA sequences are allowed.
-            // Invalid: uppercase T, lowercase u
+            // Invalid: uppercase T, lowercase u (quadro14L ERROR 2)
             if (/T/.test(rawSeq))
                 errs.push("Sequence contains uppercase 'T' — RNA residues use 'U' (uppercase)")
             if (/u/.test(rawSeq))
-                errs.push("Sequence contains lowercase 'u' — DNA residues use 't' (lowercase)")
+                errs.push("Sequence contains lowercase 'u' — use uppercase 'U' for RNA uridine (quadro14L rejects lowercase 'u')")
             if (!/^[ACGUacgt]+$/.test(rawSeq))
                 errs.push('Sequence contains invalid characters — allowed: A C G U (RNA uppercase) · a c g t (DNA lowercase)')
         }
@@ -245,7 +245,7 @@ export default function SequenceForm({ onRun, runState }) {
         setParseError(null)
 
         const name = nameVal.trim() || 'structure'
-        const seq = seqVal.trim().toLowerCase()
+        const seq = seqVal.trim()
         const struct = structVal.trim()
 
         // Path: user-supplied raw string → split on semicolons, or null if empty
@@ -717,7 +717,7 @@ export default function SequenceForm({ onRun, runState }) {
                                                 value={val}
                                                 onChange={e => {
                                                     const next = [...parts]
-                                                    next[i] = e.target.value.replace(/[^0-9.]/g, '')
+                                                    next[i] = e.target.value.replace(/[^0-9.\-]/g, '')
                                                     setTwist(next.join(';'))
                                                 }}
                                                 placeholder="29"
@@ -749,7 +749,7 @@ export default function SequenceForm({ onRun, runState }) {
                                                 T{i + 1}→T{i + 2}
                                             </span>
                                             <input type="text" value={val}
-                                                onChange={e => { const n = [...parts]; n[i] = e.target.value.replace(/[^0-9.]/g, ''); setRise(n.join(';')) }}
+                                                onChange={e => { const n = [...parts]; n[i] = e.target.value.replace(/[^0-9.\-]/g, ''); setRise(n.join(';')) }}
                                                 placeholder="3.4" style={{ width: 72, fontFamily: 'var(--mono)', textAlign: 'center' }} />
                                         </div>
                                     ))

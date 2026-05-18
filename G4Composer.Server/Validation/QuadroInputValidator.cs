@@ -27,13 +27,13 @@ public sealed class ValidationResult
 public sealed class QuadroInputValidator : IValidator<QuadroInput>
 {
     // UPPERCASE = RNA (A,C,G,U) · lowercase = DNA (a,c,g,t) · mixed sequences allowed.
-    // Invalid: uppercase T, lowercase u (quadro14L only accepts: a,c,g,t or A,C,G,U).
+    // Lowercase 'u' is NOT accepted — quadro14L explicitly rejects it (ERROR 2).
     private static readonly HashSet<char> AllowedChars = ['A','C','G','U','a','c','g','t'];
 
     private const double MaxRise  = 10.0;
-    private const double MinRise  = 1.0;
+    private const double MinRise  = -10.0;
     private const double MaxTwist = 180.0;
-    private const double MinTwist = 0.0;
+    private const double MinTwist = -180.0;
 
     public ValidationResult Validate(QuadroInput input)
     {
@@ -121,12 +121,11 @@ public sealed class QuadroInputValidator : IValidator<QuadroInput>
         }
 
         // Uppercase T is invalid (RNA uses U, not T).
-        // Lowercase u is invalid — DNA uses t, RNA uses U (uppercase).
-        // quadro14L only accepts: a,c,g,t (DNA) and A,C,G,U (RNA).
+        // Lowercase u is also invalid — quadro14L rejects it with ERROR 2.
         if (sequence.Contains('T'))
             errors.Add("Sequence contains uppercase 'T' — RNA residues must use 'U' (uppercase).");
         if (sequence.Contains('u'))
-            errors.Add("Sequence contains lowercase 'u' — invalid: DNA uses 't', RNA uses 'U' (uppercase).");
+            errors.Add("Sequence contains lowercase 'u' — use uppercase 'U' for RNA uridine (quadro14L rejects lowercase 'u').");
 
         var invalid = sequence.Where(c => !AllowedChars.Contains(c)).Distinct().ToArray();
         if (invalid.Length > 0)

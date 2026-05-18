@@ -109,7 +109,7 @@ function parseInpFormat(raw) {
     : null
 
   const twist = result.twist?.trim() || DEFAULT_TWIST
-  const rise  = parseFloat(result.rise)  || 3.4
+  const rise  = result.rise?.trim() || '3.4'
 
   // "test n" in .inp → isTest: false (14L default is n / false)
   const testRaw = (result.test ?? result.istest ?? 'n').toLowerCase()

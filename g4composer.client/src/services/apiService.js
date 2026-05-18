@@ -198,6 +198,56 @@ export async function fetchExample() {
 }
 
 /**
+ * Run the full RNA → G4 pipeline via SSE.
+ * Yields parsed event objects as they arrive.
+ * @param {string} sequence
+ * @yields {object} SSE event objects
+ */
+export async function* runPipeline(sequence) {
+  const response = await fetch('/api/pipeline/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sequence }),
+  })
+
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+  const reader  = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer    = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() // keep the incomplete line
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try { yield JSON.parse(line.slice(6)) } catch { /* ignore malformed */ }
+      }
+    }
+  }
+}
+
+/**
+ * Fetch the standard PDB produced by the pipeline for a given job.
+ * Returns an object URL, or null on failure.
+ * @param {string} jobId
+ * @returns {Promise<string|null>}
+ */
+export async function fetchPipelinePdb(jobId) {
+  try {
+    const res = await fetch(`/api/pipeline/pdb/${jobId}`)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return URL.createObjectURL(new Blob([blob], { type: 'chemical/x-pdb' }))
+  } catch {
+    return null
+  }
+}
+
+/**
  * Fetch all Silva groups with subtypes and example summaries.
  * Used to populate the classification picker and examples list.
  * @returns {Promise<Array|null>}

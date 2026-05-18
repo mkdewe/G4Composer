@@ -47,7 +47,8 @@ import { buildPath, buildDefaultTwist, scaleOrientToTetrads } from './silvaTopol
 
 const MINIMAL_LINES_COUNT = 5
 const FULL_LINES_COUNT    = 11
-// UPPERCASE=RNA(A,C,G,U), lowercase=DNA(a,c,g,t), mixed allowed. Invalid: T (uppercase), u (lowercase).
+// UPPERCASE=RNA(A,C,G,U), lowercase=DNA(a,c,g,t), mixed allowed. Invalid: uppercase T, lowercase u.
+// Quadro14L explicitly rejects lowercase 'u' (ERROR 2) — use uppercase 'U' for RNA uridine.
 const ALLOWED_SEQ_CHARS = /^[ACGUacgt]+$/
 const KNOWN_KEYS = new Set([
   'name', 'sequence', 'structure', 'chi', 'orient',
@@ -181,8 +182,8 @@ function parseFull(lines) {
   const riseStr = riseRaw.trim()
   for (const part of riseStr.split(';')) {
     const v = parseFloat(part.trim())
-    if (!Number.isFinite(v) || v <= 0)
-      throw new Error(`Line 6 (rise): '${part.trim()}' is not a valid positive number.`)
+    if (!Number.isFinite(v) || v === 0)
+      throw new Error(`Line 6 (rise): '${part.trim()}' is not a valid non-zero number.`)
   }
 
   const rmLevel = parseInt(rmRaw, 10)
@@ -234,8 +235,8 @@ function parseKeyValue(raw) {
   const riseStr = fields.rise?.trim() ?? '3.4'
   for (const part of riseStr.split(';')) {
     const v = parseFloat(part.trim())
-    if (!Number.isFinite(v) || v <= 0)
-      throw new Error(`Field 'rise': '${part.trim()}' is not a valid positive number.`)
+    if (!Number.isFinite(v) || v === 0)
+      throw new Error(`Field 'rise': '${part.trim()}' is not a valid non-zero number.`)
   }
 
   const rmLevel = fields.rm_level ? parseInt(fields.rm_level, 10) : 0
@@ -274,19 +275,18 @@ function validateSequence(sequence) {
   if (/T/.test(sequence))
     throw new Error("Sequence contains uppercase 'T' — RNA residues use 'U' (uppercase).")
   if (/u/.test(sequence))
-    throw new Error("Sequence contains lowercase 'u' — DNA residues use 't' (lowercase).")
+    throw new Error("Sequence contains lowercase 'u' — use uppercase 'U' for RNA uridine (quadro14L rejects lowercase 'u').")
   if (!ALLOWED_SEQ_CHARS.test(sequence))
     throw new Error('Sequence contains invalid characters — allowed: A C G U (RNA uppercase) · a c g t (DNA lowercase) · mixed sequences are OK.')
 }
 
-// Lenient validation for .inp key/value files — quadro14L always stores sequences
-// in lowercase (including 'u' for RNA). Round-trip uploads must be accepted.
+// Validation for .inp key/value files — same rules as UI: uppercase U for RNA, no lowercase u.
 function validateSequenceInp(sequence) {
   if (!sequence) throw new Error('Sequence is empty.')
   if (/u/.test(sequence))
-    throw new Error("Sequence contains lowercase 'u' — invalid: DNA uses 't', RNA uses 'U' (uppercase).")
+    throw new Error("Sequence contains lowercase 'u' — use uppercase 'U' for RNA uridine (quadro14L rejects lowercase 'u').")
   if (!/^[ACGUacgt]+$/.test(sequence))
-    throw new Error('Sequence contains invalid characters — allowed: a c g t (DNA) or A C G U (RNA).')
+    throw new Error('Sequence contains invalid characters — allowed: a c g t (DNA lowercase) or A C G U (RNA uppercase).')
 }
 
 function validateTopology(topology, subtype, topologyRaw, subtypeRaw, silvaData) {

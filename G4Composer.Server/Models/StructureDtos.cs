@@ -37,7 +37,7 @@ public sealed record StructureExampleDetailDto(
     string Structure,
     string Chi,
     string Orient,
-    float Rise,
+    string Rise,
     string Twist,
     string Path,
     bool IsTest,

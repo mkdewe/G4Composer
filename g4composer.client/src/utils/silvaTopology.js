@@ -143,3 +143,77 @@ export function buildDefaultPucker(tetrads, type = 'S') {
   const steps = Math.max(1, tetrads - 1)
   return Array(steps).fill(type).join(';')
 }
+
+/**
+ * Auto-generates the chi (glycosidic bond) string from structure, path, and orient.
+ *
+ * Rule — for each G at a tetrad position:
+ *   U-strand (tetrad letters ascending A→B→C in sequence order) + '+' sign → SYN ('S')
+ *   D-strand (tetrad letters descending C→B→A in sequence order) + '−' sign → SYN ('S')
+ *   Any other combination                                                    → ANTI ('.')
+ *
+ * Non-tetrad positions (loops, WC pairs) are always '.'.
+ *
+ * Works for standard ABCD and '^' structure notation. Returns '' if inputs are
+ * inconsistent (path entry count ≠ tetrad position count).
+ *
+ * @param {string} structure  e.g. "ABC...CBA...ABC" or "^^^...^^^"
+ * @param {string} path       e.g. "A1;B1;C1;C4;B4;A4;..."
+ * @param {string} orient     e.g. "A+;B-;C-"
+ * @returns {string}          chi string, same length as structure
+ */
+export function buildChiFromOrient(structure, path, orient) {
+  if (!structure || !path || !orient) return ''
+
+  // Parse orient → sign per tetrad letter
+  const orientSign = {}
+  for (const part of orient.split(';')) {
+    const m = part.trim().match(/^([A-D])([+-])$/)
+    if (m) orientSign[m[1]] = m[2]
+  }
+
+  // Parse path into ordered (tetrad, strand) entries
+  const pathEntries = path.split(';').map(s => {
+    const m = s.trim().match(/^([A-D])(\d)$/)
+    return m ? { tetrad: m[1], strand: parseInt(m[2]) } : null
+  }).filter(Boolean)
+
+  if (!pathEntries.length) return ''
+
+  // Collect tetrad positions from structure (A-D or ^)
+  const tetradIndices = []
+  for (let i = 0; i < structure.length; i++) {
+    if (/[ABCD^]/.test(structure[i])) tetradIndices.push(i)
+  }
+
+  if (tetradIndices.length !== pathEntries.length) return ''
+
+  // Pair each tetrad position with its path entry
+  const gEntries = tetradIndices.map((pos, i) => ({
+    seqPos: pos, tetrad: pathEntries[i].tetrad, strand: pathEntries[i].strand,
+  }))
+
+  // Determine direction of each strand: ascending tetrad letters → U, descending → D
+  const byStrand = {}
+  for (const e of gEntries) {
+    if (!byStrand[e.strand]) byStrand[e.strand] = []
+    byStrand[e.strand].push(e)
+  }
+  const strandDir = {}
+  for (const [strand, entries] of Object.entries(byStrand)) {
+    const letters = entries.map(e => e.tetrad)
+    const ascending = letters.every((t, i) => i === 0 || t > letters[i - 1])
+    strandDir[strand] = ascending ? 'U' : 'D'
+  }
+
+  // Build chi: '.' at all positions, 'S' where rule fires
+  const chi = Array(structure.length).fill('.')
+  for (const { seqPos, tetrad, strand } of gEntries) {
+    const sign = orientSign[tetrad] ?? '+'
+    const dir  = strandDir[strand]
+    if ((dir === 'U' && sign === '+') || (dir === 'D' && sign === '-')) {
+      chi[seqPos] = 'S'
+    }
+  }
+  return chi.join('')
+}

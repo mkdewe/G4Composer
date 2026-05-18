@@ -39,6 +39,13 @@ function autoTwistFromOrient(orient) {
     return unique.length === 1 ? unique[0] : steps.join(';')
 }
 
+function formatRise(val) {
+    return String(val).split(';').map(s => {
+        const v = parseFloat(s.trim())
+        return Number.isFinite(v) ? parseFloat(v.toFixed(1)).toString() : s.trim()
+    }).join(';')
+}
+
 const SILVA_DISPLAY_ORDER = { UUUU: 0, UDUD: 1, UDDU: 2, UUDD: 3, UDUU: 4, UUUD: 5, UUDU: 6, UDDD: 7 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -241,7 +248,7 @@ export default function SequenceForm({ onRun, runState }) {
         setPathVal(data.path ?? '')
         setOrientVal(data.orient ?? orientFromGroup(silvaGroup))
         setTwist(String(data.twist ?? '29'))
-        setRise(String(data.rise ?? '3.4'))
+        setRise(formatRise(data.rise ?? '3.4'))
         // Per-residue sugar pucker: UPPERCASE→N, lowercase→S
         const exSeq = data.sequence ?? ''
         setPucker(exSeq.split('').map(ch => /[A-Z]/.test(ch) ? 'N' : 'S').join(''))

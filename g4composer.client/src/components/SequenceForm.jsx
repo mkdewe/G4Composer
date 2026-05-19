@@ -82,6 +82,8 @@ export default function SequenceForm({ onRun, runState }) {
     const [rise, setRise] = useState('3.4')
     const [pucker, setPucker] = useState('S')
     const [parseError, setParseError] = useState(null)
+    const [examplesOpen, setExamplesOpen] = useState(false)
+    const [exFilterGroup, setExFilterGroup] = useState('UDUD')
 
     const isRunning = runState === 'running'
     const errorRef = useRef(null)
@@ -231,7 +233,7 @@ export default function SequenceForm({ onRun, runState }) {
         rise: hasInput ? rise : '–',
     }
 
-    async function loadExample(pdbId) {
+    async function loadExample(pdbId, groupCode = null, subtypeCode = null) {
         setParseError(null)
         const data = await fetchExampleDetail(pdbId)
         if (!data) {
@@ -249,6 +251,8 @@ export default function SequenceForm({ onRun, runState }) {
         // Per-residue sugar pucker: UPPERCASE→N, lowercase→S
         const exSeq = data.sequence ?? ''
         setPucker(exSeq.split('').map(ch => /[A-Z]/.test(ch) ? 'N' : 'S').join(''))
+        if (groupCode) setSilvaGroup(groupCode)
+        if (subtypeCode) setSubtype(subtypeCode)
     }
 
     function handleSubmit() {
@@ -289,8 +293,152 @@ export default function SequenceForm({ onRun, runState }) {
         onRun([payload])
     }
 
+    // Derive effective examples filter group (fall back to first available, but preserve __nc__ sentinel)
+    const effectiveExGroup = exFilterGroup === '__nc__'
+        ? '__nc__'
+        : (silvaData?.find(g => g.code === exFilterGroup) ? exFilterGroup : (silvaData?.[0]?.code ?? exFilterGroup))
+
+    const allExampleCount = silvaData
+        ? silvaData.reduce((sum, g) => sum + g.subtypes.reduce((s2, sub) => s2 + (sub.examples?.length ?? 0), 0), nonCanonical.length)
+        : null
+
     return (
         <div>
+            {/* ── Examples Browser (collapsible, pinned at top) ── */}
+            <div className={styles.card} style={{ marginBottom: 12 }}>
+                <div
+                    className={styles.cardTitle}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setExamplesOpen(v => !v)}
+                >
+                    <span style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        width: 22, height: 22, borderRadius: '50%', fontSize: 11, fontWeight: 700,
+                        background: 'var(--teal)', color: 'white', flexShrink: 0,
+                    }}>★</span>
+                    Examples
+                    {allExampleCount !== null && (
+                        <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 400, marginLeft: 4 }}>
+                            — {allExampleCount} structures
+                        </span>
+                    )}
+                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-dim)', fontWeight: 400 }}>
+                        {examplesOpen ? '▲ collapse' : '▼ expand'}
+                    </span>
+                </div>
+
+                {examplesOpen && (
+                    <div>
+                        {/* Group tabs */}
+                        <div style={{ display: 'flex', gap: 4, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+                            {[...(silvaData ?? [])].sort((a, b) => (SILVA_DISPLAY_ORDER[a.code] ?? 99) - (SILVA_DISPLAY_ORDER[b.code] ?? 99)).map(g => (
+                                <button
+                                    key={g.code}
+                                    onClick={() => { setExFilterGroup(g.code); setMode('canonical') }}
+                                    style={{
+                                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                        padding: '6px 4px', fontSize: 12, fontWeight: 600, fontFamily: 'var(--mono)',
+                                        borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                                        border: `1px solid ${effectiveExGroup === g.code ? 'var(--teal)' : 'var(--border-med)'}`,
+                                        background: effectiveExGroup === g.code ? 'var(--teal)' : 'var(--surface)',
+                                        color: effectiveExGroup === g.code ? 'white' : 'var(--text-dim)',
+                                        transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+                                    }}
+                                >
+                                    <Beads code={g.code} active={effectiveExGroup === g.code} />
+                                    {g.code}
+                                </button>
+                            ))}
+                            {nonCanonical.length > 0 && (
+                                <button
+                                    onClick={() => { setExFilterGroup('__nc__'); setMode('noncanonical') }}
+                                    style={{
+                                        padding: '6px 10px', fontSize: 12, fontWeight: 600,
+                                        borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                                        border: `1px solid ${effectiveExGroup === '__nc__' ? 'var(--teal)' : 'var(--border-med)'}`,
+                                        background: effectiveExGroup === '__nc__' ? 'var(--teal)' : 'var(--surface)',
+                                        color: effectiveExGroup === '__nc__' ? 'white' : 'var(--text-dim)',
+                                        transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    Non-canonical
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Content */}
+                        {effectiveExGroup === '__nc__' ? (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {nonCanonical.map(ex => (
+                                    <button key={ex.pdbId} onClick={() => loadExample(ex.pdbId)} title={ex.note}
+                                        style={{
+                                            padding: '4px 12px', fontSize: 12, fontFamily: 'var(--mono)', fontWeight: 600,
+                                            cursor: 'pointer', border: '1px solid var(--border-med)', borderRadius: 'var(--r-sm)',
+                                            background: 'var(--surface)', color: 'var(--teal-dark)',
+                                        }}>
+                                        {ex.pdbId.toUpperCase()} · {ex.tetrads}T
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (() => {
+                            const grp = silvaData?.find(g => g.code === effectiveExGroup)
+                            const subtypes = grp?.subtypes ?? []
+                            const withExamples = subtypes.filter(s => (s.examples?.length ?? 0) > 0)
+                            if (!grp) return <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Loading…</span>
+                            if (withExamples.length === 0) return (
+                                <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>
+                                    No deposited examples for group {effectiveExGroup}
+                                </span>
+                            )
+                            return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                    {withExamples.map(sub => (
+                                        <div key={sub.code}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                                                <code style={{
+                                                    fontSize: 12, fontWeight: 700, fontFamily: 'var(--mono)',
+                                                    padding: '1px 6px', borderRadius: 'var(--r-sm)',
+                                                    background: 'var(--surface2)', color: 'var(--teal-dark)',
+                                                    border: '1px solid var(--border-med)',
+                                                }}>{sub.code}</code>
+                                                <code style={{ fontSize: 12, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>{sub.loop}</code>
+                                                {sub.silva && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{sub.silva}</span>}
+                                                {sub.onz && <span style={{
+                                                    fontSize: 11, fontWeight: 600, fontFamily: 'var(--mono)',
+                                                    color: sub.onz?.startsWith('O') ? 'var(--teal-dark)' : sub.onz?.startsWith('N') ? '#9333ea' : '#d97706',
+                                                }}>{sub.onz}</span>}
+                                                {sub.note && <span style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>{sub.note}</span>}
+                                            </div>
+                                            <div className={styles.examplesList}>
+                                                {(sub.examples ?? []).map(ex => (
+                                                    <button
+                                                        key={ex.pdbId}
+                                                        className={styles.exampleBtn}
+                                                        onClick={() => loadExample(ex.pdbId, effectiveExGroup, sub.code)}
+                                                        title={`Load ${ex.pdbId} — ${ex.note}`}
+                                                    >
+                                                        <span className={styles.exPdb}>{ex.pdbId.toUpperCase().replace(/^_/, '')}</span>
+                                                        <span className={styles.exTetrads}>{ex.tetrads}T</span>
+                                                        <span className={styles.exNote}>{ex.note}</span>
+                                                        {ex.isTheoretical && <span className={styles.subNote}>theoretical</span>}
+                                                        <span className={styles.exArrow}>→ Load</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        })()}
+
+                        {silvaError && (
+                            <span style={{ color: 'var(--err-text)', fontSize: 13 }}>Failed to load examples</span>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {/* ── Step 1: Sequence & Structure Input ── */}
             <div className={styles.card}>
                 <div className={styles.cardTitle}>
@@ -427,24 +575,8 @@ export default function SequenceForm({ onRun, runState }) {
                 ))}
             </div>
 
-            {/* Non-canonical examples — small load buttons */}
-            {mode === 'noncanonical' && nonCanonical.length > 0 && (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 0' }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-dim)', alignSelf: 'center' }}>Load example:</span>
-                    {nonCanonical.map(ex => (
-                        <button key={ex.pdbId} onClick={() => loadExample(ex.pdbId)} title={ex.note}
-                            style={{
-                                padding: '4px 12px', fontSize: 12, fontFamily: 'var(--mono)', fontWeight: 600,
-                                cursor: 'pointer', border: '1px solid var(--border-med)', borderRadius: 'var(--r-sm)',
-                                background: 'var(--surface)', color: 'var(--teal-dark)',
-                            }}>
-                            {ex.pdbId.toUpperCase()} · {ex.tetrads}T
-                        </button>
-                    ))}
-                </div>
-            )}
 
-            {/* ── Step 2: Silva Loop Classification (canonical only) ── */}
+{/* ── Step 2: Silva Loop Classification (canonical only) ── */}
             {mode === 'canonical' && <div className={styles.card}>
                 <div className={styles.cardTitle}>
                     <span className={styles.badge}>2</span>
@@ -511,39 +643,6 @@ export default function SequenceForm({ onRun, runState }) {
                     </div>
                 </div>
 
-                {/* Examples browser */}
-                <div className={styles.row}>
-                    <div className={styles.label}>
-                        PDB examples
-                        <small>Known structures for {subtype}</small>
-                    </div>
-                    <div className={styles.control}>
-                        {(() => {
-                            const currentSub = currentSubtypes.find(s => s.code === subtype)
-                            const examples = currentSub?.examples ?? []
-                            return examples.length === 0 ? (
-                                <span className={styles.noExamples}>No deposited examples for subtype {subtype}</span>
-                            ) : (
-                                <div className={styles.examplesList}>
-                                    {examples.map(ex => (
-                                        <button
-                                            key={ex.pdbId}
-                                            className={styles.exampleBtn}
-                                            onClick={() => loadExample(ex.pdbId)}
-                                            title={`Load ${ex.pdbId} — ${ex.note}`}
-                                        >
-                                            <span className={styles.exPdb}>{ex.pdbId.toUpperCase().replace(/^_/, '')}</span>
-                                            <span className={styles.exTetrads}>{ex.tetrads}T</span>
-                                            <span className={styles.exNote}>{ex.note}</span>
-                                            {ex.isTheoretical && <span className={styles.subNote}>theoretical</span>}
-                                            <span className={styles.exArrow}>→ Load</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )
-                        })()}
-                    </div>
-                </div>
             </div>
 
             }
@@ -596,18 +695,49 @@ export default function SequenceForm({ onRun, runState }) {
 
                 {(advOpen || mode === 'noncanonical') && (
                     <div>
-                        {/* Sequence summary — shown in canonical mode only (in noncanonical it's visible directly above) */}
-                        {mode === 'canonical' && (nameVal || seqVal || structVal) && (
-                            <div style={{
-                                padding: '8px 14px', background: 'var(--surface2)',
-                                border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
-                                marginBottom: 20, fontFamily: 'var(--mono)', fontSize: 12, lineHeight: 1.8,
-                            }}>
-                                <div><span style={{ color: 'var(--teal)' }}>{'>'} </span><span style={{ color: 'var(--text-dim)' }}>{nameVal || '(no name)'}</span></div>
-                                <div style={{ color: 'var(--text)' }}>{seqVal || '—'}</div>
-                                <div style={{ color: '#B45309' }}>{structVal || '—'}</div>
+                        {/* Name / Sequence / Structure — mirrored from Step 1 (shared state → bidirectional sync) */}
+                        <div className={styles.row}>
+                            <div className={styles.label}>
+                                Name
+                                <small>Structure name</small>
                             </div>
-                        )}
+                            <input
+                                type="text"
+                                style={{ width: '100%', fontSize: 13 }}
+                                value={nameVal}
+                                onChange={e => setNameVal(e.target.value)}
+                                placeholder="e.g. pz74_mp_G14L"
+                                spellCheck={false}
+                            />
+                        </div>
+                        <div className={styles.row}>
+                            <div className={styles.label}>
+                                Sequence
+                                <small>UPPERCASE = RNA · lowercase = DNA</small>
+                            </div>
+                            <input
+                                type="text"
+                                style={{ width: '100%', fontFamily: 'var(--mono)', fontSize: 13 }}
+                                value={seqVal}
+                                onChange={e => setSeqVal(e.target.value)}
+                                placeholder="e.g. agggttaggg"
+                                spellCheck={false}
+                            />
+                        </div>
+                        <div className={styles.row}>
+                            <div className={styles.label}>
+                                Structure
+                                <small>dot-bracket + ^ markers</small>
+                            </div>
+                            <input
+                                type="text"
+                                style={{ width: '100%', fontFamily: 'var(--mono)', fontSize: 13 }}
+                                value={structVal}
+                                onChange={e => setStructVal(e.target.value)}
+                                placeholder="e.g. (((^^.^^.)))..."
+                                spellCheck={false}
+                            />
+                        </div>
 
                         {/* Chi — glycosidic bond conformation */}
                         <div className={styles.row}>

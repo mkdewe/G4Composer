@@ -21,9 +21,11 @@ builder.Services.AddDatabase(builder.Configuration, builder.Environment);
 // Wersję silnika (14G / 14L / ...) przełącza się w appsettings.json → "Quadro:Version".
 builder.Services.AddQuadro(builder.Configuration);
 
-// ── Pipeline (RNA tools + Quadro 3D pipeline) ─────────────────────────────────
+// ── Pipeline (ViennaRNA + gqrs + Quadro 3D pipeline) ─────────────────────────
 builder.Services.AddSingleton<G4Composer.Server.Services.IRnaSecondaryStructureService,
                                G4Composer.Server.Services.RnaSecondaryStructureService>();
+builder.Services.AddSingleton<G4Composer.Server.Services.IGqrsService,
+                               G4Composer.Server.Services.GqrsService>();
 builder.Services.AddSingleton<G4Composer.Server.Services.IPipelinePdbStore,
                                G4Composer.Server.Services.InMemoryPipelinePdbStore>();
 

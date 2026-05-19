@@ -439,7 +439,35 @@ export default function SequenceForm({ onRun, runState }) {
                 )}
             </div>
 
-            {/* ── Step 1: Sequence & Structure Input ── */}
+            {/* ── Mode toggle: Canonical / Non-canonical ── */}
+            <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderRadius: 'var(--r-md)', overflow: 'hidden', border: '1px solid var(--border-med)', alignSelf: 'flex-start', width: 'fit-content' }}>
+                {[
+                    { id: 'canonical', label: 'Canonical', desc: 'Auto-derive parameters from Silva classification' },
+                    { id: 'noncanonical', label: 'Non-canonical', desc: 'Manually specify all structural parameters' },
+                ].map(({ id, label, desc }) => (
+                    <button
+                        key={id}
+                        onClick={() => setMode(id)}
+                        title={desc}
+                        style={{
+                            padding: '8px 20px',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            fontFamily: 'var(--sans)',
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: mode === id ? 'var(--teal)' : 'var(--surface)',
+                            color: mode === id ? 'white' : 'var(--text-dim)',
+                            transition: 'background 0.15s, color 0.15s',
+                        }}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+
+            {/* ── Step 1: Sequence & Structure Input (canonical only) ── */}
+            {mode === 'canonical' && (
             <div className={styles.card}>
                 <div className={styles.cardTitle}>
                     <span className={styles.badge}>1</span>
@@ -527,54 +555,8 @@ export default function SequenceForm({ onRun, runState }) {
 
                 </div>
 
-                {parseError && (
-                    <div ref={errorRef} style={{
-                        display: 'flex', alignItems: 'flex-start', gap: 8,
-                        margin: '12px 0 0', padding: '10px 14px',
-                        background: 'var(--err-bg)', border: '1px solid var(--err-border)',
-                        borderRadius: 'var(--r-md)', color: 'var(--err-text)',
-                        fontSize: 13, lineHeight: 1.5,
-                    }}>
-                        <WarnIcon />
-                        <div>
-                            <strong>{parseError}</strong>
-                            {currentErrors.length > 1 && (
-                                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-                                    {currentErrors.slice(1).map((e, i) => <li key={i}>{e}</li>)}
-                                </ul>
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
-
-            {/* ── Mode toggle: Canonical / Non-canonical ── */}
-            <div style={{ display: 'flex', gap: 0, margin: '16px 0 0', borderRadius: 'var(--r-md)', overflow: 'hidden', border: '1px solid var(--border-med)', alignSelf: 'flex-start', width: 'fit-content' }}>
-                {[
-                    { id: 'canonical', label: 'Canonical', desc: 'Auto-derive parameters from Silva classification' },
-                    { id: 'noncanonical', label: 'Non-canonical', desc: 'Manually specify all structural parameters' },
-                ].map(({ id, label, desc }) => (
-                    <button
-                        key={id}
-                        onClick={() => setMode(id)}
-                        title={desc}
-                        style={{
-                            padding: '8px 20px',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            fontFamily: 'var(--sans)',
-                            border: 'none',
-                            cursor: 'pointer',
-                            background: mode === id ? 'var(--teal)' : 'var(--surface)',
-                            color: mode === id ? 'white' : 'var(--text-dim)',
-                            transition: 'background 0.15s, color 0.15s',
-                        }}
-                    >
-                        {label}
-                    </button>
-                ))}
-            </div>
-
+            )}
 
 {/* ── Step 2: Silva Loop Classification (canonical only) ── */}
             {mode === 'canonical' && <div className={styles.card}>
@@ -910,6 +892,25 @@ export default function SequenceForm({ onRun, runState }) {
                 )}
             </div>
 
+            {parseError && (
+                <div ref={errorRef} style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 8,
+                    margin: '0 0 12px', padding: '10px 14px',
+                    background: 'var(--err-bg)', border: '1px solid var(--err-border)',
+                    borderRadius: 'var(--r-md)', color: 'var(--err-text)',
+                    fontSize: 13, lineHeight: 1.5,
+                }}>
+                    <WarnIcon />
+                    <div>
+                        <strong>{parseError}</strong>
+                        {currentErrors.length > 1 && (
+                            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                                {currentErrors.slice(1).map((e, i) => <li key={i}>{e}</li>)}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            )}
             {/* Submit */}
             <div className={styles.submitArea} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                 {hasErrors && hasInput && (

@@ -56,9 +56,9 @@ public abstract class QuadroEngineBase : IQuadroEngine
         // Twist can be multi-step (e.g. "19;29") — write as-is; quadro14L.exe parses the semicolons.
         var twist = string.IsNullOrWhiteSpace(input.Twist) ? "29" : input.Twist.Trim();
         var pathStr   = input.Path is { Count: > 0 } ? string.Join(';', input.Path) : string.Empty;
-        var test      = input.IsTest ? "y" : "n";
-        var rmLevel   = Math.Max(0, input.RmLevel);
-        var iteration = Math.Max(1, input.Iterations);
+        const string test      = "n";
+        const int    rmLevel   = 0;
+        const int    iteration = 100;
 
         // Field names padded with spaces to match the pz74 reference .inp format exactly.
         // quadro14L.exe is sensitive to whitespace style — tabs caused parse failures.

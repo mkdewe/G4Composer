@@ -4,25 +4,20 @@ using G4Composer.Server.Models;
 namespace G4Composer.Server.Services;
 
 /// <summary>
-/// Auto-generates a complete QuadroInput from a bare nucleotide sequence by
-/// detecting G-tracts and building G4 topology parameters for Quadro14L.
+/// Auto-generates QuadroInput instances for Quadro14L from a nucleotide sequence.
 ///
-/// Algorithm:
-///   1. Normalise: uppercase T (invalid RNA) → full lowercase (treat as DNA).
-///   2. Find G-tracts (consecutive G/g runs).
-///   3. Require exactly 4 G-tracts (intramolecular G4).
-///   4. nTetrads = min(4, shortest G-tract length).
-///   5. Structure: base = RNA dot-bracket prediction; G-tetrad positions stamped with '^'.
-///   6. Parallel topology (+P+P+P) for RNA; same for DNA (extend later).
-///   7. shugar: 'N' per uppercase residue (RNA/C3′-endo), 'S' per lowercase (DNA/C2′-endo).
-///   8. orient: all + per plane (A+;B+;… for parallel).
-///   9. path: from SilvaTopology.BuildPath("+P+P+P", nTetrads).
-///  10. rise: (nTetrads-1) × "3.4".
-///  11. twist: (nTetrads-1) × "29" (parallel G4 default).
+/// Supports two modes:
+///   TryGenerate      — legacy: finds G-tracts from sequence directly.
+///   TryGenerateFromGqrs — new: uses gqrs motif positions for G-tract placement.
+///
+/// Topology defaults:
+///   RNA (uppercase U present) → parallel topology (+P+P+P), orient all-+, twist 29°.
+///   DNA (no uppercase U)       → antiparallel UDUD (-Lw-Ln-Lw), alternating orient, twist 19°/37°/…
 /// </summary>
 public static class G4TopologyGenerator
 {
-    private const string ParallelLoops = "+P+P+P";
+    private const string ParallelLoops     = "+P+P+P";
+    private const string AntiparallelLoops = "-Lw-Ln-Lw";   // UDUD 6a (most common antiparallel chair)
 
     /// <summary>
     /// Returns a fully populated QuadroInput ready for serialisation, or null
@@ -74,9 +69,71 @@ public static class G4TopologyGenerator
             Rise       = rise,
             Twist      = twist,
             Path       = path,
-            IsTest     = false,
-            RmLevel    = 0,
-            Iterations = 50,
+        };
+    }
+
+    // ── gqrs-based generation ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Generates a QuadroInput from a gqrs motif. Uses gqrs G-tract positions instead
+    /// of searching for G-tracts in the sequence. Topology defaults: RNA → parallel,
+    /// DNA → antiparallel UDUD (6a).
+    /// </summary>
+    public static QuadroInput? TryGenerateFromGqrs(
+        string name, string sequence, string? rnaStructure, GqrsMotif motif)
+    {
+        if (string.IsNullOrWhiteSpace(sequence)) return null;
+        if (motif.Tetrads < 1 || motif.Tetrads > 4) return null;
+
+        // Normalise: uppercase T → treat as DNA
+        if (sequence.Contains('T'))
+            sequence = sequence.ToLowerInvariant();
+
+        int n = motif.Tetrads;
+        var gTracts = new List<(int Start, int Length)>
+        {
+            (motif.Tetrad1, n),
+            (motif.Tetrad2, n),
+            (motif.Tetrad3, n),
+            (motif.Tetrad4, n),
+        };
+
+        // Validate all G-tract positions are within the sequence
+        foreach (var (start, len) in gTracts)
+        {
+            if (start < 0 || start + len > sequence.Length) return null;
+        }
+
+        var structure = BuildCombinedStructure(sequence, gTracts, n, rnaStructure);
+        var chi       = new string('.', sequence.Length);
+        var shugar    = BuildShugar(sequence);
+
+        bool isRna = sequence.Any(char.IsUpper);
+
+        // Antiparallel lateral loops (Lw/Ln) need ≥2 nt to span the groove.
+        // For DNA, fall back to parallel propeller when any loop is too short.
+        int loopLen1 = motif.Tetrad2 - motif.Tetrad1 - n;
+        int loopLen2 = motif.Tetrad3 - motif.Tetrad2 - n;
+        int loopLen3 = motif.Tetrad4 - motif.Tetrad3 - n;
+        bool useAntiparallel = !isRna && loopLen1 >= 2 && loopLen2 >= 2 && loopLen3 >= 2;
+
+        var loops  = useAntiparallel ? AntiparallelLoops : ParallelLoops;
+        var orient = useAntiparallel ? SilvaTopology.BuildDefaultOrient(n) : BuildParallelOrient(n);
+        var twist  = BuildTwistFromOrient(orient);
+        var rise   = BuildRise(n);
+        var path   = SilvaTopology.BuildPath(loops, n).Split(';').ToList();
+
+        return new QuadroInput
+        {
+            Name       = name,
+            Sequence   = sequence,
+            Structure  = structure,
+            Chi        = chi,
+            Sugar      = shugar,
+            Orient     = orient,
+            Rise       = rise,
+            Twist      = twist,
+            Path       = path,
         };
     }
 
@@ -161,6 +218,28 @@ public static class G4TopologyGenerator
 
     private static string BuildTwist(int n)
         => n <= 1 ? "29" : string.Join(";", Enumerable.Repeat("29", n - 1));
+
+    /// <summary>
+    /// Computes helical twist (N-1 values for N tetrad planes) from the orient string.
+    /// Lookup: ++→27°, --→29°, +−→19°, −+→37°.
+    /// Works for both parallel (all +) and antiparallel topologies.
+    /// </summary>
+    private static string BuildTwistFromOrient(string orient)
+    {
+        var signs = orient.Split(';').Select(s => s.TrimStart('A', 'B', 'C', 'D')).ToArray();
+        if (signs.Length <= 1) return "27";
+
+        static string Twist(string a, string b) => (a, b) switch
+        {
+            ("+", "-") => "19",
+            ("-", "+") => "37",
+            ("+", "+") => "27",
+            _          => "29",
+        };
+
+        return string.Join(";", Enumerable.Range(0, signs.Length - 1)
+            .Select(i => Twist(signs[i], signs[i + 1])));
+    }
 
     // Only G-runs of length >= 2 are considered. A single isolated G is not a G-tract
     // and causes nTetrads=1 when it happens to be one of the first four runs found.

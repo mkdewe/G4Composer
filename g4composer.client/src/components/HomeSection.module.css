@@ -419,3 +419,83 @@ details[open] .inpSummary::before { content: '▼ '; }
 .idleText strong {
   color: var(--text-sub);
 }
+
+/* ── Action bar (download buttons + structure display) ── */
+.actionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.actionLeft {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.structureInline {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.actionRight {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.actionBtn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-family: var(--sans);
+  font-weight: 500;
+  color: var(--text-sub);
+  background: none;
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+.actionBtn:hover:not(:disabled) { background: var(--surface); }
+.actionBtn:disabled { opacity: 0.35; cursor: default; }
+
+.actionPrimary {
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+}
+.actionPrimary:hover:not(:disabled) { background: var(--teal-dark); }
+
+/* ── Energy comparison bar ── */
+.energyBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+.energyBarLabel {
+  color: var(--text-dim);
+  margin-right: 4px;
+}
+
+.energyBarHint {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin-left: auto;
+}

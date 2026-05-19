@@ -27,9 +27,9 @@ export function serializeInp(input) {
   const path      = Array.isArray(input.path)
     ? input.path.join(';')
     : (input.path || '')
-  const test      = input.isTest ? 'y' : 'n'
-  const rmLevel   = input.RM_Level   ?? input.rmLevel   ?? 0
-  const iteration = input.Iterations ?? input.iterations ?? 100
+  const test      = 'n'
+  const rmLevel   = 0
+  const iteration = 100
 
   // Match pz74 reference format — field name left-padded with spaces
   return [

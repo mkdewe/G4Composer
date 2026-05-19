@@ -81,9 +81,6 @@ export default function SequenceForm({ onRun, runState }) {
     const [twist, setTwist] = useState('29')
     const [rise, setRise] = useState('3.4')
     const [pucker, setPucker] = useState('S')
-    const [iterations, setIterations] = useState(100)
-    const [rmLevel, setRmLevel] = useState(0)
-    const [isTest, setIsTest] = useState(false)
     const [parseError, setParseError] = useState(null)
 
     const isRunning = runState === 'running'
@@ -252,9 +249,6 @@ export default function SequenceForm({ onRun, runState }) {
         // Per-residue sugar pucker: UPPERCASE→N, lowercase→S
         const exSeq = data.sequence ?? ''
         setPucker(exSeq.split('').map(ch => /[A-Z]/.test(ch) ? 'N' : 'S').join(''))
-        setIterations(data.iterations ?? 70)
-        setRmLevel(data.rmLevel ?? 0)
-        setIsTest(data.isTest ?? false)
     }
 
     function handleSubmit() {
@@ -289,9 +283,6 @@ export default function SequenceForm({ onRun, runState }) {
             rise: rise.trim() || '3.4',
             twist: twist.trim() || '29',
             path: pathList,
-            isTest: isTest,
-            RM_Level: rmLevel,
-            Iterations: iterations,
             Shugar: pucker,  // per-residue sugar pucker for quadro14L .inp
         }
 

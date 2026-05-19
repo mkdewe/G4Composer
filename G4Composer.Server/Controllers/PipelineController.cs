@@ -16,7 +16,13 @@ public sealed class PipelineController : ControllerBase
     private static readonly JsonSerializerOptions JsonOpts =
         new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
 
-    private readonly IRnaSecondaryStructureService _rna;
+    private static readonly System.Text.RegularExpressions.Regex EnergyRegex =
+        new(@"\(\s*([-+]?\d+(?:\.\d+)?)\s*\)",
+            System.Text.RegularExpressions.RegexOptions.Compiled |
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private readonly IDockerCommandRunner          _docker;
+    private readonly IGqrsService                  _gqrs;
     private readonly IQuadroJobRunner              _jobRunner;
     private readonly IQuadroEngineSelector         _engineSelector;
     private readonly IPipelinePdbStore             _pipelinePdbStore;
@@ -25,7 +31,8 @@ public sealed class PipelineController : ControllerBase
     private readonly ILogger<PipelineController>   _logger;
 
     public PipelineController(
-        IRnaSecondaryStructureService rna,
+        IDockerCommandRunner docker,
+        IGqrsService gqrs,
         IQuadroJobRunner jobRunner,
         IQuadroEngineSelector engineSelector,
         IPipelinePdbStore pipelinePdbStore,
@@ -33,7 +40,8 @@ public sealed class PipelineController : ControllerBase
         IOptions<QuadroOptions> options,
         ILogger<PipelineController> logger)
     {
-        _rna              = rna;
+        _docker           = docker;
+        _gqrs             = gqrs;
         _jobRunner        = jobRunner;
         _engineSelector   = engineSelector;
         _pipelinePdbStore = pipelinePdbStore;
@@ -42,7 +50,7 @@ public sealed class PipelineController : ControllerBase
         _logger           = logger;
     }
 
-    // ── SSE pipeline ─────────────────────────────────────────────────────────
+    // ── SSE pipeline: ViennaRNA + gqrs → Quadro per motif ────────────────────
 
     [HttpPost("run")]
     public async Task RunPipeline([FromBody] PipelineRequest request, CancellationToken cancellationToken)
@@ -59,87 +67,51 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        var toolNames = _rna.ToolNames;
-        await SendEventAsync("start", new { type = "start", tools = toolNames, count = toolNames.Count }, cancellationToken);
+        await SendEventAsync("start", new { type = "start" }, cancellationToken);
 
-        // ── Phase 1: Run all RNA tools in parallel ───────────────────────────
-        var rnaTasks = toolNames
-            .Select(name => RunRnaToolAsync(name, sequence, cancellationToken))
-            .ToList();
-
-        var rnaResults = new Dictionary<string, ToolStructureResult>();
-
-        // Use WhenAny loop so we emit events as each tool completes
-        var pending = rnaTasks.ToList();
-        while (pending.Count > 0)
+        // ── Phase 1: ViennaRNA secondary structure (--gquad always on) ───────
+        var rnaResult = await RunViennaRnaAsync(sequence, cancellationToken);
+        await SendEventAsync("viennarna_done", new
         {
-            var completed = await Task.WhenAny(pending);
-            pending.Remove(completed);
+            type      = "viennarna_done",
+            success   = rnaResult.Success,
+            structure = rnaResult.Structure,
+            energy    = rnaResult.Energy,
+            error     = rnaResult.Error,
+        }, cancellationToken);
 
-            ToolStructureResult rnaResult;
-            try   { rnaResult = await completed; }
-            catch (Exception ex)
+        // ── Phase 2: gqrs G-quadruplex motif prediction ───────────────────────
+        var gqrsResult = await _gqrs.PredictAsync(sequence, cancellationToken);
+        await SendEventAsync("gqrs_done", new
+        {
+            type    = "gqrs_done",
+            success = gqrsResult.Success,
+            count   = gqrsResult.Motifs.Count,
+            motifs  = gqrsResult.Motifs.Select(m => new
             {
-                _logger.LogError(ex, "RNA task faulted unexpectedly");
-                continue;
-            }
+                id       = m.Id,
+                tetrad1  = m.Tetrad1,
+                tetrad2  = m.Tetrad2,
+                tetrad3  = m.Tetrad3,
+                tetrad4  = m.Tetrad4,
+                tetrads  = m.Tetrads,
+                gscore   = m.GScore,
+                sequence = m.MotifSequence,
+            }),
+            error = gqrsResult.Error,
+        }, cancellationToken);
 
-            rnaResults[rnaResult.ToolName] = rnaResult;
-
-            if (rnaResult.Success)
-            {
-                await SendEventAsync("rna_done", new
-                {
-                    type      = "rna_done",
-                    tool      = rnaResult.ToolName,
-                    success   = true,
-                    structure = rnaResult.Structure,
-                    energy    = rnaResult.Energy,
-                }, cancellationToken);
-            }
-            else
-            {
-                await SendEventAsync("rna_done", new
-                {
-                    type    = "rna_done",
-                    tool    = rnaResult.ToolName,
-                    success = false,
-                    error   = rnaResult.Error,
-                }, cancellationToken);
-            }
+        if (!gqrsResult.Success || gqrsResult.Motifs.Count == 0)
+        {
+            await SendEventAsync("complete", new { type = "complete" }, cancellationToken);
+            return;
         }
 
-        // ── Phase 2: Deduplicate by structure, then run Quadro in parallel ───────
-        // Process tools in the fixed canonical order so deduplication is deterministic.
-        var orderedSuccessful = _rna.ToolNames
-            .Where(name => rnaResults.TryGetValue(name, out var r) && r.Success)
-            .Select(name => rnaResults[name])
-            .ToList();
+        // ── Phase 3: Quadro for each gqrs motif in parallel ──────────────────
+        var rnaStructure = rnaResult.Success ? rnaResult.Structure : null;
 
-        var seenStructures = new HashSet<string>(StringComparer.Ordinal);
-        var uniqueRna      = new List<ToolStructureResult>();
-
-        foreach (var rna in orderedSuccessful)
-        {
-            var s = rna.Structure ?? string.Empty;
-            if (!seenStructures.Add(s))
-            {
-                var original = uniqueRna.FirstOrDefault(r => r.Structure == s)?.ToolName ?? "another tool";
-                await SendEventAsync("quadro_skip", new
-                {
-                    type     = "quadro_skip",
-                    tool     = rna.ToolName,
-                    original,
-                }, cancellationToken);
-            }
-            else
-            {
-                uniqueRna.Add(rna);
-            }
-        }
-
-        var quadroTasks = uniqueRna
-            .Select(r => RunQuadroForToolAsync(r, sequence, cancellationToken))
+        var quadroTasks = gqrsResult.Motifs
+            .Select(motif => RunQuadroForMotifAsync(motif, sequence, rnaStructure, cancellationToken))
             .ToList();
 
         await Task.WhenAll(quadroTasks);
@@ -153,125 +125,160 @@ public sealed class PipelineController : ControllerBase
     public ActionResult GetPdb(string jobId)
     {
         var pdb = _pipelinePdbStore.Get(jobId);
-        if (pdb is null)
-            return NotFound();
+        if (pdb is null) return NotFound();
         return File(pdb, "chemical/x-pdb", $"pipeline_{jobId}.pdb");
+    }
+
+    [HttpGet("alt-pdb/{jobId}")]
+    public ActionResult GetAltPdb(string jobId)
+    {
+        var pdb = _altPdbStore.Get(jobId);
+        if (pdb is null) return NotFound();
+        return File(pdb, "chemical/x-pdb", $"pipeline_alt_{jobId}.pdb");
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private async Task<ToolStructureResult> RunRnaToolAsync(string toolName, string sequence, CancellationToken ct)
+    private async Task<ToolStructureResult> RunViennaRnaAsync(
+        string sequence, CancellationToken ct)
     {
+        const string tool = "ViennaRNA";
+        var cmd = $"echo '{sequence}' | RNAfold --noPS --gquad";
+
         try
         {
-            _logger.LogInformation("Pipeline: starting RNA tool {Tool}", toolName);
-            var result = await _rna.PredictAsync(toolName, sequence, ct);
-            _logger.LogInformation("Pipeline: RNA tool {Tool} {Status}", toolName, result.Success ? "succeeded" : "failed");
-            return result;
+            var result = await _docker.RunAsync(
+                ["run", "--rm", "--entrypoint", "/bin/sh", "viennarna:latest", "-c", cmd], ct);
+
+            if (result.ExitCode != 0)
+                return new ToolStructureResult(tool, false, null, null,
+                    $"exit {result.ExitCode}: {result.Stderr.Trim().Split('\n').LastOrDefault()}");
+
+            var lines = result.Stdout.Split('\n', StringSplitOptions.None);
+            var structLine = lines.LastOrDefault(l =>
+                l.Trim().Length > 0 && (l.Contains('.') || l.Contains('(') || l.Contains('+')));
+
+            if (structLine is null)
+                return new ToolStructureResult(tool, false, null, null,
+                    $"Unexpected output: {Truncate(result.Stdout)}");
+
+            var parts     = structLine.Trim().Split(' ', 2);
+            // Strip '+' from --g-quadruplex output (replaced by gqrs positions as '^')
+            var structure = parts[0].Trim().Replace('+', '.');
+            double? energy = parts.Length > 1 ? ParseParenEnergy(parts[1]) : null;
+
+            return new ToolStructureResult(tool, true, structure, energy, null);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Pipeline: RNA tool {Tool} threw", toolName);
-            return new ToolStructureResult(toolName, false, null, null, ex.Message);
+            _logger.LogError(ex, "ViennaRNA failed");
+            return new ToolStructureResult(tool, false, null, null, ex.Message);
         }
     }
 
-    private async Task RunQuadroForToolAsync(ToolStructureResult rnaResult, string sequence, CancellationToken ct)
+    private async Task RunQuadroForMotifAsync(
+        GqrsMotif motif, string sequence, string? rnaStructure, CancellationToken ct)
     {
-        var toolName = rnaResult.ToolName;
-        await SendEventAsync("quadro_start", new { type = "quadro_start", tool = toolName }, ct);
+        var label = $"G4_{motif.Id}";
+        await SendEventAsync("quadro_start", new { type = "quadro_start", tool = label, motifId = motif.Id }, ct);
 
-        var jobId      = $"pl_{Guid.NewGuid():N}"[..16];
-        var jobDir     = Path.Combine(Path.GetTempPath(), $"g4_pipeline_{jobId}");
-        string? inpContent = null;   // hoisted so catch blocks can include it
+        var jobId  = $"pl_{Guid.NewGuid():N}"[..16];
+        var jobDir = Path.Combine(Path.GetTempPath(), $"g4_pipeline_{jobId}");
+        string? inpContent        = null;
+        string? combinedStructure = null;
         Directory.CreateDirectory(jobDir);
 
         try
         {
             var engine = _engineSelector.Active;
+            var input  = G4TopologyGenerator.TryGenerateFromGqrs(label, sequence, rnaStructure, motif);
 
-            var input = G4TopologyGenerator.TryGenerate(toolName, sequence, rnaResult.Structure);
             if (input is null)
             {
                 await SendEventAsync("quadro_done", new
                 {
                     type    = "quadro_done",
-                    tool    = toolName,
+                    tool    = label,
+                    motifId = motif.Id,
                     success = false,
-                    error   = "Sequence does not contain 4 G-tracts required for G4 topology.",
+                    error   = "Could not generate Quadro input from gqrs motif (positions out of range?).",
                 }, ct);
                 return;
             }
 
-            inpContent      = engine.SerializeInput(input);
-            var inpFileName = "struct_000.inp";
-            var items       = new List<QuadroJobItem>
-            {
-                new(0, inpFileName, inpContent),
-            };
+            inpContent        = engine.SerializeInput(input);
+            combinedStructure = input.Structure;
+            var items  = new List<QuadroJobItem> { new(0, "struct_000.inp", inpContent) };
 
             using var jobCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             jobCts.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
 
             var result = await _jobRunner.RunAsync(jobId, jobDir, items, jobCts.Token);
 
-            var stdOk  = result.Standard.Success    && result.Standard.Pdb    is { Length: > 0 };
-            var altOk  = result.Alternative.Success && result.Alternative.Pdb is { Length: > 0 };
+            var stdOk = result.Standard.Success    && result.Standard.Pdb    is { Length: > 0 };
+            var altOk = result.Alternative.Success && result.Alternative.Pdb is { Length: > 0 };
 
             if (!stdOk)
             {
                 await SendEventAsync("quadro_done", new
                 {
-                    type    = "quadro_done",
-                    tool    = toolName,
-                    success = false,
-                    error   = "Quadro produced no PDB",
+                    type              = "quadro_done",
+                    tool              = label,
+                    motifId           = motif.Id,
+                    success           = false,
+                    error             = "Quadro produced no PDB",
                     inpContent,
+                    combinedStructure,
                 }, ct);
                 return;
             }
 
-            // Store PDBs
             _pipelinePdbStore.Store(jobId, result.Standard.Pdb!);
             if (altOk && result.Alternative.Pdb is not null)
                 _altPdbStore.Store(jobId, result.Alternative.Pdb);
 
             await SendEventAsync("quadro_done", new
             {
-                type       = "quadro_done",
-                tool       = toolName,
-                success    = true,
+                type              = "quadro_done",
+                tool              = label,
+                motifId           = motif.Id,
+                success           = true,
                 jobId,
-                stdEnergy  = result.Standard.Etotal,
-                altEnergy  = result.Alternative.Etotal,
-                winner     = result.Winner ?? "standard",
-                hasAlt     = altOk,
+                stdEnergy         = result.Standard.Etotal,
+                altEnergy         = result.Alternative.Etotal,
+                winner            = result.Winner ?? "standard",
+                hasAlt            = altOk,
                 inpContent,
+                combinedStructure,
             }, ct);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             await SendEventAsync("quadro_done", new
             {
-                type    = "quadro_done",
-                tool    = toolName,
-                success = false,
-                error   = $"Quadro timeout after {_options.TimeoutSeconds}s",
+                type              = "quadro_done",
+                tool              = label,
+                motifId           = motif.Id,
+                success           = false,
+                error             = $"Quadro timeout after {_options.TimeoutSeconds}s",
                 inpContent,
+                combinedStructure,
             }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Pipeline: Quadro failed for tool {Tool}", toolName);
+            _logger.LogError(ex, "Quadro failed for motif {Id}", motif.Id);
             var quadroOutput = ex is DockerException dx ? dx.DockerOutput : null;
             await SendEventAsync("quadro_done", new
             {
-                type         = "quadro_done",
-                tool         = toolName,
-                success      = false,
-                error        = ex.Message,
+                type              = "quadro_done",
+                tool              = label,
+                motifId           = motif.Id,
+                success           = false,
+                error             = ex.Message,
                 inpContent,
+                combinedStructure,
                 quadroOutput,
             }, ct);
         }
@@ -291,8 +298,8 @@ public sealed class PipelineController : ControllerBase
     {
         if (ct.IsCancellationRequested) return;
 
-        var json = JsonSerializer.Serialize(data, JsonOpts);
-        var line = $"data: {json}\n\n";
+        var json  = JsonSerializer.Serialize(data, JsonOpts);
+        var line  = $"data: {json}\n\n";
         var bytes = Encoding.UTF8.GetBytes(line);
 
         await _writeLock.WaitAsync(ct);
@@ -301,8 +308,24 @@ public sealed class PipelineController : ControllerBase
             await Response.Body.WriteAsync(bytes, ct);
             await Response.Body.FlushAsync(ct);
         }
-        catch (OperationCanceledException) { /* client disconnected */ }
+        catch (OperationCanceledException) { }
         catch (Exception ex) { _logger.LogWarning("SSE write failed: {Msg}", ex.Message); }
         finally { _writeLock.Release(); }
+    }
+
+    private static double? ParseParenEnergy(string text)
+    {
+        var m = EnergyRegex.Match(text);
+        return m.Success ? ParseDouble(m.Groups[1].Value) : null;
+    }
+
+    private static double? ParseDouble(string s)
+        => double.TryParse(s, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
+
+    private static string Truncate(string text, int max = 200)
+    {
+        var t = (text ?? string.Empty).Trim();
+        return t.Length <= max ? t : t[..max];
     }
 }

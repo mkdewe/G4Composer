@@ -198,16 +198,17 @@ export async function fetchExample() {
 }
 
 /**
- * Run the full RNA → G4 pipeline via SSE.
+ * Run the G4 pipeline (ViennaRNA + gqrs → Quadro per motif) via SSE.
  * Yields parsed event objects as they arrive.
  * @param {string} sequence
+ * @param {boolean} useGquadruplex  Enable ViennaRNA --g-quadruplex flag
  * @yields {object} SSE event objects
  */
-export async function* runPipeline(sequence) {
+export async function* runPipeline(sequence, useGquadruplex = false) {
   const response = await fetch('/api/pipeline/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sequence }),
+    body: JSON.stringify({ sequence, useGquadruplex }),
   })
 
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -239,6 +240,23 @@ export async function* runPipeline(sequence) {
 export async function fetchPipelinePdb(jobId) {
   try {
     const res = await fetch(`/api/pipeline/pdb/${jobId}`)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return URL.createObjectURL(new Blob([blob], { type: 'chemical/x-pdb' }))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch the alternative PDB produced by the pipeline for a given job.
+ * Returns an object URL, or null on failure.
+ * @param {string} jobId
+ * @returns {Promise<string|null>}
+ */
+export async function fetchPipelineAltPdb(jobId) {
+  try {
+    const res = await fetch(`/api/pipeline/alt-pdb/${jobId}`)
     if (!res.ok) return null
     const blob = await res.blob()
     return URL.createObjectURL(new Blob([blob], { type: 'chemical/x-pdb' }))

@@ -186,25 +186,13 @@ function parseFull(lines) {
       throw new Error(`Line 6 (rise): '${part.trim()}' is not a valid non-zero number.`)
   }
 
-  const rmLevel = parseInt(rmRaw, 10)
-  if (!Number.isInteger(rmLevel) || rmLevel < 0)
-    throw new Error(`Line 10 (rm_level) must be a non-negative integer; got '${rmRaw}'.`)
-
-  const iterations = parseInt(iterRaw, 10)
-  if (!Number.isInteger(iterations) || iterations < 1)
-    throw new Error(`Line 11 (iteration) must be a positive integer; got '${iterRaw}'.`)
-
-  const test = testRaw.toLowerCase()
-  if (test !== 'y' && test !== 'n')
-    throw new Error(`Line 9 (test) must be 'y' or 'n'; got '${testRaw}'.`)
-
   return {
     name, sequence, structure, chi, orient, rise: riseStr,
     twist:       twistRaw,
     path:        pathRaw ? pathRaw.split(';').map(s => s.trim()).filter(Boolean) : null,
-    isTest:      test === 'y',
-    RM_Level:    rmLevel,
-    Iterations:  iterations,
+    isTest:      false,
+    RM_Level:    0,
+    Iterations:  100,
     sugarPucker: /[U]/.test(sequenceRaw) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
 }
@@ -239,18 +227,6 @@ function parseKeyValue(raw) {
       throw new Error(`Field 'rise': '${part.trim()}' is not a valid non-zero number.`)
   }
 
-  const rmLevel = fields.rm_level ? parseInt(fields.rm_level, 10) : 0
-  if (!Number.isInteger(rmLevel) || rmLevel < 0)
-    throw new Error(`Field 'rm_level' must be a non-negative integer; got '${fields.rm_level}'.`)
-
-  const iterations = fields.iteration ? parseInt(fields.iteration, 10) : 100
-  if (!Number.isInteger(iterations) || iterations < 1)
-    throw new Error(`Field 'iteration' must be a positive integer; got '${fields.iteration}'.`)
-
-  const test = (fields.test ?? 'n').toLowerCase()
-  if (test !== 'y' && test !== 'n')
-    throw new Error(`Field 'test' must be 'y' or 'n'; got '${fields.test}'.`)
-
   return {
     name:        fields.name,
     sequence,
@@ -262,9 +238,9 @@ function parseKeyValue(raw) {
     path:        fields.path
                    ? fields.path.split(';').map(s => s.trim()).filter(Boolean)
                    : null,
-    isTest:      test === 'y',
-    RM_Level:    rmLevel,
-    Iterations:  iterations,
+    isTest:      false,
+    RM_Level:    0,
+    Iterations:  100,
     sugarPucker: /[U]/.test(fields.sequence) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
 }

@@ -97,14 +97,6 @@ public sealed class QuadroInputValidator : IValidator<QuadroInput>
             }
         }
 
-        // ── Iterations ────────────────────────────────────────────────────────
-        if (input.Iterations <= 0)
-            errors.Add($"Iterations must be positive (got: {input.Iterations}).");
-
-        // ── RmLevel ───────────────────────────────────────────────────────────
-        if (input.RmLevel < 0)
-            errors.Add($"RmLevel must be non-negative (got: {input.RmLevel}).");
-
         return errors.Count == 0
             ? ValidationResult.Success
             : ValidationResult.Failure(errors);

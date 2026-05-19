@@ -1,46 +1,41 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import MolstarViewer from './MolstarViewer.jsx'
-import { runPipeline, fetchPipelinePdb } from '../services/apiService.js'
+import { runPipeline, fetchPipelinePdb, fetchPipelineAltPdb } from '../services/apiService.js'
+import { downloadInp } from '../utils/inpSerializer.js'
 import styles from './HomeSection.module.css'
 
-const TOOL_ORDER = ['ViennaRNA', 'LinearFold', 'RNAStructure', 'MXfold2', 'UNAFold', 'SPOT-RNA', 'UFold']
-
 export default function HomeSection() {
-  const [sequence,     setSequence]     = useState('')
-  const [phase,        setPhase]        = useState('idle')   // 'idle' | 'running' | 'done'
-  const [rnaResults,   setRnaResults]   = useState({})       // { toolName: { success, structure, energy, error } }
-  const [quadroResults, setQuadroResults] = useState({})     // { toolName: { success, jobId, stdEnergy, altEnergy, winner, hasAlt, pdbUrl, error } }
-  const [activeTab,    setActiveTab]    = useState(null)
-  const [progressLog,  setProgressLog]  = useState([])
-  const [toolCount,    setToolCount]    = useState(0)
+  const [sequence,      setSequence]      = useState('')
+  const [phase,         setPhase]         = useState('idle')   // 'idle' | 'running' | 'done'
+  const [viennaResult,  setViennaResult]  = useState(null)     // kept for progress log only
+  const [gqrsMotifs,    setGqrsMotifs]    = useState([])       // for tab labels
+  const [quadroResults, setQuadroResults] = useState({})       // { 'G4_1': { ... } }
+  const [activeTab,     setActiveTab]     = useState(null)
+  const [progressLog,   setProgressLog]   = useState([])
 
   const abortRef = useRef(null)
 
-  // ── Best energy computation ───────────────────────────────────────────────
+  // ── Best energy tab ───────────────────────────────────────────────────────
   const bestTool = Object.entries(quadroResults)
     .filter(([, r]) => r.success)
     .map(([tool, r]) => ({
       tool,
-      energy: r.winner === 'alternative' ? r.altEnergy : r.stdEnergy,
+      energy: r.displayVariant === 'alternative' ? r.altEnergy : r.stdEnergy,
     }))
     .filter(x => x.energy != null)
     .sort((a, b) => a.energy - b.energy)[0]?.tool ?? null
-
-  // ── Tabs visible: all tools in order that have at least RNA done ──────────
-  const visibleTabs = TOOL_ORDER.filter(t => rnaResults[t] !== undefined)
 
   // ── Run pipeline ──────────────────────────────────────────────────────────
   const handleRun = useCallback(async () => {
     const seq = sequence.trim()
     if (!seq) return
 
-    // Reset state
     setPhase('running')
-    setRnaResults({})
+    setViennaResult(null)
+    setGqrsMotifs([])
     setQuadroResults({})
     setActiveTab(null)
     setProgressLog([])
-    setToolCount(0)
 
     const abort = new AbortController()
     abortRef.current = abort
@@ -51,22 +46,32 @@ export default function HomeSection() {
 
         switch (event.type) {
           case 'start':
-            setToolCount(event.count ?? TOOL_ORDER.length)
-            setProgressLog([`Starting pipeline: ${event.count} tools`])
+            setProgressLog(['Pipeline started'])
             break
 
-          case 'rna_done': {
-            const { tool, success, structure, energy, error } = event
-            setRnaResults(prev => ({
-              ...prev,
-              [tool]: { success, structure, energy: energy ?? null, error: error ?? null },
-            }))
-            setProgressLog(prev => [
-              ...prev,
-              success ? `${tool}: RNA structure computed` : `${tool}: RNA failed — ${error}`,
+          case 'viennarna_done': {
+            const { success, structure, energy, error } = event
+            setViennaResult({ success, structure, energy, error })
+            setProgressLog(prev => [...prev,
+              success
+                ? `ViennaRNA: structure predicted (${formatEnergy(energy)})`
+                : `ViennaRNA: failed — ${error}`,
             ])
-            // Auto-select first successful tab
-            setActiveTab(prev => prev ?? (success ? tool : null))
+            break
+          }
+
+          case 'gqrs_done': {
+            const { success, motifs, count, error } = event
+            if (success && motifs?.length) {
+              setGqrsMotifs(motifs)
+              setProgressLog(prev => [...prev,
+                `gqrs: ${count} G-quadruplex motif${count !== 1 ? 's' : ''} found`,
+              ])
+            } else {
+              setProgressLog(prev => [...prev,
+                success ? 'gqrs: no G-quadruplex motifs found' : `gqrs: failed — ${error}`,
+              ])
+            }
             break
           }
 
@@ -74,47 +79,52 @@ export default function HomeSection() {
             setProgressLog(prev => [...prev, `${event.tool}: running Quadro 3D…`])
             break
 
-          case 'quadro_skip': {
-            const { tool, original } = event
-            setQuadroResults(prev => ({
-              ...prev,
-              [tool]: { success: false, skipped: true, error: `Same structure as ${original} — skipped` },
-            }))
-            setProgressLog(prev => [...prev, `${tool}: skipped (same structure as ${original})`])
-            break
-          }
-
           case 'quadro_done': {
-            const { tool, success, jobId, stdEnergy, altEnergy, winner, hasAlt, error, inpContent, quadroOutput } = event
+            const { tool, motifId, success, jobId, stdEnergy, altEnergy, winner,
+                    hasAlt, error, inpContent, quadroOutput, combinedStructure } = event
             if (success) {
-              // Fetch PDB asynchronously and update state when ready
-              fetchPipelinePdb(jobId).then(pdbUrl => {
+              const fetchBoth = async () => {
+                const pdbUrl    = await fetchPipelinePdb(jobId)
+                const altPdbUrl = hasAlt ? await fetchPipelineAltPdb(jobId) : null
+                return { pdbUrl, altPdbUrl }
+              }
+              fetchBoth().then(({ pdbUrl, altPdbUrl }) => {
                 setQuadroResults(prev => {
                   const next = {
                     ...prev,
-                    [tool]: { success: true, jobId, stdEnergy, altEnergy, winner, hasAlt, pdbUrl, inpContent, error: null },
+                    [tool]: {
+                      success: true, motifId, jobId, stdEnergy, altEnergy,
+                      winner, hasAlt, pdbUrl, altPdbUrl,
+                      combinedStructure: combinedStructure ?? null,
+                      displayVariant: winner ?? 'standard',
+                      inpContent, error: null,
+                    },
                   }
-                  // Auto-select the tab with best energy so far
-                  const bestEntry = Object.entries(next)
+                  const best = Object.entries(next)
                     .filter(([, r]) => r.success)
                     .map(([t, r]) => ({ t, e: r.winner === 'alternative' ? r.altEnergy : r.stdEnergy }))
                     .filter(x => x.e != null)
                     .sort((a, b) => a.e - b.e)[0]
-                  if (bestEntry) setActiveTab(bestEntry.t)
+                  if (best) setActiveTab(best.t)
                   return next
                 })
               })
-              setProgressLog(prev => [
-                ...prev,
+              setProgressLog(prev => [...prev,
                 `${tool}: 3D model ready (ΔG ${formatEnergy(winner === 'alternative' ? altEnergy : stdEnergy)})`,
               ])
             } else {
               setQuadroResults(prev => ({
                 ...prev,
-                [tool]: { success: false, error: error ?? 'Unknown error', inpContent: inpContent ?? null, quadroOutput: quadroOutput ?? null },
+                [tool]: {
+                  success: false, motifId, error: error ?? 'Unknown error',
+                  combinedStructure: combinedStructure ?? null,
+                  inpContent: inpContent ?? null,
+                  quadroOutput: quadroOutput ?? null,
+                },
               }))
               setProgressLog(prev => [...prev, `${tool}: Quadro failed — ${error}`])
             }
+            setActiveTab(prev => prev ?? tool)
             break
           }
 
@@ -146,23 +156,45 @@ export default function HomeSection() {
     setProgressLog(prev => [...prev, 'Stopped by user.'])
   }, [])
 
-  // ── Resolve active tab's data ─────────────────────────────────────────────
-  const activeRna    = activeTab ? rnaResults[activeTab]    : null
-  const activeQuadro = activeTab ? quadroResults[activeTab] : null
+  const handleVariantToggle = useCallback((tool, variant) => {
+    setQuadroResults(prev => {
+      const r = prev[tool]
+      if (!r) return prev
+      return { ...prev, [tool]: { ...r, displayVariant: variant } }
+    })
+  }, [])
 
-  const activePdbUrl = activeQuadro?.pdbUrl ?? null
+  // ── Active tab data ───────────────────────────────────────────────────────
+  const activeQuadro   = activeTab ? quadroResults[activeTab] : null
+  const displayVariant = activeQuadro?.displayVariant ?? 'standard'
+  const activePdbUrl   = displayVariant === 'alternative'
+    ? (activeQuadro?.altPdbUrl ?? activeQuadro?.pdbUrl)
+    : (activeQuadro?.pdbUrl ?? null)
 
-  // Determine viewer state for MolstarViewer
-  const quadroRunning = activeTab && rnaResults[activeTab]?.success && !quadroResults[activeTab]
+  const quadroRunning = activeTab && gqrsMotifs.length > 0 && !quadroResults[activeTab]
   const viewerState   = quadroRunning ? 'running'
     : (activeQuadro?.success && activePdbUrl) ? 'done'
     : activeQuadro && !activeQuadro.success ? 'error'
     : 'idle'
 
-  // ── RNA done count for progress bar ──────────────────────────────────────
-  const rnaDoneCount    = Object.keys(rnaResults).length
-  const quadroDoneCount = Object.keys(quadroResults).length
-  const totalTools      = toolCount || TOOL_ORDER.length
+  const visibleTabs = gqrsMotifs.map(m => `G4_${m.id}`)
+  const quadroDone  = Object.keys(quadroResults).length
+  const totalMotifs = gqrsMotifs.length
+
+  // ── Download handlers ─────────────────────────────────────────────────────
+  function handleDownloadInp() {
+    if (!activeQuadro?.inpContent) return
+    downloadInp(activeQuadro.inpContent, activeTab ?? 'structure')
+  }
+
+  function handleDownloadPdb() {
+    if (!activePdbUrl) return
+    const variant = displayVariant === 'alternative' ? 'alt' : 'std'
+    const a = document.createElement('a')
+    a.href     = activePdbUrl
+    a.download = `${activeTab ?? 'structure'}_${variant}.pdb`
+    a.click()
+  }
 
   return (
     <div className={styles.root}>
@@ -178,7 +210,7 @@ export default function HomeSection() {
             type="text"
             value={sequence}
             onChange={e => setSequence(e.target.value)}
-            placeholder="e.g. ggggaaaacccc"
+            placeholder="e.g. GGGGAAGGGGAAGGGGAAGGGG  (uppercase = RNA, lowercase = DNA)"
             spellCheck={false}
             disabled={phase === 'running'}
             onKeyDown={e => e.key === 'Enter' && phase !== 'running' && handleRun()}
@@ -207,18 +239,19 @@ export default function HomeSection() {
 
       {/* ── Progress area ────────────────────────────────────────────────── */}
       {(phase === 'running' || (phase === 'done' && progressLog.length > 0)) && (
-        <div className={styles.progressArea}>
+        <div className={styles.progressArea} style={{ maxWidth: 780, margin: '0 auto 16px' }}>
           {phase === 'running' && (
             <div className={styles.progressBarRow}>
               <div className={styles.progressTrack}>
                 <div
                   className={styles.progressFill}
-                  style={{ width: `${Math.round((rnaDoneCount / totalTools) * 100)}%` }}
+                  style={{ width: totalMotifs > 0 ? `${Math.round((quadroDone / totalMotifs) * 100)}%` : '10%' }}
                 />
               </div>
               <span className={styles.progressLabel}>
-                RNA {rnaDoneCount}/{totalTools}
-                {quadroDoneCount > 0 && ` · 3D ${quadroDoneCount}`}
+                {totalMotifs > 0
+                  ? `Quadro ${quadroDone}/${totalMotifs} motifs`
+                  : (viennaResult ? 'gqrs running…' : 'ViennaRNA running…')}
                 {progressLog.length > 0 && ` · ${progressLog[progressLog.length - 1]}`}
               </span>
             </div>
@@ -236,31 +269,33 @@ export default function HomeSection() {
       {/* ── Results panel ────────────────────────────────────────────────── */}
       {visibleTabs.length > 0 && (
         <div className={styles.resultsPanel}>
-
-          {/* Tab bar */}
+          {/* Motif tab bar */}
           <div className={styles.tabBar}>
             <div className={styles.tabs}>
               {visibleTabs.map(tool => {
-                const rna    = rnaResults[tool]
+                const motif  = gqrsMotifs.find(m => `G4_${m.id}` === tool)
                 const quadro = quadroResults[tool]
                 const isBest = tool === bestTool
+                const dv     = quadro?.displayVariant ?? quadro?.winner ?? 'standard'
                 const energy = quadro?.success
-                  ? (quadro.winner === 'alternative' ? quadro.altEnergy : quadro.stdEnergy)
+                  ? (dv === 'alternative' ? quadro.altEnergy : quadro.stdEnergy)
                   : null
 
                 return (
                   <button
                     key={tool}
-                    className={`${styles.tab} ${activeTab === tool ? styles.tabActive : ''} ${!rna?.success ? styles.tabFailed : ''}`}
+                    className={`${styles.tab} ${activeTab === tool ? styles.tabActive : ''} ${quadro?.success === false ? styles.tabFailed : ''}`}
                     onClick={() => setActiveTab(tool)}
                   >
-                    <TabDot rna={rna} quadro={quadro} />
-                    <span className={styles.tabName}>{tool}</span>
+                    <TabDot quadro={quadro} running={!quadro && phase === 'running'} />
+                    <span className={styles.tabName}>
+                      G4_{motif?.id} · {motif?.tetrads}T
+                    </span>
                     {isBest && <span className={styles.bestStar} title="Best energy">★</span>}
                     {energy != null && (
                       <span className={styles.energyChip}>{formatEnergy(energy)}</span>
                     )}
-                    {rna?.success === false && (
+                    {quadro?.success === false && (
                       <span className={styles.failChip}>!</span>
                     )}
                   </button>
@@ -272,57 +307,71 @@ export default function HomeSection() {
           {/* Tab body */}
           {activeTab && (
             <div className={styles.tabBody}>
-              {/* Meta row */}
-              <div className={styles.metaRow}>
-                {activeRna?.success && (
-                  <div className={styles.metaItem}>
-                    <span className={styles.metaLabel}>Structure</span>
-                    <code className={styles.structureCode}>{activeRna.structure}</code>
-                  </div>
-                )}
-                {activeRna?.success === false && (
-                  <div className={styles.metaError}>
-                    RNA prediction failed: {activeRna.error}
-                  </div>
-                )}
-                {activeQuadro?.success && (
-                  <>
-                    <div className={styles.metaItem}>
-                      <span className={styles.metaLabel}>ΔG std</span>
-                      <span className={styles.metaValue}>{formatEnergy(activeQuadro.stdEnergy)}</span>
-                    </div>
-                    {activeQuadro.hasAlt && (
-                      <div className={styles.metaItem}>
-                        <span className={styles.metaLabel}>ΔG alt</span>
-                        <span className={styles.metaValue}>{formatEnergy(activeQuadro.altEnergy)}</span>
-                      </div>
-                    )}
-                    <div className={styles.metaItem}>
-                      <span className={styles.metaLabel}>Winner</span>
-                      <span className={`${styles.metaValue} ${styles.winnerBadge}`}>
-                        {activeQuadro.winner}
-                      </span>
-                    </div>
+
+              {/* Action bar — downloads */}
+              {activeQuadro && (
+                <div className={styles.actionBar}>
+                  <div className={styles.actionLeft} />
+                  <div className={styles.actionRight}>
                     {activeQuadro.inpContent && (
-                      <div className={styles.metaItem}>
-                        <span className={styles.metaLabel}>Input</span>
-                        <InpPopover content={activeQuadro.inpContent} />
-                      </div>
+                      <button
+                        className={styles.actionBtn}
+                        onClick={handleDownloadInp}
+                        title="Download .inp input file"
+                      >
+                        ↓ .inp
+                      </button>
                     )}
-                  </>
-                )}
-                {activeQuadro?.success === false && !activeQuadro.skipped && (
+                    <button
+                      className={`${styles.actionBtn} ${styles.actionPrimary}`}
+                      disabled={!activePdbUrl}
+                      onClick={handleDownloadPdb}
+                      title={`Download ${displayVariant} PDB`}
+                    >
+                      ↓ .pdb ({displayVariant === 'alternative' ? 'alt' : 'std'})
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Energy comparison bar */}
+              {activeQuadro?.success && (activeQuadro.stdEnergy != null || activeQuadro.altEnergy != null) && (
+                <div className={styles.energyBar}>
+                  <span className={styles.energyBarLabel}>Energy</span>
+                  <EnergyBadge
+                    label="Standard"
+                    energy={activeQuadro.stdEnergy}
+                    isWinner={activeQuadro.winner === 'standard'}
+                    isActive={displayVariant === 'standard'}
+                    onClick={() => handleVariantToggle(activeTab, 'standard')}
+                  />
+                  {activeQuadro.altEnergy != null && (
+                    <EnergyBadge
+                      label="Alternative"
+                      energy={activeQuadro.altEnergy}
+                      isWinner={activeQuadro.winner === 'alternative'}
+                      isActive={displayVariant === 'alternative'}
+                      onClick={() => handleVariantToggle(activeTab, 'alternative')}
+                    />
+                  )}
+                  <span className={styles.energyBarHint}>lower = better minimization</span>
+                </div>
+              )}
+
+              {/* Error row */}
+              {activeQuadro?.success === false && (
+                <div className={styles.metaRow}>
                   <div className={styles.metaError}>
                     3D model failed: {activeQuadro.error}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* Generated .inp — shown on both success and failure */}
+              {/* Generated .inp */}
               {activeQuadro?.inpContent && (
                 <details className={styles.inpDetails}>
                   <summary className={styles.inpSummary}>Generated .inp input</summary>
-                  <pre className={styles.inpPre}>{activeQuadro.inpContent}</pre>
+                  <pre className={styles.inpPre}>{filterInpDisplay(activeQuadro.inpContent)}</pre>
                 </details>
               )}
 
@@ -334,18 +383,15 @@ export default function HomeSection() {
                 </details>
               )}
 
-
               {/* 3D viewer */}
-              {!activeQuadro?.skipped && (
-                <div className={styles.viewerWrap}>
-                  <MolstarViewer
-                    pdbUrl={activePdbUrl}
-                    runState={viewerState}
-                    runStatus={activeQuadro?.error ?? ''}
-                    structureName={activeTab}
-                  />
-                </div>
-              )}
+              <div className={styles.viewerWrap}>
+                <MolstarViewer
+                  pdbUrl={activePdbUrl}
+                  runState={viewerState}
+                  runStatus={activeQuadro?.error ?? ''}
+                  structureName={activeTab}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -354,10 +400,14 @@ export default function HomeSection() {
       {/* ── Idle placeholder ─────────────────────────────────────────────── */}
       {phase === 'idle' && (
         <div className={styles.idlePlaceholder}>
-          <PipelineIcon />
+          <G4Icon />
           <p className={styles.idleText}>
             Enter a nucleotide sequence and click <strong>Run Pipeline</strong> to predict
-            secondary structure with 7 RNA tools and generate 3D G-quadruplex models in parallel.
+            secondary structure with ViennaRNA, detect G-quadruplex motifs with gqrs,
+            and generate 3D G4 models for each motif in parallel.
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
+            Uppercase = RNA (parallel topology) · lowercase = DNA (antiparallel UDUD)
           </p>
         </div>
       )}
@@ -367,66 +417,70 @@ export default function HomeSection() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function TabDot({ rna, quadro }) {
-  if (!rna) return <span className={`${styles.tabDot} ${styles.tabDotGrey}`} />
-  if (!rna.success) return <span className={`${styles.tabDot} ${styles.tabDotRed}`} />
-  if (!quadro) return <span className={`${styles.tabDot} ${styles.tabDotPulse}`} />
-  if (quadro.skipped) return <span className={`${styles.tabDot} ${styles.tabDotSkipped}`} title="Duplicate structure — skipped" />
+function TabDot({ quadro, running }) {
+  if (running) return <span className={`${styles.tabDot} ${styles.tabDotPulse}`} />
+  if (!quadro) return <span className={`${styles.tabDot} ${styles.tabDotGrey}`} />
   if (!quadro.success) return <span className={`${styles.tabDot} ${styles.tabDotRed}`} />
   return <span className={`${styles.tabDot} ${styles.tabDotGreen}`} />
 }
 
-function InpPopover({ content }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
+function EnergyBadge({ label, energy, isWinner, isActive, onClick }) {
   return (
-    <div className={styles.inpPopoverWrap} ref={ref}>
-      <button
-        className={styles.inpIconBtn}
-        onClick={() => setOpen(v => !v)}
-        title="Show generated .inp parameters"
-        aria-expanded={open}
-      >ⓘ Show .inp</button>
-      {open && (
-        <div className={styles.inpPopover}>
-          <pre className={styles.inpPopoverPre}>{content}</pre>
-        </div>
-      )}
-    </div>
+    <span
+      onClick={onClick}
+      title="Click to view this model in Mol*"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '3px 10px', borderRadius: 'var(--r-sm)',
+        border: `1px solid ${isActive ? 'var(--teal)' : 'var(--border-med)'}`,
+        background: isActive ? 'var(--teal-light)' : 'var(--surface)',
+        cursor: 'pointer',
+        outline: isActive ? '2px solid var(--teal)' : 'none',
+        outlineOffset: 1,
+        transition: 'background 0.12s, border-color 0.12s',
+      }}
+    >
+      <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{label}</span>
+      <span style={{
+        color: isWinner ? 'var(--teal-dark)' : 'var(--text)',
+        fontWeight: isWinner ? 700 : 400,
+      }}>
+        {energy != null ? energy.toFixed(1) : '—'}
+      </span>
+      {isWinner && <span style={{ fontSize: 10, color: 'var(--teal-dark)' }}>★</span>}
+    </span>
   )
 }
 
-function PipelineIcon() {
+function G4Icon() {
   return (
     <svg width="52" height="52" viewBox="0 0 52 52" fill="none" style={{ marginBottom: 16 }}>
       <circle cx="26" cy="26" r="24" stroke="var(--border)" strokeWidth="1"/>
-      <polygon points="26,12 36,18 26,24 16,18" fill="url(#pi1)" opacity=".9"/>
-      <polygon points="26,17 36,23 26,29 16,23" fill="url(#pi2)" opacity=".8"/>
-      <polygon points="26,22 36,28 26,34 16,28" fill="url(#pi3)" opacity=".7"/>
-      <polygon points="26,27 36,33 26,39 16,33" fill="url(#pi4)" opacity=".6"/>
+      <rect x="14" y="14" width="10" height="10" rx="2" fill="url(#g1)" opacity=".9"/>
+      <rect x="28" y="14" width="10" height="10" rx="2" fill="url(#g2)" opacity=".9"/>
+      <rect x="14" y="28" width="10" height="10" rx="2" fill="url(#g3)" opacity=".9"/>
+      <rect x="28" y="28" width="10" height="10" rx="2" fill="url(#g4)" opacity=".9"/>
+      <line x1="19" y1="24" x2="19" y2="28" stroke="var(--border-med)" strokeWidth="1.5"/>
+      <line x1="33" y1="24" x2="33" y2="28" stroke="var(--border-med)" strokeWidth="1.5"/>
+      <line x1="24" y1="19" x2="28" y2="19" stroke="var(--border-med)" strokeWidth="1.5"/>
+      <line x1="24" y1="33" x2="28" y2="33" stroke="var(--border-med)" strokeWidth="1.5"/>
       <defs>
-        <linearGradient id="pi1" x1="16" y1="12" x2="36" y2="24" gradientUnits="userSpaceOnUse"><stop stopColor="#2D9AC5"/><stop offset="1" stopColor="#5DCAA5"/></linearGradient>
-        <linearGradient id="pi2" x1="16" y1="17" x2="36" y2="29" gradientUnits="userSpaceOnUse"><stop stopColor="#1D7FA5"/><stop offset="1" stopColor="#3DBAA0"/></linearGradient>
-        <linearGradient id="pi3" x1="16" y1="22" x2="36" y2="34" gradientUnits="userSpaceOnUse"><stop stopColor="#185F95"/><stop offset="1" stopColor="#2D9A90"/></linearGradient>
-        <linearGradient id="pi4" x1="16" y1="27" x2="36" y2="39" gradientUnits="userSpaceOnUse"><stop stopColor="#0C3F75"/><stop offset="1" stopColor="#1D7575"/></linearGradient>
+        <linearGradient id="g1" x1="14" y1="14" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stopColor="#2D9AC5"/><stop offset="1" stopColor="#5DCAA5"/></linearGradient>
+        <linearGradient id="g2" x1="28" y1="14" x2="38" y2="24" gradientUnits="userSpaceOnUse"><stop stopColor="#1D7FA5"/><stop offset="1" stopColor="#3DBAA0"/></linearGradient>
+        <linearGradient id="g3" x1="14" y1="28" x2="24" y2="38" gradientUnits="userSpaceOnUse"><stop stopColor="#185F95"/><stop offset="1" stopColor="#2D9A90"/></linearGradient>
+        <linearGradient id="g4" x1="28" y1="28" x2="38" y2="38" gradientUnits="userSpaceOnUse"><stop stopColor="#0C3F75"/><stop offset="1" stopColor="#1D7575"/></linearGradient>
       </defs>
     </svg>
   )
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
-
 function formatEnergy(e) {
   if (e == null) return '–'
   return `${Number(e).toFixed(1)} kcal/mol`
+}
+
+const HIDDEN_INP_KEYS = /^(test|rm_level|iteration)\s/i
+function filterInpDisplay(text) {
+  if (!text) return text
+  return text.split('\n').filter(l => !HIDDEN_INP_KEYS.test(l.trim())).join('\n')
 }

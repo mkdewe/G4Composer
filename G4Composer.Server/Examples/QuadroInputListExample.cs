@@ -21,9 +21,6 @@ public sealed class QuadroInputListExample : IExamplesProvider<List<QuadroInput>
             Rise        = "3.4",
             Twist       = "19",
             Path        = ["A1", "B1", "B4", "A4", "A3", "B3", "B2", "A2"],
-            IsTest      = false,
-            RmLevel     = 0,
-            Iterations  = 100,
             Sugar = "S",
         },
     ];

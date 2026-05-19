@@ -111,10 +111,6 @@ function parseInpFormat(raw) {
   const twist = result.twist?.trim() || DEFAULT_TWIST
   const rise  = result.rise?.trim() || '3.4'
 
-  // "test n" in .inp → isTest: false (14L default is n / false)
-  const testRaw = (result.test ?? result.istest ?? 'n').toLowerCase()
-  const isTest  = testRaw === 'y'
-
   return {
     name:        result.name,
     sequence:    result.sequence.toLowerCase(),
@@ -125,9 +121,9 @@ function parseInpFormat(raw) {
     twist,
     path:        pathList,
     pathRaw:     result.path || '',
-    isTest,
-    RM_Level:    parseInt(result.rm_level ?? result.rmlevel ?? '0', 10),
-    Iterations:  parseInt(result.iteration ?? result.iterations ?? '70', 10),
+    isTest:      false,
+    RM_Level:    0,
+    Iterations:  100,
     sugarPucker: detectSugarPucker(result.sequence),
     twistKey:    '>>',
     _format:     'inp',
@@ -191,7 +187,7 @@ export function parseInputLines(raw) {
     pathRaw:     '',
     isTest:      false,
     RM_Level:    0,
-    Iterations:  70,
+    Iterations:  100,
     _format:     '3line',
     _tetradCount: tetradCount,
   }

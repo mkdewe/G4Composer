@@ -47,13 +47,12 @@ public class QuadroInput
     /// <summary>
     /// Tryb testowy generatora (mapowany na pole <c>test</c> w .inp jako "y"/"n").
     /// </summary>
-    [JsonPropertyName("isTest")] // zgodność wsteczna z istniejącym kontraktem JSON
-    public bool IsTest { get; set; } = false;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsTest { get; } = false;
 
-    /// <summary>Poziom RMSD (pole <c>rm_level</c>).</summary>
-    [JsonPropertyName("RM_Level")] // zgodność wsteczna z istniejącym kontraktem JSON
-    public int RmLevel { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int RmLevel { get; } = 0;
 
-    /// <summary>Liczba iteracji CYANA (pole <c>iteration</c>).</summary>
-    public int Iterations { get; set; } = 100;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int Iterations { get; } = 100;
 }

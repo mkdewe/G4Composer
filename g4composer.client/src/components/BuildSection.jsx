@@ -340,10 +340,11 @@ function EnergyBadge({ label, energy, isWinner, isActive, onClick }) {
 
 function IterationSlider({ frames, activeStep, bestStep, onStep }) {
   if (!frames?.length) return null
-  const idx = Math.max(0, frames.findIndex(f => f.step === activeStep))
+  const idx    = Math.max(0, frames.findIndex(f => f.step === activeStep))
+  const thumbW = 16
 
   return (
-    <div style={{ padding: '4px 16px 8px', borderTop: '1px solid var(--border)' }}>
+    <div style={{ padding: '4px 16px 10px', borderTop: '1px solid var(--border)' }}>
       <input
         type="range"
         min={0}
@@ -353,17 +354,20 @@ function IterationSlider({ frames, activeStep, bestStep, onStep }) {
         onChange={e => onStep(frames[+e.target.value].step)}
         className={styles.iterSlider}
       />
-      <div style={{
-        display: 'flex', justifyContent: 'space-between',
-        paddingTop: 3, fontFamily: 'var(--mono)', fontSize: 10,
-      }}>
-        {frames.map(f => {
+      <div style={{ position: 'relative', height: 16, marginTop: 6, fontFamily: 'var(--mono)', fontSize: 10 }}>
+        {frames.map((f, i) => {
+          const pct      = frames.length > 1 ? i / (frames.length - 1) * 100 : 50
+          const offsetPx = thumbW * (0.5 - pct / 100)
           const isCurrent = f.step === activeStep
           const isBest    = f.step === bestStep
           return (
             <span key={f.step} style={{
+              position: 'absolute',
+              left: `calc(${pct}% + ${offsetPx}px)`,
+              transform: 'translateX(-50%)',
               color: isCurrent ? 'var(--teal-dark)' : 'var(--text-dim)',
               fontWeight: isCurrent ? 700 : 400,
+              whiteSpace: 'nowrap',
             }}>
               {f.step}{isBest ? '★' : ''}
             </span>

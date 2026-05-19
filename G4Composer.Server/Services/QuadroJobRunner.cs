@@ -22,9 +22,14 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
     private const int PollIntervalMs  = 150;
     private const int PollMaxAttempts = 40;
 
+    // Matches "Etotal = -605.7" in xplor output / energy files
     private static readonly Regex EtotalRegex =
         new(@"Etotal\s*=\s*([-+]?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    // Matches iteration-step PDB names like "6w9p_80.pdb" — captures step number
+    private static readonly Regex StepPdbRegex =
+        new(@"_(\d+)\.pdb$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly IDockerCommandRunner    _docker;
     private readonly IQuadroEngineSelector   _engineSelector;
@@ -49,7 +54,7 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         IReadOnlyList<QuadroJobItem> items,
         CancellationToken cancellationToken)
     {
-        var empty = new SingleRunResult(null, null, false);
+        var empty = SingleRunResult.Empty;
         if (items.Count == 0) return new DualRunResult(empty, empty);
 
         foreach (var item in items)
@@ -62,13 +67,11 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         if (items.Count > 1)
         {
             // Batch: sequential, standard engine only
-            (byte[]? pdb, double? e, string _) last = default;
+            SingleRunResult last = empty;
             foreach (var item in items)
                 last = await CoreAsync(jobId, jobDir, item.InpFileName,
                     engine.Executable, engine.Image, "std", cancellationToken);
-            return new DualRunResult(
-                new SingleRunResult(last.pdb, last.e, last.pdb is not null),
-                empty);
+            return new DualRunResult(last, empty);
         }
 
         // Single item: dual parallel run
@@ -91,17 +94,17 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         var altTask = altExe is not null
             ? CoreAsync(jobId + "_alt", altDir, item0.InpFileName,
                 altExe, engine.Image, "alt", cancellationToken)
-            : Task.FromResult<(byte[]?, double?, string)>((null, null, ""));
+            : Task.FromResult(SingleRunResult.Empty);
 
-        (byte[]? pdb, double? e, string log) stdRes = default;
-        (byte[]? pdb, double? e, string log) altRes = default;
+        SingleRunResult stdRes = empty;
+        SingleRunResult altRes = empty;
 
         try   { stdRes = await stdTask; }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Job {J}: standard run failed", jobId);
             _logStore.Append(jobId, $"ERROR (standard): {ex.Message}");
-            throw;   // standard failure = job failure
+            throw;
         }
 
         try   { altRes = await altTask; }
@@ -111,14 +114,12 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
             _logStore.Append(jobId, $"WARNING (alternative): {ex.Message}");
         }
 
-        return new DualRunResult(
-            new SingleRunResult(stdRes.pdb, stdRes.e ?? ParseEtotal(stdRes.log), stdRes.pdb is not null),
-            new SingleRunResult(altRes.pdb, altRes.e ?? ParseEtotal(altRes.log), altRes.pdb is not null));
+        return new DualRunResult(stdRes, altRes);
     }
 
     // ── Core runner ─────────────────────────────────────────────────────────
 
-    private async Task<(byte[]? Pdb, double? Etotal, string Stdout)> CoreAsync(
+    private async Task<SingleRunResult> CoreAsync(
         string jobId, string jobDir, string inpFile,
         string executable, string image, string prefix,
         CancellationToken ct)
@@ -153,10 +154,13 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
             await ExecDebug  (jobId, cname, ct, "ls", "-lh", $"{workDir}/");
             await ExecChecked(jobId, cname, ct, "/bin/sh", "-c",
                 $"cp {workDir}/*.pdb {dataDir}/ 2>/dev/null || true");
+            await ExecChecked(jobId, cname, ct, "/bin/sh", "-c",
+                $"cp {workDir}/*_energy.txt {dataDir}/ 2>/dev/null || true");
             await ExecDebug  (jobId, cname, ct, "ls", "-lh", $"{dataDir}/");
 
-            var pdbs = Directory.GetFiles(jobDir, "*.pdb");
-            if (pdbs.Length == 0)
+            var frames = CollectFrames(jobDir, quadro.Stdout, preferAlt: prefix == "alt");
+
+            if (frames.Count == 0)
             {
                 var files = string.Join(", ", Directory.GetFiles(jobDir).Select(Path.GetFileName));
                 throw new DockerException(
@@ -164,11 +168,81 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
                     BuildDiag(quadro, files));
             }
 
-            var best  = pdbs.FirstOrDefault(f => f.Contains("xplor", StringComparison.OrdinalIgnoreCase)) ?? pdbs[0];
-            var bytes = await File.ReadAllBytesAsync(best, ct);
-            return (bytes, ParseEtotal(quadro.Stdout), quadro.Stdout);
+            return new SingleRunResult(frames, true);
         }
         finally { await RemoveAsync(jobId, cname); }
+    }
+
+    // ── Frame collector ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Collects per-step PDB frames from jobDir.
+    /// Prefers *_{step}.pdb files (multi-step run); falls back to any xplor PDB.
+    /// </summary>
+    /// <param name="preferAlt">
+    /// True when collecting from the alt engine (alternatywa14L.exe).
+    /// That script runs two quadro14L calls in the same dir, producing both
+    /// <c>name_N.pdb</c> (inner std run) and <c>name_alt_N.pdb</c> (actual alt run).
+    /// When true, the <c>_alt_</c> files are selected; otherwise they are excluded.
+    /// </param>
+    private static List<IterationFrame> CollectFrames(string jobDir, string stdout, bool preferAlt = false)
+    {
+        var frames = new List<IterationFrame>();
+
+        // Gather all PDB files in jobDir, respecting which engine produced them.
+        var allPdbs = Directory.GetFiles(jobDir, "*.pdb");
+        var altPdbs = allPdbs.Where(p =>  Path.GetFileName(p).Contains("_alt_", StringComparison.OrdinalIgnoreCase)).ToArray();
+        var stdPdbs = allPdbs.Where(p => !Path.GetFileName(p).Contains("_alt_", StringComparison.OrdinalIgnoreCase)).ToArray();
+        var pdbs = preferAlt && altPdbs.Length > 0 ? altPdbs : stdPdbs;
+
+        // Try to find step-numbered PDBs: name_80.pdb, name_100.pdb, etc.
+        // Exclude raw CYANA checkpoint_*.pdb files — they are unprocessed intermediates.
+        // Deduplicate by step: if multiple files share the same step number, keep the first.
+        var stepPdbs = pdbs
+            .Where(p => !Path.GetFileName(p).StartsWith("checkpoint_", StringComparison.OrdinalIgnoreCase))
+            .Select(p => (Path: p, Match: StepPdbRegex.Match(Path.GetFileName(p))))
+            .Where(t => t.Match.Success)
+            .Select(t => (t.Path, Step: int.Parse(t.Match.Groups[1].Value)))
+            .GroupBy(t => t.Step)
+            .Select(g => g.First())
+            .OrderBy(t => t.Step)
+            .ToList();
+
+        if (stepPdbs.Count > 0)
+        {
+            foreach (var (pdbPath, step) in stepPdbs)
+            {
+                var pdbBytes = File.ReadAllBytes(pdbPath);
+                var energy   = ReadEnergyFile(jobDir, pdbPath, step) ?? ParseEtotal(stdout);
+                frames.Add(new IterationFrame(step, pdbBytes, energy));
+            }
+            return frames;
+        }
+
+        // Fallback: single-step legacy run (no step suffix)
+        var best = pdbs.FirstOrDefault(f => f.Contains("xplor", StringComparison.OrdinalIgnoreCase))
+                   ?? pdbs.FirstOrDefault();
+        if (best is not null)
+        {
+            var pdbBytes = File.ReadAllBytes(best);
+            frames.Add(new IterationFrame(100, pdbBytes, ParseEtotal(stdout)));
+        }
+        return frames;
+    }
+
+    private static double? ReadEnergyFile(string jobDir, string pdbPath, int step)
+    {
+        // energy file naming: {name}_{step}_energy.txt
+        // derive base name from PDB path: strip step suffix
+        var pdbName = Path.GetFileNameWithoutExtension(pdbPath); // e.g. "6w9p_80"
+        var energyFile = Path.Combine(jobDir, $"{pdbName}_energy.txt");
+        if (!File.Exists(energyFile)) return null;
+        var text = File.ReadAllText(energyFile);
+        var m = EtotalRegex.Matches(text);
+        if (m.Count == 0) return null;
+        return double.TryParse(m[^1].Groups[1].Value,
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
     }
 
     // ── Energy parser ────────────────────────────────────────────────────────

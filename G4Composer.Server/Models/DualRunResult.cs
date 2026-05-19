@@ -1,10 +1,29 @@
 namespace G4Composer.Server.Models;
 
 /// <summary>
-/// Result of a single engine run — contains the PDB bytes and the final Etotal
-/// energy parsed from Xplor-NIH output. Energy is null if parsing failed.
+/// One minimization checkpoint: the complete Xplor-refined structure at a given
+/// cumulative CYANA iteration count.
 /// </summary>
-public sealed record SingleRunResult(byte[]? Pdb, double? Etotal, bool Success);
+public sealed record IterationFrame(int Step, byte[] Pdb, double? Etotal);
+
+/// <summary>
+/// Result of a single engine run. Frames contains one entry per iteration_steps
+/// checkpoint. Pdb and Etotal are derived from the best-energy frame.
+/// </summary>
+public sealed record SingleRunResult(IReadOnlyList<IterationFrame> Frames, bool Success)
+{
+    public static readonly SingleRunResult Empty =
+        new([], false);
+
+    /// <summary>Frame with the lowest (best) Etotal, or first frame if no energy available.</summary>
+    public IterationFrame? BestFrame =>
+        Frames.Count == 0 ? null
+        : Frames.Where(f => f.Etotal.HasValue).MinBy(f => f.Etotal!.Value)
+          ?? Frames[0];
+
+    public byte[]? Pdb    => BestFrame?.Pdb;
+    public double? Etotal => BestFrame?.Etotal;
+}
 
 /// <summary>
 /// Result of a dual run: standard quadro14L.exe + alternative alternatywa14L.exe,

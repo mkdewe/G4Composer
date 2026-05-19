@@ -121,6 +121,23 @@ export async function runQuadro11(inputs, onProgress) {
     const hasAlt    = response.headers.get('X-Has-Alt') === '1'
     const winner    = response.headers.get('X-Winner') || 'standard'
 
+    // Parse multi-step frame headers
+    const parseSteps    = h => (h || '').split(',').map(Number).filter(n => !isNaN(n) && n > 0)
+    const parseEnergies = h => (h || '').split(',').map(s => s.trim() === '' ? null : parseFloat(s))
+    const stdSteps    = parseSteps(response.headers.get('X-Std-Steps'))
+    const altSteps    = parseSteps(response.headers.get('X-Alt-Steps'))
+    const stdEnergies = parseEnergies(response.headers.get('X-Std-Energies'))
+    const altEnergies = parseEnergies(response.headers.get('X-Alt-Energies'))
+    const stdBestStep = parseInt(response.headers.get('X-Std-Best-Step') || '0', 10) || null
+    const altBestStep = parseInt(response.headers.get('X-Alt-Best-Step') || '0', 10) || null
+
+    // Build per-step frames metadata (PDB URLs fetched lazily)
+    const buildFramesMeta = (steps, energies) =>
+      steps.map((step, i) => ({ step, energy: energies[i] ?? null, url: null, blob: null }))
+
+    const stdFrames = buildFramesMeta(stdSteps, stdEnergies)
+    const altFrames = buildFramesMeta(altSteps, altEnergies)
+
     // Fetch alternative PDB if available
     let altBlob = null
     let altUrl  = null
@@ -144,6 +161,7 @@ export async function runQuadro11(inputs, onProgress) {
       stdEnergy: stdEnergy ? parseFloat(stdEnergy) : null,
       altEnergy:  altEnergy  ? parseFloat(altEnergy)  : null,
       hasAlt, winner, altBlob, altUrl,
+      stdFrames, altFrames, stdBestStep, altBestStep, jobId,
     }
 
   } catch (err) {
@@ -287,6 +305,26 @@ export async function fetchSilvaGroups() {
     })
     if (!response.ok) return null
     return await response.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch a single iteration-step PDB for a completed job.
+ * Returns an object { blob, url } or null on failure.
+ * @param {string} jobId
+ * @param {'std'|'alt'} engine
+ * @param {number} step
+ * @returns {Promise<{blob: Blob, url: string}|null>}
+ */
+export async function fetchFrame(jobId, engine, step) {
+  try {
+    const res = await fetch(`/api/quadro11/frame/${jobId}/${engine}/${step}`)
+    if (!res.ok) return null
+    const raw  = await res.blob()
+    const blob = raw.type === 'chemical/x-pdb' ? raw : new Blob([raw], { type: 'chemical/x-pdb' })
+    return { blob, url: URL.createObjectURL(blob) }
   } catch {
     return null
   }

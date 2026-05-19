@@ -35,6 +35,7 @@ public sealed class QuadroController : ControllerBase
     private readonly QuadroOptions _options;
     private readonly IJobLogStore _logStore;
     private readonly IAltPdbStore _altPdbStore;
+    private readonly IFrameStore _frameStore;
 
     public QuadroController(
         ILogger<QuadroController> logger,
@@ -44,7 +45,8 @@ public sealed class QuadroController : ControllerBase
         IValidator<QuadroInput> validator,
         IOptions<QuadroOptions> options,
         IJobLogStore logStore,
-        IAltPdbStore altPdbStore)
+        IAltPdbStore altPdbStore,
+        IFrameStore frameStore)
     {
         _logger = logger;
         _engineSelector = engineSelector;
@@ -54,6 +56,7 @@ public sealed class QuadroController : ControllerBase
         _options = options.Value;
         _logStore = logStore;
         _altPdbStore = altPdbStore;
+        _frameStore = frameStore;
     }
 
     // ── Health ───────────────────────────────────────────────────────────────
@@ -145,21 +148,42 @@ public sealed class QuadroController : ControllerBase
             _logger.LogInformation("Job {JobId}: success, {Bytes} bytes (std), altSuccess={AltOk}",
                 jobId, result.Standard.Pdb.Length, result.Alternative.Success);
 
-            // Store alt PDB for later retrieval via GET /alt-pdb/{jobId}
+            // Store all frames for later retrieval
+            foreach (var frame in result.Standard.Frames)
+                _frameStore.Store(jobId, "std", frame.Step, frame.Pdb);
+            if (result.Alternative.Success)
+                foreach (var frame in result.Alternative.Frames)
+                    _frameStore.Store(jobId, "alt", frame.Step, frame.Pdb);
+
+            // Store alt best-frame PDB for legacy GET /alt-pdb/{jobId}
             if (result.Alternative.Success && result.Alternative.Pdb is not null)
                 _altPdbStore.Store(jobId, result.Alternative.Pdb);
 
-            var stdEnergy = result.Standard.Etotal?.ToString("F3", System.Globalization.CultureInfo.InvariantCulture) ?? "";
-            var altEnergy = result.Alternative.Etotal?.ToString("F3", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            var ic = System.Globalization.CultureInfo.InvariantCulture;
+            var stdEnergy    = result.Standard.Etotal?.ToString("F3", ic) ?? "";
+            var altEnergy    = result.Alternative.Etotal?.ToString("F3", ic) ?? "";
+            var stdSteps     = string.Join(",", result.Standard.Frames.Select(f => f.Step));
+            var altSteps     = string.Join(",", result.Alternative.Frames.Select(f => f.Step));
+            var stdEnergies  = string.Join(",", result.Standard.Frames.Select(f => f.Etotal?.ToString("F3", ic) ?? ""));
+            var altEnergies  = string.Join(",", result.Alternative.Frames.Select(f => f.Etotal?.ToString("F3", ic) ?? ""));
+            var stdBestStep  = result.Standard.BestFrame?.Step.ToString() ?? "";
+            var altBestStep  = result.Alternative.BestFrame?.Step.ToString() ?? "";
 
-            Response.Headers["X-Job-Id"]      = jobId;
-            Response.Headers["X-Atom-Count"]  = CountPdbAtoms(result.Standard.Pdb).ToString();
-            Response.Headers["X-Std-Energy"]  = stdEnergy;
-            Response.Headers["X-Alt-Energy"]  = altEnergy;
-            Response.Headers["X-Has-Alt"]     = result.Alternative.Success ? "1" : "0";
-            Response.Headers["X-Winner"]      = result.Winner ?? "standard";
+            Response.Headers["X-Job-Id"]         = jobId;
+            Response.Headers["X-Atom-Count"]      = CountPdbAtoms(result.Standard.Pdb).ToString();
+            Response.Headers["X-Std-Energy"]      = stdEnergy;
+            Response.Headers["X-Alt-Energy"]      = altEnergy;
+            Response.Headers["X-Has-Alt"]         = result.Alternative.Success ? "1" : "0";
+            Response.Headers["X-Winner"]          = result.Winner ?? "standard";
+            Response.Headers["X-Std-Steps"]       = stdSteps;
+            Response.Headers["X-Alt-Steps"]       = altSteps;
+            Response.Headers["X-Std-Energies"]    = stdEnergies;
+            Response.Headers["X-Alt-Energies"]    = altEnergies;
+            Response.Headers["X-Std-Best-Step"]   = stdBestStep;
+            Response.Headers["X-Alt-Best-Step"]   = altBestStep;
             Response.Headers["Access-Control-Expose-Headers"] =
-                "X-Job-Id, X-Atom-Count, X-Std-Energy, X-Alt-Energy, X-Has-Alt, X-Winner";
+                "X-Job-Id, X-Atom-Count, X-Std-Energy, X-Alt-Energy, X-Has-Alt, X-Winner, " +
+                "X-Std-Steps, X-Alt-Steps, X-Std-Energies, X-Alt-Energies, X-Std-Best-Step, X-Alt-Best-Step";
 
             return File(result.Standard.Pdb, "chemical/x-pdb", $"g4_{jobId}.pdb");
         }
@@ -186,6 +210,21 @@ public sealed class QuadroController : ControllerBase
             // Sprzątanie w tle — nie blokuje odpowiedzi.
             _ = Task.Run(() => CleanupJobDir(jobDir));
         }
+    }
+
+    // ── Frame PDB ────────────────────────────────────────────────────────────
+
+    [HttpGet("frame/{jobId}/{engine}/{step:int}")]
+    [SwaggerOperation(Summary = "Get PDB for a specific iteration frame", Tags = [SwaggerTag])]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "chemical/x-pdb")]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult GetFrame(string jobId, string engine, int step)
+    {
+        var pdb = _frameStore.Get(jobId, engine, step);
+        if (pdb is null)
+            return NotFound(new ErrorDto($"Frame {engine}/{step} for job '{jobId}' not found."));
+
+        return File(pdb, "chemical/x-pdb", $"g4_{jobId}_{engine}_{step}.pdb");
     }
 
     // ── Alt PDB ──────────────────────────────────────────────────────────────

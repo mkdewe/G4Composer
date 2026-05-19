@@ -33,6 +33,7 @@ public static class QuadroServiceCollectionExtensions
         services.AddSingleton<IDockerHealthService, DockerHealthService>();
         services.AddSingleton<IJobLogStore, InMemoryJobLogStore>();
         services.AddSingleton<IAltPdbStore, InMemoryAltPdbStore>();
+        services.AddSingleton<IFrameStore, InMemoryFrameStore>();
         services.AddSingleton<IQuadroJobRunner, QuadroJobRunner>();
 
         return services;

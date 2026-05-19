@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import MolstarViewer from './MolstarViewer.jsx'
-import { runPipeline, fetchPipelinePdb, fetchPipelineAltPdb } from '../services/apiService.js'
+import { runPipeline, fetchPipelinePdb, fetchPipelineAltPdb, fetchFrame } from '../services/apiService.js'
 import { downloadInp } from '../utils/inpSerializer.js'
 import styles from './HomeSection.module.css'
 
@@ -12,6 +12,11 @@ export default function HomeSection() {
   const [quadroResults, setQuadroResults] = useState({})       // { 'G4_1': { ... } }
   const [activeTab,     setActiveTab]     = useState(null)
   const [progressLog,   setProgressLog]   = useState([])
+
+  // Per-motif slider positions: { 'G4_1': { std: 80, alt: 60 }, ... }
+  const [motifSteps,    setMotifSteps]    = useState({})
+  const [displayedPdbUrl, setDisplayedPdbUrl] = useState(null)
+  const frameCacheRef = useRef({})
 
   const abortRef = useRef(null)
 
@@ -81,8 +86,19 @@ export default function HomeSection() {
 
           case 'quadro_done': {
             const { tool, motifId, success, jobId, stdEnergy, altEnergy, winner,
-                    hasAlt, error, inpContent, quadroOutput, combinedStructure } = event
+                    hasAlt, error, inpContent, quadroOutput, combinedStructure,
+                    stdFrames: stdFramesMeta, altFrames: altFramesMeta,
+                    stdBestStep, altBestStep } = event
             if (success) {
+              // Auto-set slider to best-energy step for this motif
+              setMotifSteps(prev => ({
+                ...prev,
+                [tool]: {
+                  std: stdBestStep ?? null,
+                  alt: altBestStep ?? null,
+                },
+              }))
+
               const fetchBoth = async () => {
                 const pdbUrl    = await fetchPipelinePdb(jobId)
                 const altPdbUrl = hasAlt ? await fetchPipelineAltPdb(jobId) : null
@@ -95,6 +111,10 @@ export default function HomeSection() {
                     [tool]: {
                       success: true, motifId, jobId, stdEnergy, altEnergy,
                       winner, hasAlt, pdbUrl, altPdbUrl,
+                      stdFrames: stdFramesMeta ?? [],
+                      altFrames: altFramesMeta ?? [],
+                      stdBestStep: stdBestStep ?? null,
+                      altBestStep: altBestStep ?? null,
                       combinedStructure: combinedStructure ?? null,
                       displayVariant: winner ?? 'standard',
                       inpContent, error: null,
@@ -157,6 +177,7 @@ export default function HomeSection() {
   }, [])
 
   const handleVariantToggle = useCallback((tool, variant) => {
+    setDisplayedPdbUrl(null)
     setQuadroResults(prev => {
       const r = prev[tool]
       if (!r) return prev
@@ -167,9 +188,57 @@ export default function HomeSection() {
   // ── Active tab data ───────────────────────────────────────────────────────
   const activeQuadro   = activeTab ? quadroResults[activeTab] : null
   const displayVariant = activeQuadro?.displayVariant ?? 'standard'
-  const activePdbUrl   = displayVariant === 'alternative'
-    ? (activeQuadro?.altPdbUrl ?? activeQuadro?.pdbUrl)
-    : (activeQuadro?.pdbUrl ?? null)
+
+  const activeStdFrames = activeQuadro?.stdFrames ?? []
+  const activeAltFrames = activeQuadro?.altFrames ?? []
+  const activeFrames    = displayVariant === 'alternative' ? activeAltFrames : activeStdFrames
+  const activeStep      = motifSteps[activeTab]?.[displayVariant === 'alternative' ? 'alt' : 'std'] ?? null
+  const activeBestStep  = displayVariant === 'alternative'
+    ? activeQuadro?.altBestStep : activeQuadro?.stdBestStep
+
+  const stdStepEnergy = activeStdFrames.find(f => f.step === motifSteps[activeTab]?.std)?.energy
+    ?? activeQuadro?.stdEnergy ?? null
+  const altStepEnergy = activeAltFrames.find(f => f.step === motifSteps[activeTab]?.alt)?.energy
+    ?? activeQuadro?.altEnergy ?? null
+
+  // Lazy-fetch frame PDB when tab / variant / step changes
+  useEffect(() => {
+    if (!activeQuadro?.success || !activeQuadro.jobId) {
+      setDisplayedPdbUrl(
+        displayVariant === 'alternative'
+          ? (activeQuadro?.altPdbUrl ?? activeQuadro?.pdbUrl ?? null)
+          : (activeQuadro?.pdbUrl ?? null)
+      )
+      return
+    }
+    const engine = displayVariant === 'alternative' ? 'alt' : 'std'
+    if (activeFrames.length <= 1 || !activeStep) {
+      setDisplayedPdbUrl(
+        displayVariant === 'alternative'
+          ? (activeQuadro.altPdbUrl ?? activeQuadro.pdbUrl ?? null)
+          : (activeQuadro.pdbUrl ?? null)
+      )
+      return
+    }
+    const cacheKey = `${activeQuadro.jobId}_${engine}_${activeStep}`
+    if (frameCacheRef.current[cacheKey]) {
+      setDisplayedPdbUrl(frameCacheRef.current[cacheKey])
+      return
+    }
+    let cancelled = false
+    fetchFrame(activeQuadro.jobId, engine, activeStep).then(result => {
+      if (!cancelled && result?.url) {
+        frameCacheRef.current[cacheKey] = result.url
+        setDisplayedPdbUrl(result.url)
+      }
+    })
+    return () => { cancelled = true }
+  }, [activeTab, displayVariant, activeStep, activeQuadro?.jobId, activeQuadro?.success])
+
+  const activePdbUrl = displayedPdbUrl
+    ?? (displayVariant === 'alternative'
+      ? (activeQuadro?.altPdbUrl ?? activeQuadro?.pdbUrl ?? null)
+      : (activeQuadro?.pdbUrl ?? null))
 
   const quadroRunning = activeTab && gqrsMotifs.length > 0 && !quadroResults[activeTab]
   const viewerState   = quadroRunning ? 'running'
@@ -189,10 +258,12 @@ export default function HomeSection() {
 
   function handleDownloadPdb() {
     if (!activePdbUrl) return
-    const variant = displayVariant === 'alternative' ? 'alt' : 'std'
+    const engine = displayVariant === 'alternative' ? 'alt' : 'std'
+    const step   = motifSteps[activeTab]?.[engine] ?? null
+    const suffix = step && activeFrames.length > 1 ? `${engine}_${step}` : engine
     const a = document.createElement('a')
     a.href     = activePdbUrl
-    a.download = `${activeTab ?? 'structure'}_${variant}.pdb`
+    a.download = `${activeTab ?? 'structure'}_${suffix}.pdb`
     a.click()
   }
 
@@ -334,27 +405,43 @@ export default function HomeSection() {
                 </div>
               )}
 
-              {/* Energy comparison bar */}
+              {/* Energy comparison bar + iteration slider */}
               {activeQuadro?.success && (activeQuadro.stdEnergy != null || activeQuadro.altEnergy != null) && (
-                <div className={styles.energyBar}>
-                  <span className={styles.energyBarLabel}>Energy</span>
-                  <EnergyBadge
-                    label="Standard"
-                    energy={activeQuadro.stdEnergy}
-                    isWinner={activeQuadro.winner === 'standard'}
-                    isActive={displayVariant === 'standard'}
-                    onClick={() => handleVariantToggle(activeTab, 'standard')}
-                  />
-                  {activeQuadro.altEnergy != null && (
+                <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
+                  <div className={styles.energyBar}>
+                    <span className={styles.energyBarLabel}>Energy</span>
                     <EnergyBadge
-                      label="Alternative"
-                      energy={activeQuadro.altEnergy}
-                      isWinner={activeQuadro.winner === 'alternative'}
-                      isActive={displayVariant === 'alternative'}
-                      onClick={() => handleVariantToggle(activeTab, 'alternative')}
+                      label="Standard"
+                      energy={stdStepEnergy}
+                      isWinner={activeQuadro.winner === 'standard'}
+                      isActive={displayVariant === 'standard'}
+                      onClick={() => handleVariantToggle(activeTab, 'standard')}
+                    />
+                    {activeQuadro.altEnergy != null && (
+                      <EnergyBadge
+                        label="Alternative"
+                        energy={altStepEnergy}
+                        isWinner={activeQuadro.winner === 'alternative'}
+                        isActive={displayVariant === 'alternative'}
+                        onClick={() => handleVariantToggle(activeTab, 'alternative')}
+                      />
+                    )}
+                    <span className={styles.energyBarHint}>lower = better minimization</span>
+                  </div>
+                  {activeFrames.length > 1 && (
+                    <IterationSlider
+                      frames={activeFrames}
+                      activeStep={activeStep}
+                      bestStep={activeBestStep}
+                      onStep={step => setMotifSteps(prev => ({
+                        ...prev,
+                        [activeTab]: {
+                          ...(prev[activeTab] ?? {}),
+                          [displayVariant === 'alternative' ? 'alt' : 'std']: step,
+                        },
+                      }))}
                     />
                   )}
-                  <span className={styles.energyBarHint}>lower = better minimization</span>
                 </div>
               )}
 
@@ -449,6 +536,41 @@ function EnergyBadge({ label, energy, isWinner, isActive, onClick }) {
       </span>
       {isWinner && <span style={{ fontSize: 10, color: 'var(--teal-dark)' }}>★</span>}
     </span>
+  )
+}
+
+function IterationSlider({ frames, activeStep, bestStep, onStep }) {
+  if (!frames?.length) return null
+  const idx = Math.max(0, frames.findIndex(f => f.step === activeStep))
+  return (
+    <div style={{ padding: '4px 16px 8px', borderTop: '1px solid var(--border)' }}>
+      <input
+        type="range"
+        min={0}
+        max={frames.length - 1}
+        step={1}
+        value={idx}
+        onChange={e => onStep(frames[+e.target.value].step)}
+        style={{ width: '100%', display: 'block', accentColor: 'var(--teal)', cursor: 'pointer' }}
+      />
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        paddingTop: 3, fontFamily: 'var(--mono)', fontSize: 10,
+      }}>
+        {frames.map(f => {
+          const isCurrent = f.step === activeStep
+          const isBest    = f.step === bestStep
+          return (
+            <span key={f.step} style={{
+              color: isCurrent ? 'var(--teal-dark)' : 'var(--text-dim)',
+              fontWeight: isCurrent ? 700 : 400,
+            }}>
+              {f.step}{isBest ? '★' : ''}
+            </span>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

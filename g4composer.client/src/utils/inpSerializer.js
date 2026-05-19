@@ -29,7 +29,10 @@ export function serializeInp(input) {
     : (input.path || '')
   const test      = 'n'
   const rmLevel   = 0
-  const iteration = 100
+  const steps     = Array.isArray(input.iterationSteps) && input.iterationSteps.length > 0
+    ? input.iterationSteps
+    : [20, 40, 60, 80, 100]
+  const iterationSteps = steps.join(',')
 
   // Match pz74 reference format — field name left-padded with spaces
   return [
@@ -44,7 +47,7 @@ export function serializeInp(input) {
     `path        ${path}`,
     `test               ${test}`,
     `rm_level           ${rmLevel}`,
-    `iteration          ${iteration}`,
+    `iteration_steps    ${iterationSteps}`,
   ].join('\n') + '\n'
 }
 

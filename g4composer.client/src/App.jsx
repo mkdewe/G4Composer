@@ -54,13 +54,17 @@ export default function App() {
       setRuns(prev => prev.map(r => r.id === runId ? { ...r, ...patch } : r))
 
     try {
-      const { blob, headers, dockerLog, stdEnergy, altEnergy, hasAlt, winner, altBlob, altUrl } = await runQuadro11(inputs, (msg) => {
+      const {
+        blob, headers, dockerLog, stdEnergy, altEnergy, hasAlt, winner,
+        altBlob, altUrl, stdFrames, altFrames, stdBestStep, altBestStep,
+        jobId: returnedJobId,
+      } = await runQuadro11(inputs, (msg) => {
         setCurrentStatus(msg)
         updateRun({ status: msg })
       })
 
       const url    = URL.createObjectURL(blob)
-      const jobId  = headers.get('X-Job-Id')     || '–'
+      const jobId  = returnedJobId || headers.get('X-Job-Id') || '–'
       const atoms  = headers.get('X-Atom-Count') || '?'
       const elapsed = headers.get('X-Elapsed-Ms') || null
 
@@ -75,6 +79,10 @@ export default function App() {
         winner,
         altBlob,
         altUrl,
+        stdFrames:    stdFrames  || [],
+        altFrames:    altFrames  || [],
+        stdBestStep:  stdBestStep || null,
+        altBestStep:  altBestStep || null,
         jobInfo: {
           jobId,
           atoms,

@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import SequenceForm from './SequenceForm.jsx'
 import MolstarViewer from './MolstarViewer.jsx'
 import PdbPreview from './PdbPreview.jsx'
 import RunLog from './RunLog.jsx'
 import styles from './BuildSection.module.css'
 import { downloadInp } from '../utils/inpSerializer.js'
+import { fetchFrame } from '../services/apiService.js'
 
 export default function BuildSection({
   runs,
@@ -19,6 +20,13 @@ export default function BuildSection({
   const [activeTab,   setActiveTab]   = useState('viewer')
   const [viewEngine,  setViewEngine]  = useState('standard')  // 'standard' | 'alternative'
 
+  // Per-engine active step (iteration slider position)
+  const [stdActiveStep, setStdActiveStep] = useState(null)
+  const [altActiveStep, setAltActiveStep] = useState(null)
+
+  // Cache of fetched frame URLs: { [jobId_engine_step]: url }
+  const frameCacheRef = useRef({})
+
   // Auto-select the lower-energy model when a run completes.
   // Runs on run-id change (new tab) or state→done transition.
   // Does NOT reset when switching between existing tabs — user's choice is preserved.
@@ -28,25 +36,76 @@ export default function BuildSection({
     const isNewRun = activeRun.id !== prevRunIdRef.current
     prevRunIdRef.current = activeRun.id
     if (isNewRun || activeRun.state === 'done') {
-      // Only auto-select on new run completion, not on tab switch
       if (isNewRun && activeRun.state !== 'done') return
       setViewEngine(activeRun.winner ?? 'standard')
+      // Auto-set slider to best-energy step
+      setStdActiveStep(activeRun.stdBestStep ?? null)
+      setAltActiveStep(activeRun.altBestStep ?? null)
     }
-  }, [activeRun?.id, activeRun?.state, activeRun?.winner])
+  }, [activeRun?.id, activeRun?.state, activeRun?.winner, activeRun?.stdBestStep, activeRun?.altBestStep])
 
   const isRunning = activeRun?.state === 'running' ||
     runs.some(r => r.state === 'running')
 
-  // Resolve which PDB is currently displayed
-  const activePdbBlob = (viewEngine === 'alternative' && activeRun?.altBlob) ? activeRun.altBlob : activeRun?.pdbBlob
-  const activePdbUrl  = (viewEngine === 'alternative' && activeRun?.altUrl)  ? activeRun.altUrl  : activeRun?.pdbUrl
+  // Fetch a frame PDB (with caching) and return its object URL
+  const getFrameUrl = useCallback(async (jobId, engine, step) => {
+    if (!jobId || !step) return null
+    const cacheKey = `${jobId}_${engine}_${step}`
+    if (frameCacheRef.current[cacheKey]) return frameCacheRef.current[cacheKey]
+    const result = await fetchFrame(jobId, engine, step)
+    if (result?.url) frameCacheRef.current[cacheKey] = result.url
+    return result?.url ?? null
+  }, [])
+
+  // Resolve which PDB URL is currently shown in Mol*
+  const [displayedPdbUrl, setDisplayedPdbUrl] = useState(null)
+
+  const stdStep = stdActiveStep
+  const altStep = altActiveStep
+  const jobId   = activeRun?.jobInfo?.jobId
+
+  useEffect(() => {
+    if (!activeRun || activeRun.state !== 'done') {
+      setDisplayedPdbUrl(activeRun?.pdbUrl ?? null)
+      return
+    }
+    const engine     = viewEngine === 'alternative' ? 'alt' : 'std'
+    const activeStep = viewEngine === 'alternative' ? altStep : stdStep
+    const frames     = viewEngine === 'alternative' ? activeRun.altFrames : activeRun.stdFrames
+
+    if (!frames?.length || !activeStep) {
+      // Fallback to best-frame PDB already fetched
+      setDisplayedPdbUrl(
+        viewEngine === 'alternative' ? (activeRun.altUrl ?? null) : (activeRun.pdbUrl ?? null)
+      )
+      return
+    }
+
+    let cancelled = false
+    getFrameUrl(jobId, engine, activeStep).then(url => {
+      if (!cancelled) setDisplayedPdbUrl(url ?? (viewEngine === 'alternative' ? activeRun.altUrl : activeRun.pdbUrl))
+    })
+    return () => { cancelled = true }
+  }, [activeRun?.id, activeRun?.state, viewEngine, stdStep, altStep, jobId, getFrameUrl])
+
+  // Resolve active energy for display
+  const stdFrames     = activeRun?.stdFrames ?? []
+  const altFrames     = activeRun?.altFrames ?? []
+  const stdFrameEnergy = stdFrames.find(f => f.step === stdActiveStep)?.energy ?? activeRun?.stdEnergy
+  const altFrameEnergy = altFrames.find(f => f.step === altActiveStep)?.energy ?? activeRun?.altEnergy
+
   const activeEngineLabel = viewEngine === 'alternative' ? 'alt' : 'std'
+  // Legacy blob for PDB tab / download
+  const activePdbBlob = (viewEngine === 'alternative' && activeRun?.altBlob) ? activeRun.altBlob : activeRun?.pdbBlob
 
   function downloadPdb() {
     if (!activePdbBlob) return
+    const engine = viewEngine === 'alternative' ? 'alt' : 'std'
+    const step   = viewEngine === 'alternative' ? altActiveStep : stdActiveStep
+    const suffix = step ? `${activeEngineLabel}_${step}` : activeEngineLabel
     const a = document.createElement('a')
     a.href = URL.createObjectURL(activePdbBlob)
-    a.download = `${sanitiseName(activeRun.name)}_${activeEngineLabel}.pdb`
+    a.download = `${sanitiseName(activeRun.name)}_${suffix}.pdb`
     a.click()
   }
 
@@ -140,34 +199,51 @@ export default function BuildSection({
                 </div>
               </div>
 
-              {/* Energy comparison bar — shown when both engines ran */}
+              {/* Energy + iteration slider bar */}
               {(activeRun.stdEnergy != null || activeRun.altEnergy != null) && (
                 <div style={{
-                  display: 'flex', alignItems: 'center', gap: 16,
-                  padding: '8px 16px', borderBottom: '1px solid var(--border)',
-                  background: 'var(--surface2)', fontSize: 12,
-                  fontFamily: 'var(--mono)',
+                  borderBottom: '1px solid var(--border)',
+                  background: 'var(--surface2)',
                 }}>
-                  <span style={{ color: 'var(--text-dim)', marginRight: 4 }}>Energy</span>
-                  <EnergyBadge
-                    label="Standard"
-                    energy={activeRun.stdEnergy}
-                    isWinner={activeRun.winner === 'standard'}
-                    isActive={viewEngine === 'standard'}
-                    onClick={() => setViewEngine('standard')}
-                  />
-                  {activeRun.altEnergy != null && (
+                  {/* Engine selector row */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 16,
+                    padding: '8px 16px 6px', fontSize: 12, fontFamily: 'var(--mono)',
+                  }}>
+                    <span style={{ color: 'var(--text-dim)', marginRight: 4 }}>Energy</span>
                     <EnergyBadge
-                      label="Alternative"
-                      energy={activeRun.altEnergy}
-                      isWinner={activeRun.winner === 'alternative'}
-                      isActive={viewEngine === 'alternative'}
-                      onClick={() => setViewEngine('alternative')}
+                      label="Standard"
+                      energy={stdFrameEnergy}
+                      isWinner={activeRun.winner === 'standard'}
+                      isActive={viewEngine === 'standard'}
+                      onClick={() => setViewEngine('standard')}
+                    />
+                    {(activeRun.altEnergy != null || altFrames.length > 0) && (
+                      <EnergyBadge
+                        label="Alternative"
+                        energy={altFrameEnergy}
+                        isWinner={activeRun.winner === 'alternative'}
+                        isActive={viewEngine === 'alternative'}
+                        onClick={() => setViewEngine('alternative')}
+                      />
+                    )}
+                    <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 'auto' }}>
+                      lower = better minimization
+                    </span>
+                  </div>
+
+                  {/* Single iteration slider — tracks active engine */}
+                  {(viewEngine === 'standard' ? stdFrames : altFrames).length > 1 && (
+                    <IterationSlider
+                      frames={viewEngine === 'standard' ? stdFrames : altFrames}
+                      activeStep={viewEngine === 'standard' ? stdActiveStep : altActiveStep}
+                      bestStep={viewEngine === 'standard' ? activeRun.stdBestStep : activeRun.altBestStep}
+                      onStep={step => {
+                        if (viewEngine === 'standard') setStdActiveStep(step)
+                        else setAltActiveStep(step)
+                      }}
                     />
                   )}
-                  <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 'auto' }}>
-                    lower = better minimization
-                  </span>
                 </div>
               )}
 
@@ -175,7 +251,7 @@ export default function BuildSection({
               <div className={styles.tabBody}>
                 {activeTab === 'viewer' && (
                   <MolstarViewer
-                    pdbUrl={activePdbUrl}
+                    pdbUrl={displayedPdbUrl}
                     runState={activeRun.state}
                     runStatus={activeRun.status}
                     structureName={activeRun.name}
@@ -259,6 +335,42 @@ function EnergyBadge({ label, energy, isWinner, isActive, onClick }) {
       </span>
       {isWinner && <span style={{ fontSize: 10, color: 'var(--teal-dark)' }}>★</span>}
     </span>
+  )
+}
+
+function IterationSlider({ frames, activeStep, bestStep, onStep }) {
+  if (!frames?.length) return null
+  const idx = Math.max(0, frames.findIndex(f => f.step === activeStep))
+
+  return (
+    <div style={{ padding: '4px 16px 8px', borderTop: '1px solid var(--border)' }}>
+      <input
+        type="range"
+        min={0}
+        max={frames.length - 1}
+        step={1}
+        value={idx}
+        onChange={e => onStep(frames[+e.target.value].step)}
+        style={{ width: '100%', display: 'block', accentColor: 'var(--teal)', cursor: 'pointer' }}
+      />
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        paddingTop: 3, fontFamily: 'var(--mono)', fontSize: 10,
+      }}>
+        {frames.map(f => {
+          const isCurrent = f.step === activeStep
+          const isBest    = f.step === bestStep
+          return (
+            <span key={f.step} style={{
+              color: isCurrent ? 'var(--teal-dark)' : 'var(--text-dim)',
+              fontWeight: isCurrent ? 700 : 400,
+            }}>
+              {f.step}{isBest ? '★' : ''}
+            </span>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

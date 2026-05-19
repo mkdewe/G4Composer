@@ -47,12 +47,17 @@ public class QuadroInput
     /// <summary>
     /// Tryb testowy generatora (mapowany na pole <c>test</c> w .inp jako "y"/"n").
     /// </summary>
+    /// <summary>
+    /// Iteration checkpoints for the final CYANA minimization stage.
+    /// Each value generates a complete Xplor-refined structure at that cumulative step count.
+    /// The last (highest) value is the full run — identical to the single <c>iteration</c> field.
+    /// Default: [20, 40, 60, 80, 100].
+    /// </summary>
+    public int[] IterationSteps { get; set; } = [20, 40, 60, 80, 100];
+
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsTest { get; } = false;
 
     [System.Text.Json.Serialization.JsonIgnore]
     public int RmLevel { get; } = 0;
-
-    [System.Text.Json.Serialization.JsonIgnore]
-    public int Iterations { get; } = 100;
 }

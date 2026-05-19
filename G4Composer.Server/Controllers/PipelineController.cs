@@ -27,6 +27,7 @@ public sealed class PipelineController : ControllerBase
     private readonly IQuadroEngineSelector         _engineSelector;
     private readonly IPipelinePdbStore             _pipelinePdbStore;
     private readonly IAltPdbStore                  _altPdbStore;
+    private readonly IFrameStore                   _frameStore;
     private readonly QuadroOptions                 _options;
     private readonly ILogger<PipelineController>   _logger;
 
@@ -37,6 +38,7 @@ public sealed class PipelineController : ControllerBase
         IQuadroEngineSelector engineSelector,
         IPipelinePdbStore pipelinePdbStore,
         IAltPdbStore altPdbStore,
+        IFrameStore frameStore,
         IOptions<QuadroOptions> options,
         ILogger<PipelineController> logger)
     {
@@ -46,6 +48,7 @@ public sealed class PipelineController : ControllerBase
         _engineSelector   = engineSelector;
         _pipelinePdbStore = pipelinePdbStore;
         _altPdbStore      = altPdbStore;
+        _frameStore       = frameStore;
         _options          = options.Value;
         _logger           = logger;
     }
@@ -238,6 +241,17 @@ public sealed class PipelineController : ControllerBase
             if (altOk && result.Alternative.Pdb is not null)
                 _altPdbStore.Store(jobId, result.Alternative.Pdb);
 
+            foreach (var frame in result.Standard.Frames)
+                _frameStore.Store(jobId, "std", frame.Step, frame.Pdb);
+            if (altOk)
+                foreach (var frame in result.Alternative.Frames)
+                    _frameStore.Store(jobId, "alt", frame.Step, frame.Pdb);
+
+            var stdFramesMeta = result.Standard.Frames
+                .Select(f => new { step = f.Step, energy = f.Etotal });
+            var altFramesMeta = result.Alternative.Frames
+                .Select(f => new { step = f.Step, energy = f.Etotal });
+
             await SendEventAsync("quadro_done", new
             {
                 type              = "quadro_done",
@@ -249,6 +263,10 @@ public sealed class PipelineController : ControllerBase
                 altEnergy         = result.Alternative.Etotal,
                 winner            = result.Winner ?? "standard",
                 hasAlt            = altOk,
+                stdFrames         = stdFramesMeta,
+                altFrames         = altFramesMeta,
+                stdBestStep       = result.Standard.BestFrame?.Step,
+                altBestStep       = result.Alternative.BestFrame?.Step,
                 inpContent,
                 combinedStructure,
             }, ct);

@@ -145,7 +145,7 @@ export default function MolstarViewer({ pdbUrl, runState, runStatus, structureNa
         if (comp && !cancelled) {
           await plugin.builders.structure.representation.addRepresentation(comp, {
             type: 'cartoon',
-            color: 'chain-id',
+            color: 'sequence-id',
           })
           plugin.canvas3d?.requestCameraReset?.({ durationMs: 250 })
         }

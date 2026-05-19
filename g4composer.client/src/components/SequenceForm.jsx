@@ -660,7 +660,7 @@ export default function SequenceForm({ onRun, runState }) {
             {/* In non-canonical mode: always expanded and not collapsible */}
             <div className={styles.card}>
                 <div className={styles.cardTitle}>
-                    <span className={styles.badge}>{mode === 'canonical' ? '4' : '2'}</span>
+                    {mode === 'canonical' && <span className={styles.badge}>4</span>}
                     {mode === 'canonical' ? 'Advanced Parameters' : 'Structural Parameters'}
                     {mode === 'canonical' && (
                         <>

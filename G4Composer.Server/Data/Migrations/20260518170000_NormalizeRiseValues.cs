@@ -10,6 +10,8 @@ namespace G4Composer.Server.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (migrationBuilder.ActiveProvider == "Microsoft.EntityFrameworkCore.Sqlite") return;
+
             // Single-step rises: '3.40000009536743' → '3.4'
             migrationBuilder.Sql(@"
                 UPDATE ""StructureExamples""

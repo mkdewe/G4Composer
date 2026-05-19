@@ -10,6 +10,8 @@ namespace G4Composer.Server.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (migrationBuilder.ActiveProvider == "Microsoft.EntityFrameworkCore.Sqlite") return;
+
             // Remove subtype prefix like "11a_", "4b_", "1a_" (digits+letter, underscore at position ≤ 4)
             migrationBuilder.Sql(@"
                 UPDATE ""StructureExamples""

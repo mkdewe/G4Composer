@@ -499,3 +499,32 @@ details[open] .inpSummary::before { content: '▼ '; }
   font-size: 11px;
   margin-left: auto;
 }
+
+.iterSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  display: block;
+  height: 4px;
+  background: var(--border-med);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.iterSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #1D9E75;
+  cursor: pointer;
+}
+.iterSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #1D9E75;
+  cursor: pointer;
+  border: none;
+}

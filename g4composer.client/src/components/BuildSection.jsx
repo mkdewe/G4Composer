@@ -351,7 +351,7 @@ function IterationSlider({ frames, activeStep, bestStep, onStep }) {
         step={1}
         value={idx}
         onChange={e => onStep(frames[+e.target.value].step)}
-        style={{ width: '100%', display: 'block', accentColor: 'var(--teal)', cursor: 'pointer' }}
+        className={styles.iterSlider}
       />
       <div style={{
         display: 'flex', justifyContent: 'space-between',

@@ -127,28 +127,8 @@ export default function MolstarViewer({ pdbUrl, runState, runStatus, structureNa
         const traj = await plugin.builders.structure.parseTrajectory(data, 'pdb')
         if (cancelled) return
 
-        // Build manually instead of applyPreset('default') to guarantee uniform
-        // polymer-cartoon display. The default preset creates separate components
-        // for ligand/HETATM residues and renders them as ball-and-stick, causing
-        // inconsistent "non-standard fragment" artefacts. Cartoon representation
-        // internally only applies to polymer atoms — non-polymer atoms in the 'all'
-        // component are silently ignored, so no ball-and-stick fragments appear.
-        const model = await plugin.builders.structure.createModel(traj)
-        if (cancelled) return
-
-        const struct = await plugin.builders.structure.createStructure(model)
-        if (cancelled) return
-
-        const comp = await plugin.builders.structure.tryCreateComponentStatic(
-          struct, 'all', { label }
-        )
-        if (comp && !cancelled) {
-          await plugin.builders.structure.representation.addRepresentation(comp, {
-            type: 'cartoon',
-            color: 'sequence-id',
-          })
-          plugin.canvas3d?.requestCameraReset?.({ durationMs: 250 })
-        }
+        await plugin.builders.structure.hierarchy.applyPreset(traj, 'default')
+        if (!cancelled) plugin.canvas3d?.requestCameraReset?.({ durationMs: 250 })
       } catch (err) {
         if (!cancelled) console.error('Mol* load error:', err)
       }

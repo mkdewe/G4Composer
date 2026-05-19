@@ -13,7 +13,7 @@ namespace G4Composer.Server.Data.Migrations
             // Single-step rises: '3.40000009536743' → '3.4'
             migrationBuilder.Sql(@"
                 UPDATE ""StructureExamples""
-                SET ""Rise"" = PRINTF('%.1f', CAST(""Rise"" AS REAL))
+                SET ""Rise"" = ROUND(CAST(""Rise"" AS NUMERIC), 1)::TEXT
                 WHERE ""Rise"" NOT LIKE '%;%';
             ");
 
@@ -21,9 +21,9 @@ namespace G4Composer.Server.Data.Migrations
             migrationBuilder.Sql(@"
                 UPDATE ""StructureExamples""
                 SET ""Rise"" =
-                    PRINTF('%.1f', CAST(SUBSTR(""Rise"", 1, INSTR(""Rise"", ';') - 1) AS REAL))
+                    ROUND(CAST(SUBSTR(""Rise"", 1, STRPOS(""Rise"", ';') - 1) AS NUMERIC), 1)::TEXT
                     || ';' ||
-                    PRINTF('%.1f', CAST(SUBSTR(""Rise"", INSTR(""Rise"", ';') + 1) AS REAL))
+                    ROUND(CAST(SUBSTR(""Rise"", STRPOS(""Rise"", ';') + 1) AS NUMERIC), 1)::TEXT
                 WHERE LENGTH(""Rise"") - LENGTH(REPLACE(""Rise"", ';', '')) = 1;
             ");
 
@@ -31,20 +31,20 @@ namespace G4Composer.Server.Data.Migrations
             migrationBuilder.Sql(@"
                 UPDATE ""StructureExamples""
                 SET ""Rise"" =
-                    PRINTF('%.1f', CAST(SUBSTR(""Rise"", 1, INSTR(""Rise"", ';') - 1) AS REAL))
+                    ROUND(CAST(SUBSTR(""Rise"", 1, STRPOS(""Rise"", ';') - 1) AS NUMERIC), 1)::TEXT
                     || ';' ||
-                    PRINTF('%.1f', CAST(
+                    ROUND(CAST(
                         SUBSTR(
-                            SUBSTR(""Rise"", INSTR(""Rise"", ';') + 1),
+                            SUBSTR(""Rise"", STRPOS(""Rise"", ';') + 1),
                             1,
-                            INSTR(SUBSTR(""Rise"", INSTR(""Rise"", ';') + 1), ';') - 1
-                        ) AS REAL))
+                            STRPOS(SUBSTR(""Rise"", STRPOS(""Rise"", ';') + 1), ';') - 1
+                        ) AS NUMERIC), 1)::TEXT
                     || ';' ||
-                    PRINTF('%.1f', CAST(
+                    ROUND(CAST(
                         SUBSTR(
-                            SUBSTR(""Rise"", INSTR(""Rise"", ';') + 1),
-                            INSTR(SUBSTR(""Rise"", INSTR(""Rise"", ';') + 1), ';') + 1
-                        ) AS REAL))
+                            SUBSTR(""Rise"", STRPOS(""Rise"", ';') + 1),
+                            STRPOS(SUBSTR(""Rise"", STRPOS(""Rise"", ';') + 1), ';') + 1
+                        ) AS NUMERIC), 1)::TEXT
                 WHERE LENGTH(""Rise"") - LENGTH(REPLACE(""Rise"", ';', '')) = 2;
             ");
         }

@@ -15,6 +15,13 @@ export default function HomeSection() {
   const [onquadroResult, setOnquadroResult] = useState(null)  // null | { running, success, matches, count, error }
   const [resultsMode,   setResultsMode]   = useState('predictor')  // 'predictor' | 'aligner'
 
+  // Aligner 3D predictions (GQ_1, GQ_2, ...)
+  const [alignerQuadroResults, setAlignerQuadroResults] = useState({})
+  const [alignerActiveTab,     setAlignerActiveTab]     = useState(null)
+  const [alignerSteps,         setAlignerSteps]         = useState({})
+  const [alignerDisplayedPdbUrl, setAlignerDisplayedPdbUrl] = useState(null)
+  const alignerFrameCacheRef = useRef({})
+
   // Per-motif slider positions: { 'G4_1': { std: 80, alt: 60 }, ... }
   const [motifSteps,    setMotifSteps]    = useState({})
   const [displayedPdbUrl, setDisplayedPdbUrl] = useState(null)
@@ -44,6 +51,10 @@ export default function HomeSection() {
     setActiveTab(null)
     setProgressLog([])
     setOnquadroResult(null)
+    setAlignerQuadroResults({})
+    setAlignerActiveTab(null)
+    setAlignerSteps({})
+    setAlignerDisplayedPdbUrl(null)
 
     const abort = new AbortController()
     abortRef.current = abort
@@ -167,6 +178,64 @@ export default function HomeSection() {
             break
           }
 
+          case 'aligner_quadro_start': {
+            const { tool } = event
+            setAlignerQuadroResults(prev => ({ ...prev, [tool]: { running: true } }))
+            setAlignerActiveTab(prev => prev ?? tool)
+            setProgressLog(prev => [...prev, `${tool}: running Quadro 3D (QRS topology)…`])
+            break
+          }
+
+          case 'aligner_quadro_done': {
+            const { tool, qrs, success, jobId, stdEnergy, altEnergy, winner,
+                    hasAlt, error, inpContent, quadroOutput, combinedStructure,
+                    stdFrames: stdFramesMeta, altFrames: altFramesMeta,
+                    stdBestStep, altBestStep } = event
+            if (success) {
+              setAlignerSteps(prev => ({
+                ...prev,
+                [tool]: { std: stdBestStep ?? null, alt: altBestStep ?? null },
+              }))
+              const fetchBoth = async () => {
+                const pdbUrl    = await fetchPipelinePdb(jobId)
+                const altPdbUrl = hasAlt ? await fetchPipelineAltPdb(jobId) : null
+                return { pdbUrl, altPdbUrl }
+              }
+              fetchBoth().then(({ pdbUrl, altPdbUrl }) => {
+                setAlignerQuadroResults(prev => ({
+                  ...prev,
+                  [tool]: {
+                    success: true, jobId, qrs, stdEnergy, altEnergy,
+                    winner, hasAlt, pdbUrl, altPdbUrl,
+                    stdFrames: stdFramesMeta ?? [],
+                    altFrames: altFramesMeta ?? [],
+                    stdBestStep: stdBestStep ?? null,
+                    altBestStep: altBestStep ?? null,
+                    combinedStructure: combinedStructure ?? null,
+                    displayVariant: winner ?? 'standard',
+                    inpContent, error: null,
+                  },
+                }))
+              })
+              setProgressLog(prev => [...prev,
+                `${tool}: 3D model ready (ΔG ${formatEnergy(winner === 'alternative' ? altEnergy : stdEnergy)})`,
+              ])
+            } else {
+              setAlignerQuadroResults(prev => ({
+                ...prev,
+                [tool]: {
+                  success: false, qrs, error: error ?? 'Unknown error',
+                  combinedStructure: combinedStructure ?? null,
+                  inpContent: inpContent ?? null,
+                  quadroOutput: quadroOutput ?? null,
+                },
+              }))
+              setProgressLog(prev => [...prev, `${tool}: Quadro failed — ${error}`])
+            }
+            setAlignerActiveTab(prev => prev ?? tool)
+            break
+          }
+
           case 'complete':
             setPhase('done')
             setProgressLog(prev => [...prev, 'Pipeline complete.'])
@@ -204,6 +273,15 @@ export default function HomeSection() {
     })
   }, [])
 
+  const handleAlignerVariantToggle = useCallback((tool, variant) => {
+    setAlignerDisplayedPdbUrl(null)
+    setAlignerQuadroResults(prev => {
+      const r = prev[tool]
+      if (!r) return prev
+      return { ...prev, [tool]: { ...r, displayVariant: variant } }
+    })
+  }, [])
+
   // ── Active tab data ───────────────────────────────────────────────────────
   const activeQuadro   = activeTab ? quadroResults[activeTab] : null
   const displayVariant = activeQuadro?.displayVariant ?? 'standard'
@@ -219,6 +297,20 @@ export default function HomeSection() {
     ?? activeQuadro?.stdEnergy ?? null
   const altStepEnergy = activeAltFrames.find(f => f.step === motifSteps[activeTab]?.alt)?.energy
     ?? activeQuadro?.altEnergy ?? null
+
+  // ── Aligner active tab data ───────────────────────────────────────────────
+  const alignerActiveQuadro   = alignerActiveTab ? alignerQuadroResults[alignerActiveTab] : null
+  const alignerDisplayVariant = alignerActiveQuadro?.displayVariant ?? 'standard'
+  const alignerStdFrames      = alignerActiveQuadro?.stdFrames ?? []
+  const alignerAltFrames      = alignerActiveQuadro?.altFrames ?? []
+  const alignerFrames         = alignerDisplayVariant === 'alternative' ? alignerAltFrames : alignerStdFrames
+  const alignerActiveStep     = alignerSteps[alignerActiveTab]?.[alignerDisplayVariant === 'alternative' ? 'alt' : 'std'] ?? null
+  const alignerBestStep       = alignerDisplayVariant === 'alternative'
+    ? alignerActiveQuadro?.altBestStep : alignerActiveQuadro?.stdBestStep
+  const alignerStdStepEnergy  = alignerStdFrames.find(f => f.step === alignerSteps[alignerActiveTab]?.std)?.energy
+    ?? alignerActiveQuadro?.stdEnergy ?? null
+  const alignerAltStepEnergy  = alignerAltFrames.find(f => f.step === alignerSteps[alignerActiveTab]?.alt)?.energy
+    ?? alignerActiveQuadro?.altEnergy ?? null
 
   // Lazy-fetch frame PDB when tab / variant / step changes
   useEffect(() => {
@@ -253,6 +345,46 @@ export default function HomeSection() {
     })
     return () => { cancelled = true }
   }, [activeTab, displayVariant, activeStep, activeQuadro?.jobId, activeQuadro?.success])
+
+  // Lazy-fetch aligner frame PDB
+  useEffect(() => {
+    if (!alignerActiveQuadro?.success || !alignerActiveQuadro.jobId) {
+      setAlignerDisplayedPdbUrl(
+        alignerDisplayVariant === 'alternative'
+          ? (alignerActiveQuadro?.altPdbUrl ?? alignerActiveQuadro?.pdbUrl ?? null)
+          : (alignerActiveQuadro?.pdbUrl ?? null)
+      )
+      return
+    }
+    const engine = alignerDisplayVariant === 'alternative' ? 'alt' : 'std'
+    if (alignerFrames.length <= 1 || !alignerActiveStep) {
+      setAlignerDisplayedPdbUrl(
+        alignerDisplayVariant === 'alternative'
+          ? (alignerActiveQuadro.altPdbUrl ?? alignerActiveQuadro.pdbUrl ?? null)
+          : (alignerActiveQuadro.pdbUrl ?? null)
+      )
+      return
+    }
+    const cacheKey = `${alignerActiveQuadro.jobId}_${engine}_${alignerActiveStep}`
+    if (alignerFrameCacheRef.current[cacheKey]) {
+      setAlignerDisplayedPdbUrl(alignerFrameCacheRef.current[cacheKey])
+      return
+    }
+    let cancelled = false
+    fetchFrame(alignerActiveQuadro.jobId, engine, alignerActiveStep).then(result => {
+      if (!cancelled && result?.url) {
+        alignerFrameCacheRef.current[cacheKey] = result.url
+        setAlignerDisplayedPdbUrl(result.url)
+      }
+    })
+    return () => { cancelled = true }
+  }, [alignerActiveTab, alignerDisplayVariant, alignerActiveStep,
+      alignerActiveQuadro?.jobId, alignerActiveQuadro?.success])
+
+  const alignerPdbUrl = alignerDisplayedPdbUrl
+    ?? (alignerDisplayVariant === 'alternative'
+      ? (alignerActiveQuadro?.altPdbUrl ?? alignerActiveQuadro?.pdbUrl ?? null)
+      : (alignerActiveQuadro?.pdbUrl ?? null))
 
   const activePdbUrl = displayedPdbUrl
     ?? (displayVariant === 'alternative'
@@ -531,7 +663,27 @@ export default function HomeSection() {
       {/* ── Aligner panel ───────────────────────────────────────────────── */}
       {resultsMode === 'aligner' && (
         <div className={styles.resultsPanel}>
-          <AlignerPanel result={onquadroResult} />
+          <AlignerPanel
+            result={onquadroResult}
+            quadroResults={alignerQuadroResults}
+            activeTab={alignerActiveTab}
+            setActiveTab={setAlignerActiveTab}
+            activePdbUrl={alignerPdbUrl}
+            displayVariant={alignerDisplayVariant}
+            onVariantToggle={handleAlignerVariantToggle}
+            frames={alignerFrames}
+            activeStep={alignerActiveStep}
+            bestStep={alignerBestStep}
+            onStep={step => setAlignerSteps(prev => ({
+              ...prev,
+              [alignerActiveTab]: {
+                ...(prev[alignerActiveTab] ?? {}),
+                [alignerDisplayVariant === 'alternative' ? 'alt' : 'std']: step,
+              },
+            }))}
+            stdStepEnergy={alignerStdStepEnergy}
+            altStepEnergy={alignerAltStepEnergy}
+          />
         </div>
       )}
 
@@ -629,55 +781,176 @@ function IterationSlider({ frames, activeStep, bestStep, onStep }) {
   )
 }
 
-function AlignerPanel({ result }) {
-  if (!result) return (
-    <div className={styles.alignerEmpty}>Aligner results will appear here after the pipeline runs.</div>
-  )
-  if (result.running) return (
-    <div className={styles.alignerEmpty}>
-      <span className={`${styles.tabDot} ${styles.tabDotPulse}`} style={{ marginRight: 8 }} />
-      ONQuadro Aligner running…
-    </div>
-  )
-  if (!result.success) return (
-    <div className={styles.alignerEmpty} style={{ color: 'var(--err-text)' }}>
-      Aligner failed: {result.error}
-    </div>
-  )
-  if (result.matches.length === 0) return (
-    <div className={styles.alignerEmpty}>No matching structures found in the database.</div>
-  )
+function AlignerPanel({
+  result, quadroResults, activeTab, setActiveTab,
+  activePdbUrl, displayVariant, onVariantToggle,
+  frames, activeStep, bestStep, onStep,
+  stdStepEnergy, altStepEnergy,
+}) {
+  const qrsTabs = Object.keys(quadroResults).sort()
+  const activeQ = activeTab ? quadroResults[activeTab] : null
+
+  const viewerState = activeQ?.running ? 'running'
+    : (activeQ?.success && activePdbUrl) ? 'done'
+    : activeQ && !activeQ.running && !activeQ.success ? 'error'
+    : 'idle'
+
   return (
     <div>
-      <div className={styles.alignerHeader}>
-        Found <strong>{result.count}</strong> matching structure{result.count !== 1 ? 's' : ''} · sorted by tract distance
-      </div>
-      <div className={styles.alignerTableWrap}>
-        <table className={styles.alignerTable}>
-          <thead>
-            <tr>
-              <th>QRS notation</th>
-              <th>Tetrads</th>
-              <th>Molecule</th>
-              <th title="Lower is better">Tract dist ↑</th>
-              <th title="Higher is better">Linker score ↓</th>
-              <th>PDB / Files</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.matches.map((m, i) => (
-              <tr key={i} className={i % 2 === 0 ? styles.alignerRowEven : ''}>
-                <td className={styles.alignerQrs}>{m.qrs}</td>
-                <td className={styles.alignerCenter}>{m.tetradCount}</td>
-                <td className={styles.alignerCenter}>{m.molecule}</td>
-                <td className={styles.alignerCenter}>{m.tractDistance.toFixed(4)}</td>
-                <td className={styles.alignerCenter}>{m.linkerScore.toFixed(4)}</td>
-                <td className={styles.alignerFiles}>{m.files}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* ── Matches table ──────────────────────────────────────────────── */}
+      {!result ? (
+        <div className={styles.alignerEmpty}>Aligner results will appear here after the pipeline runs.</div>
+      ) : result.running ? (
+        <div className={styles.alignerEmpty}>
+          <span className={`${styles.tabDot} ${styles.tabDotPulse}`} style={{ marginRight: 8 }} />
+          ONQuadro Aligner running…
+        </div>
+      ) : !result.success ? (
+        <div className={styles.alignerEmpty} style={{ color: 'var(--err-text)' }}>
+          Aligner failed: {result.error}
+        </div>
+      ) : result.matches.length === 0 ? (
+        <div className={styles.alignerEmpty}>No matching structures found in the database.</div>
+      ) : (
+        <details open>
+          <summary className={styles.inpSummary}>
+            Found <strong>{result.count}</strong> matching structure{result.count !== 1 ? 's' : ''} · sorted by tract distance
+          </summary>
+          <div className={styles.alignerTableWrap}>
+            <table className={styles.alignerTable}>
+              <thead>
+                <tr>
+                  <th>QRS notation</th>
+                  <th>Tetrads</th>
+                  <th>Molecule</th>
+                  <th title="Lower is better">Tract dist ↑</th>
+                  <th title="Higher is better">Linker score ↓</th>
+                  <th>PDB / Files</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.matches.map((m, i) => (
+                  <tr key={i} className={i % 2 === 0 ? styles.alignerRowEven : ''}>
+                    <td className={styles.alignerQrs}>{m.qrs}</td>
+                    <td className={styles.alignerCenter}>{m.tetradCount}</td>
+                    <td className={styles.alignerCenter}>{m.molecule}</td>
+                    <td className={styles.alignerCenter}>{m.tractDistance.toFixed(4)}</td>
+                    <td className={styles.alignerCenter}>{m.linkerScore.toFixed(4)}</td>
+                    <td className={styles.alignerFiles}>{m.files}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+
+      {/* ── 3D predictions for unique QRS topologies ───────────────────── */}
+      {qrsTabs.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div className={styles.tabBar}>
+            <div className={styles.tabs}>
+              {qrsTabs.map(tool => {
+                const q      = quadroResults[tool]
+                const dv     = q?.displayVariant ?? q?.winner ?? 'standard'
+                const energy = q?.success ? (dv === 'alternative' ? q.altEnergy : q.stdEnergy) : null
+                return (
+                  <button
+                    key={tool}
+                    className={`${styles.tab} ${activeTab === tool ? styles.tabActive : ''} ${q?.success === false ? styles.tabFailed : ''}`}
+                    onClick={() => setActiveTab(tool)}
+                  >
+                    <TabDot quadro={q} running={q?.running} />
+                    <span className={styles.tabName}>{tool}</span>
+                    {q?.qrs && (
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-dim)', marginLeft: 4 }}>
+                        {q.qrs.length > 18 ? q.qrs.slice(0, 18) + '…' : q.qrs}
+                      </span>
+                    )}
+                    {energy != null && (
+                      <span className={styles.energyChip}>{formatEnergy(energy)}</span>
+                    )}
+                    {q?.success === false && !q?.running && (
+                      <span className={styles.failChip}>!</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {activeTab && activeQ && (
+            <div className={styles.tabBody}>
+              {/* Energy bar + iteration slider */}
+              {activeQ.success && (activeQ.stdEnergy != null || activeQ.altEnergy != null) && (
+                <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
+                  <div className={styles.energyBar}>
+                    <span className={styles.energyBarLabel}>Energy</span>
+                    <EnergyBadge
+                      label="Standard"
+                      energy={stdStepEnergy}
+                      isWinner={activeQ.winner === 'standard'}
+                      isActive={displayVariant === 'standard'}
+                      onClick={() => onVariantToggle(activeTab, 'standard')}
+                    />
+                    {activeQ.altEnergy != null && (
+                      <EnergyBadge
+                        label="Alternative"
+                        energy={altStepEnergy}
+                        isWinner={activeQ.winner === 'alternative'}
+                        isActive={displayVariant === 'alternative'}
+                        onClick={() => onVariantToggle(activeTab, 'alternative')}
+                      />
+                    )}
+                    <span className={styles.energyBarHint}>lower = better minimization</span>
+                  </div>
+                  {frames.length > 1 && (
+                    <IterationSlider
+                      frames={frames}
+                      activeStep={activeStep}
+                      bestStep={bestStep}
+                      onStep={onStep}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Error row */}
+              {activeQ.success === false && !activeQ.running && (
+                <div className={styles.metaRow}>
+                  <div className={styles.metaError}>3D model failed: {activeQ.error}</div>
+                </div>
+              )}
+
+              {/* Generated .inp */}
+              {activeQ.inpContent && (
+                <details className={styles.inpDetails}>
+                  <summary className={styles.inpSummary}>Generated .inp input</summary>
+                  <pre className={styles.inpPre}>{filterInpDisplay(activeQ.inpContent)}</pre>
+                </details>
+              )}
+
+              {/* Quadro stdout/stderr — only on failure */}
+              {activeQ.quadroOutput && (
+                <details className={styles.inpDetails} open>
+                  <summary className={styles.inpSummary}>Quadro output (stdout / stderr)</summary>
+                  <pre className={styles.inpPre}>{activeQ.quadroOutput}</pre>
+                </details>
+              )}
+
+              {/* 3D viewer */}
+              <div className={styles.viewerWrap}>
+                <MolstarViewer
+                  pdbUrl={activePdbUrl}
+                  runState={viewerState}
+                  runStatus={activeQ?.error ?? ''}
+                  structureName={activeTab}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

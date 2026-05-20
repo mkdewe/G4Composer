@@ -112,7 +112,7 @@ public sealed class PipelineController : ControllerBase
 
         await SendEventAsync("onquadro_start", new { type = "onquadro_start" }, cancellationToken);
 
-        var onquadroTask = RunOnquadroAsync(sequence, cancellationToken);
+        var onquadroTask = RunOnquadroAsync(sequence, rnaStructure, gqrsResult, cancellationToken);
 
         if (gqrsResult.Success && gqrsResult.Motifs.Count > 0)
         {
@@ -147,11 +147,13 @@ public sealed class PipelineController : ControllerBase
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private async Task RunOnquadroAsync(string sequence, CancellationToken ct)
+    private async Task RunOnquadroAsync(
+        string sequence, string? rnaStructure, GqrsResult gqrsResult, CancellationToken ct)
     {
+        OnquadroResult? result = null;
         try
         {
-            var result = await _onquadro.AlignAsync(sequence, ct);
+            result = await _onquadro.AlignAsync(sequence, ct);
             await SendEventAsync("onquadro_done", new
             {
                 type    = "onquadro_done",
@@ -178,6 +180,7 @@ public sealed class PipelineController : ControllerBase
                 count   = 0,
                 error   = "onquadro-aligner timeout",
             }, ct);
+            return;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -189,6 +192,161 @@ public sealed class PipelineController : ControllerBase
                 count   = 0,
                 error   = ex.Message,
             }, ct);
+            return;
+        }
+
+        // ── Run Quadro for unique QRS topologies ─────────────────────────────
+        if (result is { Success: true } && result.Matches.Count > 0
+            && gqrsResult.Success && gqrsResult.Motifs.Count > 0)
+        {
+            var topQrs = result.Matches
+                .Where(m => m.TractDistance == 0)
+                .GroupBy(m => m.Qrs, StringComparer.Ordinal)
+                .Select(g => g.First())
+                .Take(5)
+                .ToList();
+
+            if (topQrs.Count > 0)
+            {
+                var firstMotif    = gqrsResult.Motifs[0];
+                var alignerTasks  = topQrs
+                    .Select((match, i) => RunQuadroForAlignerAsync(
+                        $"GQ_{i + 1}", sequence, rnaStructure, firstMotif, match.Qrs, ct))
+                    .ToList();
+                await Task.WhenAll(alignerTasks);
+            }
+        }
+    }
+
+    private async Task RunQuadroForAlignerAsync(
+        string label, string sequence, string? rnaStructure,
+        GqrsMotif motif, string qrs, CancellationToken ct)
+    {
+        await SendEventAsync("aligner_quadro_start",
+            new { type = "aligner_quadro_start", tool = label, qrs }, ct);
+
+        var jobId  = $"aq_{Guid.NewGuid():N}"[..16];
+        var jobDir = Path.Combine(Path.GetTempPath(), $"g4_aligner_{jobId}");
+        string? inpContent        = null;
+        string? combinedStructure = null;
+        Directory.CreateDirectory(jobDir);
+
+        try
+        {
+            var engine = _engineSelector.Active;
+            var input  = G4TopologyGenerator.TryGenerateFromGqrsWithQrs(
+                             label, sequence, rnaStructure, motif, qrs);
+
+            if (input is null)
+            {
+                await SendEventAsync("aligner_quadro_done", new
+                {
+                    type    = "aligner_quadro_done",
+                    tool    = label,
+                    qrs,
+                    success = false,
+                    error   = "Could not generate Quadro input from QRS topology.",
+                }, ct);
+                return;
+            }
+
+            inpContent        = engine.SerializeInput(input);
+            combinedStructure = input.Structure;
+            var items  = new List<QuadroJobItem> { new(0, "struct_000.inp", inpContent) };
+
+            using var jobCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            jobCts.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
+
+            var result = await _jobRunner.RunAsync(jobId, jobDir, items, jobCts.Token);
+
+            var stdOk = result.Standard.Success    && result.Standard.Pdb    is { Length: > 0 };
+            var altOk = result.Alternative.Success && result.Alternative.Pdb is { Length: > 0 };
+
+            if (!stdOk)
+            {
+                await SendEventAsync("aligner_quadro_done", new
+                {
+                    type              = "aligner_quadro_done",
+                    tool              = label,
+                    qrs,
+                    success           = false,
+                    error             = "Quadro produced no PDB",
+                    inpContent,
+                    combinedStructure,
+                }, ct);
+                return;
+            }
+
+            _pipelinePdbStore.Store(jobId, result.Standard.Pdb!);
+            if (altOk && result.Alternative.Pdb is not null)
+                _altPdbStore.Store(jobId, result.Alternative.Pdb);
+
+            foreach (var frame in result.Standard.Frames)
+                _frameStore.Store(jobId, "std", frame.Step, frame.Pdb);
+            if (altOk)
+                foreach (var frame in result.Alternative.Frames)
+                    _frameStore.Store(jobId, "alt", frame.Step, frame.Pdb);
+
+            var stdFramesMeta = result.Standard.Frames
+                .Select(f => new { step = f.Step, energy = f.Etotal });
+            var altFramesMeta = result.Alternative.Frames
+                .Select(f => new { step = f.Step, energy = f.Etotal });
+
+            await SendEventAsync("aligner_quadro_done", new
+            {
+                type              = "aligner_quadro_done",
+                tool              = label,
+                qrs,
+                success           = true,
+                jobId,
+                stdEnergy         = result.Standard.Etotal,
+                altEnergy         = result.Alternative.Etotal,
+                winner            = result.Winner ?? "standard",
+                hasAlt            = altOk,
+                stdFrames         = stdFramesMeta,
+                altFrames         = altFramesMeta,
+                stdBestStep       = result.Standard.BestFrame?.Step,
+                altBestStep       = result.Alternative.BestFrame?.Step,
+                inpContent,
+                combinedStructure,
+            }, ct);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            await SendEventAsync("aligner_quadro_done", new
+            {
+                type              = "aligner_quadro_done",
+                tool              = label,
+                qrs,
+                success           = false,
+                error             = $"Quadro timeout after {_options.TimeoutSeconds}s",
+                inpContent,
+                combinedStructure,
+            }, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Quadro failed for aligner {Label}", label);
+            var quadroOutput = ex is DockerException dx ? dx.DockerOutput : null;
+            await SendEventAsync("aligner_quadro_done", new
+            {
+                type              = "aligner_quadro_done",
+                tool              = label,
+                qrs,
+                success           = false,
+                error             = ex.Message,
+                inpContent,
+                combinedStructure,
+                quadroOutput,
+            }, ct);
+        }
+        finally
+        {
+            _ = Task.Run(() =>
+            {
+                try { if (Directory.Exists(jobDir)) Directory.Delete(jobDir, recursive: true); }
+                catch (Exception ex) { _logger.LogWarning("Could not delete {Dir}: {Msg}", jobDir, ex.Message); }
+            });
         }
     }
 

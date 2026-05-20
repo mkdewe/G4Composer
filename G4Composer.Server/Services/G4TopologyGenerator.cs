@@ -241,6 +241,61 @@ public static class G4TopologyGenerator
             .Select(i => Twist(signs[i], signs[i + 1])));
     }
 
+    // ── QRS-based helpers ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Derives the Orient string from a QRS (Quadruplex Representation String).
+    /// Uppercase first character in each G-run → '+' (parallel);
+    /// lowercase → '-' (antiparallel). Returns e.g. "A+;B-;C+;D-".
+    /// </summary>
+    public static string OrientFromQrs(string qrs)
+    {
+        var runs    = FindQrsRuns(qrs);
+        var letters = new[] { 'A', 'B', 'C', 'D' };
+        return string.Join(";", runs.Take(4).Select((run, i) =>
+        {
+            char sign = char.IsUpper(run[0]) ? '+' : '-';
+            return $"{letters[i]}{sign}";
+        }));
+    }
+
+    private static List<string> FindQrsRuns(string qrs)
+    {
+        var runs = new List<string>();
+        int i = 0;
+        while (i < qrs.Length)
+        {
+            if (qrs[i] == '.') { i++; continue; }
+            int start = i;
+            while (i < qrs.Length && qrs[i] != '.') i++;
+            if (i > start) runs.Add(qrs[start..i]);
+        }
+        return runs;
+    }
+
+    /// <summary>
+    /// Same as <see cref="TryGenerateFromGqrs"/> but overrides Orient, Twist, and Path
+    /// using the topology encoded in a QRS string from ONQuadro Aligner output.
+    /// </summary>
+    public static QuadroInput? TryGenerateFromGqrsWithQrs(
+        string name, string sequence, string? rnaStructure, GqrsMotif motif, string qrs)
+    {
+        var input = TryGenerateFromGqrs(name, sequence, rnaStructure, motif);
+        if (input is null) return null;
+
+        var orient = OrientFromQrs(qrs);
+        if (string.IsNullOrEmpty(orient)) return input;
+
+        input.Orient = orient;
+        input.Twist  = BuildTwistFromOrient(orient);
+
+        bool isAntiparallelUdud = orient == SilvaTopology.BuildDefaultOrient(motif.Tetrads);
+        var  loops  = isAntiparallelUdud ? AntiparallelLoops : ParallelLoops;
+        input.Path  = SilvaTopology.BuildPath(loops, motif.Tetrads).Split(';').ToList();
+
+        return input;
+    }
+
     // Only G-runs of length >= 2 are considered. A single isolated G is not a G-tract
     // and causes nTetrads=1 when it happens to be one of the first four runs found.
     private const int MinTractLength = 2;

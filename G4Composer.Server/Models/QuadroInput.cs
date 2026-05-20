@@ -51,9 +51,9 @@ public class QuadroInput
     /// Iteration checkpoints for the final CYANA minimization stage.
     /// Each value generates a complete Xplor-refined structure at that cumulative step count.
     /// The last (highest) value is the full run — identical to the single <c>iteration</c> field.
-    /// Default: [20, 40, 60, 80, 100].
+    /// Default: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].
     /// </summary>
-    public int[] IterationSteps { get; set; } = [20, 40, 60, 80, 100];
+    public int[] IterationSteps { get; set; } = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsTest { get; } = false;

@@ -36,10 +36,11 @@ export default function HomeSection() {
             break
 
           case 'aligner_quadro_done': {
-            const { success, jobId, qrs, stdEnergy, altEnergy, winner,
+            const { success, jobId, qrs, rnaStructure, stdEnergy, altEnergy, winner,
                     hasAlt, error, inpContent, quadroOutput, combinedStructure,
                     stdFrames: stdFramesMeta, altFrames: altFramesMeta,
-                    stdBestStep, altBestStep } = event
+                    stdBestStep, altBestStep,
+                    eltetradoOutput, eltetradoError } = event
             if (success) {
               setSteps({ std: stdBestStep ?? null, alt: altBestStep ?? null })
               const fetchBoth = async () => {
@@ -59,6 +60,9 @@ export default function HomeSection() {
                   combinedStructure: combinedStructure ?? null,
                   displayVariant: winner ?? 'standard',
                   inpContent, error: null,
+                  rnaStructure: rnaStructure ?? null,
+                  eltetradoOutput: eltetradoOutput ?? null,
+                  eltetradoError: eltetradoError ?? null,
                 })
               })
             } else {
@@ -316,6 +320,61 @@ export default function HomeSection() {
               structureName="G4"
             />
           </div>
+
+          {/* Analysis — eltetrado vs input comparison */}
+          {result?.success && (result.eltetradoOutput || result.eltetradoError) && (
+            <details className={styles.inpDetails}>
+              <summary className={styles.inpSummary}>Analysis</summary>
+
+              {/* Info strip: QRS + ViennaRNA */}
+              {(result.qrs || result.rnaStructure) && (
+                <div style={{
+                  borderTop: '1px solid var(--border)',
+                  padding: '10px 16px',
+                  background: 'var(--surface2)',
+                  fontFamily: 'var(--mono)',
+                  fontSize: 12,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                }}>
+                  {result.qrs && (
+                    <div>
+                      <span style={{ color: 'var(--text-dim)', display: 'inline-block', width: 80 }}>qrs</span>
+                      <span>{result.qrs}</span>
+                    </div>
+                  )}
+                  {result.rnaStructure && (
+                    <div>
+                      <span style={{ color: 'var(--text-dim)', display: 'inline-block', width: 80 }}>rnafold</span>
+                      <span>{result.rnaStructure}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Side-by-side: Input vs eltetrado */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, borderTop: '1px solid var(--border)' }}>
+                <div style={{ borderRight: '1px solid var(--border)', padding: '12px 16px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                    Input
+                  </div>
+                  <pre className={styles.inpPre} style={{ margin: 0 }}>
+                    {filterInpDisplay(result.inpContent ?? '')}
+                  </pre>
+                </div>
+                <div style={{ padding: '12px 16px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                    eltetrado
+                  </div>
+                  {result.eltetradoOutput
+                    ? <pre className={styles.inpPre} style={{ margin: 0 }}>{result.eltetradoOutput}</pre>
+                    : <div style={{ fontSize: 12, color: 'var(--err-text)' }}>{result.eltetradoError ?? 'Analysis unavailable'}</div>
+                  }
+                </div>
+              </div>
+            </details>
+          )}
         </div>
       )}
 
@@ -432,8 +491,19 @@ function formatEnergy(e) {
   return `${Number(e).toFixed(1)} kcal/mol`
 }
 
-const HIDDEN_INP_KEYS = /^(test|rm_level|iteration)\s/i
+const HIDDEN_INP_KEYS = /^(test|rm_level|iteration_steps|iteration)\s/i
 function filterInpDisplay(text) {
   if (!text) return text
-  return text.split('\n').filter(l => !HIDDEN_INP_KEYS.test(l.trim())).join('\n')
+  return text.split('\n')
+    .filter(l => !HIDDEN_INP_KEYS.test(l.trim()))
+    .map(line => {
+      const trimmed = line.trim()
+      if (!trimmed) return ''
+      const spaceIdx = trimmed.search(/\s/)
+      if (spaceIdx < 0) return trimmed
+      const key   = trimmed.slice(0, spaceIdx)
+      const value = trimmed.slice(spaceIdx).trimStart()
+      return key.padEnd(12) + value
+    })
+    .join('\n')
 }

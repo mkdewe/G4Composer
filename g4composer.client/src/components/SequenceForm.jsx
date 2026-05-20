@@ -87,6 +87,8 @@ export default function SequenceForm({ onRun, runState }) {
 
     const isRunning = runState === 'running'
     const errorRef = useRef(null)
+    const savedStates = useRef({})
+    const skipNextAutoDerive = useRef(false)
 
     // Auto-fill Chi with dots when sequence length changes (preserve user edits)
     useEffect(() => {
@@ -143,6 +145,7 @@ export default function SequenceForm({ onRun, runState }) {
     // Mirrors the algorithm in backend Domain/SilvaTopology.cs.
     useEffect(() => {
         if (!silvaData) return
+        if (skipNextAutoDerive.current) { skipNextAutoDerive.current = false; return }
         const seq = seqVal.trim().toLowerCase()
         const struct = structVal.trim()
         // Determine tetrads: prefer structure-based count, fall back to G-content.
@@ -211,6 +214,33 @@ export default function SequenceForm({ onRun, runState }) {
         }
     }
 
+    function deselect() {
+        setSilvaGroup(null)
+        setSubtype(null)
+    }
+
+    function switchMode(newMode) {
+        if (newMode === mode) return
+        savedStates.current[mode] = {
+            nameVal, seqVal, structVal, pathVal, chiVal, orientVal,
+            twist, rise, pucker, silvaGroup, subtype, advOpen,
+        }
+        const s = savedStates.current[newMode]
+        if (s) {
+            setNameVal(s.nameVal); setSeqVal(s.seqVal); setStructVal(s.structVal)
+            setPathVal(s.pathVal); setChiVal(s.chiVal); setOrientVal(s.orientVal)
+            setTwist(s.twist); setRise(s.rise); setPucker(s.pucker)
+            setSilvaGroup(s.silvaGroup ?? 'UDUD'); setSubtype(s.subtype ?? '6a')
+            setAdvOpen(s.advOpen)
+        } else {
+            setNameVal(''); setSeqVal(''); setStructVal(''); setPathVal(''); setChiVal('')
+            setOrientVal('A+;B-'); setTwist('29'); setRise('3.4'); setPucker('S')
+            setSilvaGroup('UDUD'); setSubtype('6a'); setAdvOpen(false)
+        }
+        setParseError(null)
+        setMode(newMode)
+    }
+
     const sequence = seqVal.trim().toLowerCase()
     const structure = structVal.trim()
     const hasInput = sequence.length > 0
@@ -235,11 +265,16 @@ export default function SequenceForm({ onRun, runState }) {
 
     async function loadExample(pdbId, groupCode = null, subtypeCode = null) {
         setParseError(null)
+        // Always load into the correct mode regardless of the main toggle position
+        if (groupCode) switchMode('canonical')
+        else switchMode('noncanonical')
         const data = await fetchExampleDetail(pdbId)
         if (!data) {
             setParseError(`Could not load example '${pdbId}' from server.`)
             return
         }
+        // Prevent auto-derive from overwriting the loaded path/orient/twist
+        skipNextAutoDerive.current = true
         setNameVal(data.inpName ?? '')
         setSeqVal(data.sequence ?? '')
         setStructVal(data.structure ?? '')
@@ -334,7 +369,7 @@ export default function SequenceForm({ onRun, runState }) {
                             {[...(silvaData ?? [])].sort((a, b) => (SILVA_DISPLAY_ORDER[a.code] ?? 99) - (SILVA_DISPLAY_ORDER[b.code] ?? 99)).map(g => (
                                 <button
                                     key={g.code}
-                                    onClick={() => setExFilterGroup(g.code)}
+                                    onClick={() => { switchMode('canonical'); setExFilterGroup(g.code) }}
                                     style={{
                                         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                                         padding: '6px 4px', fontSize: 12, fontWeight: 600, fontFamily: 'var(--mono)',
@@ -351,7 +386,7 @@ export default function SequenceForm({ onRun, runState }) {
                             ))}
                             {nonCanonical.length > 0 && (
                                 <button
-                                    onClick={() => setExFilterGroup('__nc__')}
+                                    onClick={() => { switchMode('noncanonical'); setExFilterGroup('__nc__') }}
                                     style={{
                                         padding: '6px 10px', fontSize: 12, fontWeight: 600,
                                         borderRadius: 'var(--r-sm)', cursor: 'pointer',
@@ -447,7 +482,7 @@ export default function SequenceForm({ onRun, runState }) {
                 ].map(({ id, label, desc }) => (
                     <button
                         key={id}
-                        onClick={() => setMode(id)}
+                        onClick={() => switchMode(id)}
                         title={desc}
                         style={{
                             padding: '8px 20px',
@@ -593,6 +628,8 @@ export default function SequenceForm({ onRun, runState }) {
                                 </>
                             ) : silvaError ? (
                                 <span style={{ color: 'var(--err-text)', fontSize: 13 }}>Failed to load classification data</span>
+                            ) : silvaData && silvaGroup === null ? (
+                                <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Custom — select a group to auto-derive parameters</span>
                             ) : (
                                 <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Loading…</span>
                             )}
@@ -774,7 +811,7 @@ export default function SequenceForm({ onRun, runState }) {
                                 className={styles.seqFont}
                                 style={{ width: '100%', fontFamily: 'var(--mono)' }}
                                 value={pathVal}
-                                onChange={e => setPathVal(e.target.value)}
+                                onChange={e => { deselect(); setPathVal(e.target.value) }}
                                 placeholder="e.g. A1;B1;C1;C2;B2;A2;C3;B3;A3;A4;B4;C4"
                                 spellCheck={false}
                             />
@@ -800,6 +837,7 @@ export default function SequenceForm({ onRun, runState }) {
                                                 {['R', 'L'].map(btn => (
                                                     <button key={btn}
                                                         onClick={() => {
+                                                            deselect()
                                                             const newOrient = updateOrientPolarity(orientVal, i, btn)
                                                             setOrientVal(newOrient)
                                                             setTwist(autoTwistFromOrient(newOrient))
@@ -846,6 +884,7 @@ export default function SequenceForm({ onRun, runState }) {
                                                 type="text"
                                                 value={val}
                                                 onChange={e => {
+                                                    deselect()
                                                     const next = [...parts]
                                                     next[i] = e.target.value.replace(/[^0-9.\-]/g, '')
                                                     setTwist(next.join(';'))
@@ -879,7 +918,7 @@ export default function SequenceForm({ onRun, runState }) {
                                                 T{i + 1}→T{i + 2}
                                             </span>
                                             <input type="text" value={val}
-                                                onChange={e => { const n = [...parts]; n[i] = e.target.value.replace(/[^0-9.\-]/g, ''); setRise(n.join(';')) }}
+                                                onChange={e => { deselect(); const n = [...parts]; n[i] = e.target.value.replace(/[^0-9.\-]/g, ''); setRise(n.join(';')) }}
                                                 placeholder="3.4" style={{ width: 72, fontFamily: 'var(--mono)', textAlign: 'center' }} />
                                         </div>
                                     ))

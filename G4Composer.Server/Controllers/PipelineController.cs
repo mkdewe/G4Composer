@@ -24,6 +24,7 @@ public sealed class PipelineController : ControllerBase
     private readonly IDockerCommandRunner          _docker;
     private readonly IGqrsService                  _gqrs;
     private readonly IOnquadroService              _onquadro;
+    private readonly IEltetradoService             _eltetrado;
     private readonly IQuadroJobRunner              _jobRunner;
     private readonly IQuadroEngineSelector         _engineSelector;
     private readonly IPipelinePdbStore             _pipelinePdbStore;
@@ -36,6 +37,7 @@ public sealed class PipelineController : ControllerBase
         IDockerCommandRunner docker,
         IGqrsService gqrs,
         IOnquadroService onquadro,
+        IEltetradoService eltetrado,
         IQuadroJobRunner jobRunner,
         IQuadroEngineSelector engineSelector,
         IPipelinePdbStore pipelinePdbStore,
@@ -47,6 +49,7 @@ public sealed class PipelineController : ControllerBase
         _docker           = docker;
         _gqrs             = gqrs;
         _onquadro         = onquadro;
+        _eltetrado        = eltetrado;
         _jobRunner        = jobRunner;
         _engineSelector   = engineSelector;
         _pipelinePdbStore = pipelinePdbStore;
@@ -75,7 +78,8 @@ public sealed class PipelineController : ControllerBase
 
         await SendEventAsync("start", new { type = "start" }, cancellationToken);
 
-        await RunOnquadroAsync(sequence, cancellationToken);
+        var rnaResult = await RunViennaRnaAsync(sequence, cancellationToken);
+        await RunOnquadroAsync(sequence, rnaResult.Success ? rnaResult.Structure : null, cancellationToken);
 
         await SendEventAsync("complete", new { type = "complete" }, cancellationToken);
     }
@@ -100,7 +104,7 @@ public sealed class PipelineController : ControllerBase
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private async Task RunOnquadroAsync(string sequence, CancellationToken ct)
+    private async Task RunOnquadroAsync(string sequence, string? rnaStructure, CancellationToken ct)
     {
         OnquadroResult? result = null;
         try
@@ -161,11 +165,20 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        await RunQuadroForAlignerAsync("GQ", best.MatchedSequence, best.Qrs, ct);
+        // Extract the ViennaRNA sub-structure for the matched G4 region
+        string? matchRnaStructure = null;
+        if (rnaStructure != null)
+        {
+            int matchStart = sequence.IndexOf(best.MatchedSequence, StringComparison.OrdinalIgnoreCase);
+            if (matchStart >= 0 && matchStart + best.MatchedSequence.Length <= rnaStructure.Length)
+                matchRnaStructure = rnaStructure.Substring(matchStart, best.MatchedSequence.Length);
+        }
+
+        await RunQuadroForAlignerAsync("GQ", best.MatchedSequence, best.Qrs, matchRnaStructure, ct);
     }
 
     private async Task RunQuadroForAlignerAsync(
-        string label, string matchedSequence, string qrs, CancellationToken ct)
+        string label, string matchedSequence, string qrs, string? rnaStructure, CancellationToken ct)
     {
         await SendEventAsync("aligner_quadro_start",
             new { type = "aligner_quadro_start", tool = label, qrs }, ct);
@@ -179,7 +192,7 @@ public sealed class PipelineController : ControllerBase
         try
         {
             var engine = _engineSelector.Active;
-            var input  = G4TopologyGenerator.TryGenerateFromQrs(label, matchedSequence, qrs);
+            var input  = G4TopologyGenerator.TryGenerateFromQrs(label, matchedSequence, qrs, rnaStructure);
 
             if (input is null)
             {
@@ -231,6 +244,20 @@ public sealed class PipelineController : ControllerBase
                 foreach (var frame in result.Alternative.Frames)
                     _frameStore.Store(jobId, "alt", frame.Step, frame.Pdb);
 
+            // Run eltetrado analysis on the final PDB (non-fatal if it fails)
+            string? eltetradoOutput = null;
+            string? eltetradoError  = null;
+            try
+            {
+                using var eltCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                eltCts.CancelAfter(TimeSpan.FromSeconds(90));
+                var elt = await _eltetrado.AnalyseAsync(result.Standard.Pdb!, eltCts.Token);
+                eltetradoOutput = elt.Output;
+                eltetradoError  = elt.Error;
+            }
+            catch (OperationCanceledException) { eltetradoError = "eltetrado timeout"; }
+            catch (Exception ex) { eltetradoError = ex.Message; }
+
             var stdFramesMeta = result.Standard.Frames
                 .Select(f => new { step = f.Step, energy = f.Etotal });
             var altFramesMeta = result.Alternative.Frames
@@ -241,6 +268,7 @@ public sealed class PipelineController : ControllerBase
                 type              = "aligner_quadro_done",
                 tool              = label,
                 qrs,
+                rnaStructure,
                 success           = true,
                 jobId,
                 stdEnergy         = result.Standard.Etotal,
@@ -253,6 +281,8 @@ public sealed class PipelineController : ControllerBase
                 altBestStep       = result.Alternative.BestFrame?.Step,
                 inpContent,
                 combinedStructure,
+                eltetradoOutput,
+                eltetradoError,
             }, ct);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)

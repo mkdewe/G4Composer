@@ -28,6 +28,8 @@ builder.Services.AddSingleton<G4Composer.Server.Services.IGqrsService,
                                G4Composer.Server.Services.GqrsService>();
 builder.Services.AddSingleton<G4Composer.Server.Services.IOnquadroService,
                                G4Composer.Server.Services.OnquadroService>();
+builder.Services.AddSingleton<G4Composer.Server.Services.IEltetradoService,
+                               G4Composer.Server.Services.EltetradoService>();
 builder.Services.AddSingleton<G4Composer.Server.Services.IPipelinePdbStore,
                                G4Composer.Server.Services.InMemoryPipelinePdbStore>();
 

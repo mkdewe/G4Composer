@@ -251,7 +251,8 @@ public static class G4TopologyGenerator
     /// Orient and topology are derived from sequence type (RNA=parallel, DNA=antiparallel UDUD)
     /// using the same rules as <see cref="TryGenerateFromGqrs"/>.
     /// </summary>
-    public static QuadroInput? TryGenerateFromQrs(string name, string matchedSequence, string qrs)
+    public static QuadroInput? TryGenerateFromQrs(
+        string name, string matchedSequence, string qrs, string? rnaStructure = null)
     {
         if (string.IsNullOrWhiteSpace(matchedSequence)) return null;
         if (string.IsNullOrWhiteSpace(qrs)) return null;
@@ -263,8 +264,9 @@ public static class G4TopologyGenerator
         int n = runPos[0].Len;
         if (n < 1) return null;
 
-        // Structure: non-dot chars → '^'
-        var structure = new string(qrs.Select(c => c == '.' ? '.' : '^').ToArray());
+        // Overlay QRS G-tetrad positions onto the RNA secondary structure base
+        var gTracts = runPos.Take(4).Select(r => (Start: r.Start, Length: r.Len)).ToList();
+        var structure = BuildCombinedStructure(matchedSequence, gTracts, n, rnaStructure);
 
         // Normalize: uppercase T → DNA
         if (matchedSequence.Contains('T'))

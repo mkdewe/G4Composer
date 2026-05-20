@@ -241,59 +241,77 @@ public static class G4TopologyGenerator
             .Select(i => Twist(signs[i], signs[i + 1])));
     }
 
-    // ── QRS-based helpers ─────────────────────────────────────────────────────
+    // ── QRS-based generation ─────────────────────────────────────────────────
 
     /// <summary>
-    /// Derives the Orient string from a QRS (Quadruplex Representation String).
-    /// Uppercase first character in each G-run → '+' (parallel);
-    /// lowercase → '-' (antiparallel). Returns e.g. "A+;B-;C+;D-".
+    /// Generates a QuadroInput directly from an ONQuadro Aligner match.
+    /// The QRS string is converted to the structure field (non-dot → '^').
+    /// <paramref name="matchedSequence"/> is the nucleotide sequence of the matched
+    /// G4 region (must be the same length as <paramref name="qrs"/>).
+    /// Orient and topology are derived from sequence type (RNA=parallel, DNA=antiparallel UDUD)
+    /// using the same rules as <see cref="TryGenerateFromGqrs"/>.
     /// </summary>
-    public static string OrientFromQrs(string qrs)
+    public static QuadroInput? TryGenerateFromQrs(string name, string matchedSequence, string qrs)
     {
-        var runs    = FindQrsRuns(qrs);
-        var letters = new[] { 'A', 'B', 'C', 'D' };
-        return string.Join(";", runs.Take(4).Select((run, i) =>
+        if (string.IsNullOrWhiteSpace(matchedSequence)) return null;
+        if (string.IsNullOrWhiteSpace(qrs)) return null;
+        if (matchedSequence.Length != qrs.Length) return null;
+
+        var runPos = FindQrsRunPositions(qrs);
+        if (runPos.Count < 4) return null;
+
+        int n = runPos[0].Len;
+        if (n < 1) return null;
+
+        // Structure: non-dot chars → '^'
+        var structure = new string(qrs.Select(c => c == '.' ? '.' : '^').ToArray());
+
+        // Normalize: uppercase T → DNA
+        if (matchedSequence.Contains('T'))
+            matchedSequence = matchedSequence.ToLowerInvariant();
+
+        var chi    = new string('.', matchedSequence.Length);
+        var shugar = BuildShugar(matchedSequence);
+
+        bool isRna = matchedSequence.Any(char.IsUpper);
+
+        int loopLen1 = runPos[1].Start - (runPos[0].Start + runPos[0].Len);
+        int loopLen2 = runPos[2].Start - (runPos[1].Start + runPos[1].Len);
+        int loopLen3 = runPos[3].Start - (runPos[2].Start + runPos[2].Len);
+        bool useAntiparallel = !isRna && loopLen1 >= 2 && loopLen2 >= 2 && loopLen3 >= 2;
+
+        var loops  = useAntiparallel ? AntiparallelLoops : ParallelLoops;
+        var orient = useAntiparallel ? SilvaTopology.BuildDefaultOrient(n) : BuildParallelOrient(n);
+        var twist  = BuildTwistFromOrient(orient);
+        var rise   = BuildRise(n);
+        var path   = SilvaTopology.BuildPath(loops, n).Split(';').ToList();
+
+        return new QuadroInput
         {
-            char sign = char.IsUpper(run[0]) ? '+' : '-';
-            return $"{letters[i]}{sign}";
-        }));
+            Name      = name,
+            Sequence  = matchedSequence,
+            Structure = structure,
+            Chi       = chi,
+            Sugar     = shugar,
+            Orient    = orient,
+            Rise      = rise,
+            Twist     = twist,
+            Path      = path,
+        };
     }
 
-    private static List<string> FindQrsRuns(string qrs)
+    private static List<(int Start, int Len)> FindQrsRunPositions(string qrs)
     {
-        var runs = new List<string>();
+        var positions = new List<(int Start, int Len)>();
         int i = 0;
         while (i < qrs.Length)
         {
             if (qrs[i] == '.') { i++; continue; }
             int start = i;
             while (i < qrs.Length && qrs[i] != '.') i++;
-            if (i > start) runs.Add(qrs[start..i]);
+            if (i > start) positions.Add((start, i - start));
         }
-        return runs;
-    }
-
-    /// <summary>
-    /// Same as <see cref="TryGenerateFromGqrs"/> but overrides Orient, Twist, and Path
-    /// using the topology encoded in a QRS string from ONQuadro Aligner output.
-    /// </summary>
-    public static QuadroInput? TryGenerateFromGqrsWithQrs(
-        string name, string sequence, string? rnaStructure, GqrsMotif motif, string qrs)
-    {
-        var input = TryGenerateFromGqrs(name, sequence, rnaStructure, motif);
-        if (input is null) return null;
-
-        var orient = OrientFromQrs(qrs);
-        if (string.IsNullOrEmpty(orient)) return input;
-
-        input.Orient = orient;
-        input.Twist  = BuildTwistFromOrient(orient);
-
-        bool isAntiparallelUdud = orient == SilvaTopology.BuildDefaultOrient(motif.Tetrads);
-        var  loops  = isAntiparallelUdud ? AntiparallelLoops : ParallelLoops;
-        input.Path  = SilvaTopology.BuildPath(loops, motif.Tetrads).Split(';').ToList();
-
-        return input;
+        return positions;
     }
 
     // Only G-runs of length >= 2 are considered. A single isolated G is not a G-tract

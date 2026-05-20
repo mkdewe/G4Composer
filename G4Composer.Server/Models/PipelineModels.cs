@@ -33,7 +33,8 @@ public sealed record OnquadroMatch(
     string Molecule,
     double TractDistance,
     double LinkerScore,
-    string Qrs
+    string Qrs,
+    string MatchedSequence
 );
 
 public sealed record OnquadroResult(

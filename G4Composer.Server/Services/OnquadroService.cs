@@ -64,12 +64,13 @@ public sealed class OnquadroService : IOnquadroService
                     System.Globalization.CultureInfo.InvariantCulture, out var linkerScore)) continue;
 
             matches.Add(new OnquadroMatch(
-                Files:         cols[0].Trim(),
-                TetradCount:   tetradCount,
-                Molecule:      cols[2].Trim(),
-                TractDistance: tractDist,
-                LinkerScore:   linkerScore,
-                Qrs:           cols[6].Trim()
+                Files:           cols[0].Trim(),
+                TetradCount:     tetradCount,
+                Molecule:        cols[2].Trim(),
+                TractDistance:   tractDist,
+                LinkerScore:     linkerScore,
+                Qrs:             cols[6].Trim(),
+                MatchedSequence: cols[5].Trim()
             ));
         }
         return matches;

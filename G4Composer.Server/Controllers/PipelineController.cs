@@ -196,11 +196,10 @@ public sealed class PipelineController : ControllerBase
         }
 
         // ── Run Quadro for unique QRS topologies ─────────────────────────────
-        if (result is { Success: true } && result.Matches.Count > 0
-            && gqrsResult.Success && gqrsResult.Motifs.Count > 0)
+        if (result is { Success: true } && result.Matches.Count > 0)
         {
             var topQrs = result.Matches
-                .Where(m => m.TractDistance == 0)
+                .Where(m => m.TractDistance == 0 && !string.IsNullOrWhiteSpace(m.MatchedSequence))
                 .GroupBy(m => m.Qrs, StringComparer.Ordinal)
                 .Select(g => g.First())
                 .Take(5)
@@ -208,10 +207,9 @@ public sealed class PipelineController : ControllerBase
 
             if (topQrs.Count > 0)
             {
-                var firstMotif    = gqrsResult.Motifs[0];
-                var alignerTasks  = topQrs
+                var alignerTasks = topQrs
                     .Select((match, i) => RunQuadroForAlignerAsync(
-                        $"GQ_{i + 1}", sequence, rnaStructure, firstMotif, match.Qrs, ct))
+                        $"GQ_{i + 1}", match.MatchedSequence, match.Qrs, ct))
                     .ToList();
                 await Task.WhenAll(alignerTasks);
             }
@@ -219,8 +217,7 @@ public sealed class PipelineController : ControllerBase
     }
 
     private async Task RunQuadroForAlignerAsync(
-        string label, string sequence, string? rnaStructure,
-        GqrsMotif motif, string qrs, CancellationToken ct)
+        string label, string matchedSequence, string qrs, CancellationToken ct)
     {
         await SendEventAsync("aligner_quadro_start",
             new { type = "aligner_quadro_start", tool = label, qrs }, ct);
@@ -234,8 +231,7 @@ public sealed class PipelineController : ControllerBase
         try
         {
             var engine = _engineSelector.Active;
-            var input  = G4TopologyGenerator.TryGenerateFromGqrsWithQrs(
-                             label, sequence, rnaStructure, motif, qrs);
+            var input  = G4TopologyGenerator.TryGenerateFromQrs(label, matchedSequence, qrs);
 
             if (input is null)
             {

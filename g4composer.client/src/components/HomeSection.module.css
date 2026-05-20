@@ -528,3 +528,122 @@ details[open] .inpSummary::before { content: '▼ '; }
   cursor: pointer;
   border: none;
 }
+
+/* ── Mode tabs (Predictor / Aligner) ── */
+.modeBar {
+  display: flex;
+  gap: 0;
+  margin: 0 auto 12px;
+  max-width: 780px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--border-med);
+  width: fit-content;
+}
+
+.modeTab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--sans);
+  border: none;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--text-dim);
+  transition: background 0.12s, color 0.12s;
+}
+
+.modeTabActive {
+  background: var(--teal);
+  color: white;
+}
+
+.modeChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--border-med);
+  color: var(--text-dim);
+}
+
+.modeTabActive .modeChip {
+  background: rgba(255,255,255,0.25);
+  color: white;
+}
+
+/* ── Aligner panel ── */
+.alignerEmpty {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alignerHeader {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+.alignerTableWrap {
+  overflow-x: auto;
+}
+
+.alignerTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+.alignerTable th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  white-space: nowrap;
+}
+
+.alignerTable td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.alignerRowEven td {
+  background: var(--surface2);
+}
+
+.alignerQrs {
+  letter-spacing: 0.05em;
+  color: var(--teal-dark);
+  font-weight: 600;
+}
+
+.alignerCenter {
+  text-align: center;
+}
+
+.alignerFiles {
+  color: var(--text-dim);
+  font-size: 11px;
+  max-width: 220px;
+  word-break: break-all;
+}

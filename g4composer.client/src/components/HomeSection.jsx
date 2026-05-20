@@ -12,6 +12,8 @@ export default function HomeSection() {
   const [quadroResults, setQuadroResults] = useState({})       // { 'G4_1': { ... } }
   const [activeTab,     setActiveTab]     = useState(null)
   const [progressLog,   setProgressLog]   = useState([])
+  const [onquadroResult, setOnquadroResult] = useState(null)  // null | { running, success, matches, count, error }
+  const [resultsMode,   setResultsMode]   = useState('predictor')  // 'predictor' | 'aligner'
 
   // Per-motif slider positions: { 'G4_1': { std: 80, alt: 60 }, ... }
   const [motifSteps,    setMotifSteps]    = useState({})
@@ -41,6 +43,7 @@ export default function HomeSection() {
     setQuadroResults({})
     setActiveTab(null)
     setProgressLog([])
+    setOnquadroResult(null)
 
     const abort = new AbortController()
     abortRef.current = abort
@@ -145,6 +148,22 @@ export default function HomeSection() {
               setProgressLog(prev => [...prev, `${tool}: Quadro failed — ${error}`])
             }
             setActiveTab(prev => prev ?? tool)
+            break
+          }
+
+          case 'onquadro_start':
+            setOnquadroResult({ running: true, success: false, matches: [], count: 0, error: null })
+            setProgressLog(prev => [...prev, 'ONQuadro Aligner: running…'])
+            break
+
+          case 'onquadro_done': {
+            const { success, matches, count, error } = event
+            setOnquadroResult({ running: false, success, matches: matches ?? [], count: count ?? 0, error: error ?? null })
+            setProgressLog(prev => [...prev,
+              success
+                ? `ONQuadro Aligner: ${count} match${count !== 1 ? 'es' : ''} found`
+                : `ONQuadro Aligner: failed — ${error}`,
+            ])
             break
           }
 
@@ -337,8 +356,33 @@ export default function HomeSection() {
         </div>
       )}
 
+      {/* ── Mode tabs: Predictor / Aligner ─────────────────────────────── */}
+      {(visibleTabs.length > 0 || onquadroResult) && (
+        <div className={styles.modeBar}>
+          <button
+            className={`${styles.modeTab} ${resultsMode === 'predictor' ? styles.modeTabActive : ''}`}
+            onClick={() => setResultsMode('predictor')}
+          >
+            G4 Predictor
+            {visibleTabs.length > 0 && (
+              <span className={styles.modeChip}>{Object.keys(quadroResults).length}/{visibleTabs.length}</span>
+            )}
+          </button>
+          <button
+            className={`${styles.modeTab} ${resultsMode === 'aligner' ? styles.modeTabActive : ''}`}
+            onClick={() => setResultsMode('aligner')}
+          >
+            G4 Aligner
+            {onquadroResult?.running && <span className={`${styles.tabDot} ${styles.tabDotPulse}`} style={{ marginLeft: 6 }} />}
+            {onquadroResult && !onquadroResult.running && (
+              <span className={styles.modeChip}>{onquadroResult.count}</span>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* ── Results panel ────────────────────────────────────────────────── */}
-      {visibleTabs.length > 0 && (
+      {visibleTabs.length > 0 && resultsMode === 'predictor' && (
         <div className={styles.resultsPanel}>
           {/* Motif tab bar */}
           <div className={styles.tabBar}>
@@ -484,6 +528,13 @@ export default function HomeSection() {
         </div>
       )}
 
+      {/* ── Aligner panel ───────────────────────────────────────────────── */}
+      {resultsMode === 'aligner' && (
+        <div className={styles.resultsPanel}>
+          <AlignerPanel result={onquadroResult} />
+        </div>
+      )}
+
       {/* ── Idle placeholder ─────────────────────────────────────────────── */}
       {phase === 'idle' && (
         <div className={styles.idlePlaceholder}>
@@ -573,6 +624,59 @@ function IterationSlider({ frames, activeStep, bestStep, onStep }) {
             </span>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+function AlignerPanel({ result }) {
+  if (!result) return (
+    <div className={styles.alignerEmpty}>Aligner results will appear here after the pipeline runs.</div>
+  )
+  if (result.running) return (
+    <div className={styles.alignerEmpty}>
+      <span className={`${styles.tabDot} ${styles.tabDotPulse}`} style={{ marginRight: 8 }} />
+      ONQuadro Aligner running…
+    </div>
+  )
+  if (!result.success) return (
+    <div className={styles.alignerEmpty} style={{ color: 'var(--err-text)' }}>
+      Aligner failed: {result.error}
+    </div>
+  )
+  if (result.matches.length === 0) return (
+    <div className={styles.alignerEmpty}>No matching structures found in the database.</div>
+  )
+  return (
+    <div>
+      <div className={styles.alignerHeader}>
+        Found <strong>{result.count}</strong> matching structure{result.count !== 1 ? 's' : ''} · sorted by tract distance
+      </div>
+      <div className={styles.alignerTableWrap}>
+        <table className={styles.alignerTable}>
+          <thead>
+            <tr>
+              <th>QRS notation</th>
+              <th>Tetrads</th>
+              <th>Molecule</th>
+              <th title="Lower is better">Tract dist ↑</th>
+              <th title="Higher is better">Linker score ↓</th>
+              <th>PDB / Files</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.matches.map((m, i) => (
+              <tr key={i} className={i % 2 === 0 ? styles.alignerRowEven : ''}>
+                <td className={styles.alignerQrs}>{m.qrs}</td>
+                <td className={styles.alignerCenter}>{m.tetradCount}</td>
+                <td className={styles.alignerCenter}>{m.molecule}</td>
+                <td className={styles.alignerCenter}>{m.tractDistance.toFixed(4)}</td>
+                <td className={styles.alignerCenter}>{m.linkerScore.toFixed(4)}</td>
+                <td className={styles.alignerFiles}>{m.files}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )

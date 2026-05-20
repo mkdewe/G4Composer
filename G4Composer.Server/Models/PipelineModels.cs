@@ -26,3 +26,18 @@ public sealed record GqrsResult(
     IReadOnlyList<GqrsMotif> Motifs,
     string? Error
 );
+
+public sealed record OnquadroMatch(
+    string Files,
+    int TetradCount,
+    string Molecule,
+    double TractDistance,
+    double LinkerScore,
+    string Qrs
+);
+
+public sealed record OnquadroResult(
+    bool Success,
+    IReadOnlyList<OnquadroMatch> Matches,
+    string? Error
+);

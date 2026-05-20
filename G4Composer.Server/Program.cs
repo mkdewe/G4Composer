@@ -26,6 +26,8 @@ builder.Services.AddSingleton<G4Composer.Server.Services.IRnaSecondaryStructureS
                                G4Composer.Server.Services.RnaSecondaryStructureService>();
 builder.Services.AddSingleton<G4Composer.Server.Services.IGqrsService,
                                G4Composer.Server.Services.GqrsService>();
+builder.Services.AddSingleton<G4Composer.Server.Services.IOnquadroService,
+                               G4Composer.Server.Services.OnquadroService>();
 builder.Services.AddSingleton<G4Composer.Server.Services.IPipelinePdbStore,
                                G4Composer.Server.Services.InMemoryPipelinePdbStore>();
 

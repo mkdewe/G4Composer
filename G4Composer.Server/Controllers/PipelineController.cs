@@ -23,6 +23,7 @@ public sealed class PipelineController : ControllerBase
 
     private readonly IDockerCommandRunner          _docker;
     private readonly IGqrsService                  _gqrs;
+    private readonly IOnquadroService              _onquadro;
     private readonly IQuadroJobRunner              _jobRunner;
     private readonly IQuadroEngineSelector         _engineSelector;
     private readonly IPipelinePdbStore             _pipelinePdbStore;
@@ -34,6 +35,7 @@ public sealed class PipelineController : ControllerBase
     public PipelineController(
         IDockerCommandRunner docker,
         IGqrsService gqrs,
+        IOnquadroService onquadro,
         IQuadroJobRunner jobRunner,
         IQuadroEngineSelector engineSelector,
         IPipelinePdbStore pipelinePdbStore,
@@ -44,6 +46,7 @@ public sealed class PipelineController : ControllerBase
     {
         _docker           = docker;
         _gqrs             = gqrs;
+        _onquadro         = onquadro;
         _jobRunner        = jobRunner;
         _engineSelector   = engineSelector;
         _pipelinePdbStore = pipelinePdbStore;
@@ -104,20 +107,22 @@ public sealed class PipelineController : ControllerBase
             error = gqrsResult.Error,
         }, cancellationToken);
 
-        if (!gqrsResult.Success || gqrsResult.Motifs.Count == 0)
-        {
-            await SendEventAsync("complete", new { type = "complete" }, cancellationToken);
-            return;
-        }
-
-        // ── Phase 3: Quadro for each gqrs motif in parallel ──────────────────
+        // ── Phase 3: Quadro (per motif) + ONQuadro aligner — all in parallel ───
         var rnaStructure = rnaResult.Success ? rnaResult.Structure : null;
 
-        var quadroTasks = gqrsResult.Motifs
-            .Select(motif => RunQuadroForMotifAsync(motif, sequence, rnaStructure, cancellationToken))
-            .ToList();
+        await SendEventAsync("onquadro_start", new { type = "onquadro_start" }, cancellationToken);
 
-        await Task.WhenAll(quadroTasks);
+        var onquadroTask = RunOnquadroAsync(sequence, cancellationToken);
+
+        if (gqrsResult.Success && gqrsResult.Motifs.Count > 0)
+        {
+            var quadroTasks = gqrsResult.Motifs
+                .Select(motif => RunQuadroForMotifAsync(motif, sequence, rnaStructure, cancellationToken))
+                .ToList();
+            await Task.WhenAll(quadroTasks);
+        }
+
+        await onquadroTask;
 
         await SendEventAsync("complete", new { type = "complete" }, cancellationToken);
     }
@@ -141,6 +146,51 @@ public sealed class PipelineController : ControllerBase
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private async Task RunOnquadroAsync(string sequence, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _onquadro.AlignAsync(sequence, ct);
+            await SendEventAsync("onquadro_done", new
+            {
+                type    = "onquadro_done",
+                success = result.Success,
+                count   = result.Matches.Count,
+                matches = result.Matches.Select(m => new
+                {
+                    files         = m.Files,
+                    tetradCount   = m.TetradCount,
+                    molecule      = m.Molecule,
+                    tractDistance = m.TractDistance,
+                    linkerScore   = m.LinkerScore,
+                    qrs           = m.Qrs,
+                }),
+                error = result.Error,
+            }, ct);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            await SendEventAsync("onquadro_done", new
+            {
+                type    = "onquadro_done",
+                success = false,
+                count   = 0,
+                error   = "onquadro-aligner timeout",
+            }, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "onquadro-aligner failed");
+            await SendEventAsync("onquadro_done", new
+            {
+                type    = "onquadro_done",
+                success = false,
+                count   = 0,
+                error   = ex.Message,
+            }, ct);
+        }
+    }
 
     private async Task<ToolStructureResult> RunViennaRnaAsync(
         string sequence, CancellationToken ct)

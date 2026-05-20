@@ -56,7 +56,7 @@ public sealed class PipelineController : ControllerBase
         _logger           = logger;
     }
 
-    // ── SSE pipeline: ViennaRNA + gqrs → Quadro per motif ────────────────────
+    // ── SSE pipeline: ONQuadro aligner → Quadro for best QRS ────────────────
 
     [HttpPost("run")]
     public async Task RunPipeline([FromBody] PipelineRequest request, CancellationToken cancellationToken)
@@ -75,54 +75,7 @@ public sealed class PipelineController : ControllerBase
 
         await SendEventAsync("start", new { type = "start" }, cancellationToken);
 
-        // ── Phase 1: ViennaRNA secondary structure (--gquad always on) ───────
-        var rnaResult = await RunViennaRnaAsync(sequence, cancellationToken);
-        await SendEventAsync("viennarna_done", new
-        {
-            type      = "viennarna_done",
-            success   = rnaResult.Success,
-            structure = rnaResult.Structure,
-            energy    = rnaResult.Energy,
-            error     = rnaResult.Error,
-        }, cancellationToken);
-
-        // ── Phase 2: gqrs G-quadruplex motif prediction ───────────────────────
-        var gqrsResult = await _gqrs.PredictAsync(sequence, cancellationToken);
-        await SendEventAsync("gqrs_done", new
-        {
-            type    = "gqrs_done",
-            success = gqrsResult.Success,
-            count   = gqrsResult.Motifs.Count,
-            motifs  = gqrsResult.Motifs.Select(m => new
-            {
-                id       = m.Id,
-                tetrad1  = m.Tetrad1,
-                tetrad2  = m.Tetrad2,
-                tetrad3  = m.Tetrad3,
-                tetrad4  = m.Tetrad4,
-                tetrads  = m.Tetrads,
-                gscore   = m.GScore,
-                sequence = m.MotifSequence,
-            }),
-            error = gqrsResult.Error,
-        }, cancellationToken);
-
-        // ── Phase 3: Quadro (per motif) + ONQuadro aligner — all in parallel ───
-        var rnaStructure = rnaResult.Success ? rnaResult.Structure : null;
-
-        await SendEventAsync("onquadro_start", new { type = "onquadro_start" }, cancellationToken);
-
-        var onquadroTask = RunOnquadroAsync(sequence, rnaStructure, gqrsResult, cancellationToken);
-
-        if (gqrsResult.Success && gqrsResult.Motifs.Count > 0)
-        {
-            var quadroTasks = gqrsResult.Motifs
-                .Select(motif => RunQuadroForMotifAsync(motif, sequence, rnaStructure, cancellationToken))
-                .ToList();
-            await Task.WhenAll(quadroTasks);
-        }
-
-        await onquadroTask;
+        await RunOnquadroAsync(sequence, cancellationToken);
 
         await SendEventAsync("complete", new { type = "complete" }, cancellationToken);
     }
@@ -147,37 +100,20 @@ public sealed class PipelineController : ControllerBase
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private async Task RunOnquadroAsync(
-        string sequence, string? rnaStructure, GqrsResult gqrsResult, CancellationToken ct)
+    private async Task RunOnquadroAsync(string sequence, CancellationToken ct)
     {
         OnquadroResult? result = null;
         try
         {
             result = await _onquadro.AlignAsync(sequence, ct);
-            await SendEventAsync("onquadro_done", new
-            {
-                type    = "onquadro_done",
-                success = result.Success,
-                count   = result.Matches.Count,
-                matches = result.Matches.Select(m => new
-                {
-                    files         = m.Files,
-                    tetradCount   = m.TetradCount,
-                    molecule      = m.Molecule,
-                    tractDistance = m.TractDistance,
-                    linkerScore   = m.LinkerScore,
-                    qrs           = m.Qrs,
-                }),
-                error = result.Error,
-            }, ct);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            await SendEventAsync("onquadro_done", new
+            await SendEventAsync("aligner_quadro_done", new
             {
-                type    = "onquadro_done",
+                type    = "aligner_quadro_done",
+                tool    = "GQ",
                 success = false,
-                count   = 0,
                 error   = "onquadro-aligner timeout",
             }, ct);
             return;
@@ -185,35 +121,47 @@ public sealed class PipelineController : ControllerBase
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "onquadro-aligner failed");
-            await SendEventAsync("onquadro_done", new
+            await SendEventAsync("aligner_quadro_done", new
             {
-                type    = "onquadro_done",
+                type    = "aligner_quadro_done",
+                tool    = "GQ",
                 success = false,
-                count   = 0,
-                error   = ex.Message,
+                error   = $"onquadro-aligner: {ex.Message}",
             }, ct);
             return;
         }
 
-        // ── Run Quadro for unique QRS topologies ─────────────────────────────
-        if (result is { Success: true } && result.Matches.Count > 0)
+        if (!result.Success || result.Matches.Count == 0)
         {
-            var topQrs = result.Matches
-                .Where(m => m.TractDistance == 0 && !string.IsNullOrWhiteSpace(m.MatchedSequence))
-                .GroupBy(m => m.Qrs, StringComparer.Ordinal)
-                .Select(g => g.First())
-                .Take(5)
-                .ToList();
-
-            if (topQrs.Count > 0)
+            await SendEventAsync("aligner_quadro_done", new
             {
-                var alignerTasks = topQrs
-                    .Select((match, i) => RunQuadroForAlignerAsync(
-                        $"GQ_{i + 1}", match.MatchedSequence, match.Qrs, ct))
-                    .ToList();
-                await Task.WhenAll(alignerTasks);
-            }
+                type    = "aligner_quadro_done",
+                tool    = "GQ",
+                success = false,
+                error   = result.Error ?? "No matching structures found",
+            }, ct);
+            return;
         }
+
+        // Best match: tract_distance = 0, highest linker_score
+        var best = result.Matches
+            .Where(m => m.TractDistance == 0 && !string.IsNullOrWhiteSpace(m.MatchedSequence))
+            .OrderByDescending(m => m.LinkerScore)
+            .FirstOrDefault();
+
+        if (best is null)
+        {
+            await SendEventAsync("aligner_quadro_done", new
+            {
+                type    = "aligner_quadro_done",
+                tool    = "GQ",
+                success = false,
+                error   = "No match with tract_distance = 0",
+            }, ct);
+            return;
+        }
+
+        await RunQuadroForAlignerAsync("GQ", best.MatchedSequence, best.Qrs, ct);
     }
 
     private async Task RunQuadroForAlignerAsync(

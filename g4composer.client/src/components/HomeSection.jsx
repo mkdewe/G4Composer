@@ -5,39 +5,13 @@ import { downloadInp } from '../utils/inpSerializer.js'
 import styles from './HomeSection.module.css'
 
 export default function HomeSection() {
-  const [sequence,      setSequence]      = useState('')
-  const [phase,         setPhase]         = useState('idle')   // 'idle' | 'running' | 'done'
-  const [viennaResult,  setViennaResult]  = useState(null)     // kept for progress log only
-  const [gqrsMotifs,    setGqrsMotifs]    = useState([])       // for tab labels
-  const [quadroResults, setQuadroResults] = useState({})       // { 'G4_1': { ... } }
-  const [activeTab,     setActiveTab]     = useState(null)
-  const [progressLog,   setProgressLog]   = useState([])
-  const [onquadroResult, setOnquadroResult] = useState(null)  // null | { running, success, matches, count, error }
-  const [resultsMode,   setResultsMode]   = useState('predictor')  // 'predictor' | 'aligner'
-
-  // Aligner 3D predictions (GQ_1, GQ_2, ...)
-  const [alignerQuadroResults, setAlignerQuadroResults] = useState({})
-  const [alignerActiveTab,     setAlignerActiveTab]     = useState(null)
-  const [alignerSteps,         setAlignerSteps]         = useState({})
-  const [alignerDisplayedPdbUrl, setAlignerDisplayedPdbUrl] = useState(null)
-  const alignerFrameCacheRef = useRef({})
-
-  // Per-motif slider positions: { 'G4_1': { std: 80, alt: 60 }, ... }
-  const [motifSteps,    setMotifSteps]    = useState({})
+  const [sequence,  setSequence]  = useState('')
+  const [phase,     setPhase]     = useState('idle')   // 'idle' | 'running' | 'done'
+  const [result,    setResult]    = useState(null)     // null | { running, success, ... }
+  const [steps,     setSteps]     = useState({ std: null, alt: null })
   const [displayedPdbUrl, setDisplayedPdbUrl] = useState(null)
   const frameCacheRef = useRef({})
-
-  const abortRef = useRef(null)
-
-  // ── Best energy tab ───────────────────────────────────────────────────────
-  const bestTool = Object.entries(quadroResults)
-    .filter(([, r]) => r.success)
-    .map(([tool, r]) => ({
-      tool,
-      energy: r.displayVariant === 'alternative' ? r.altEnergy : r.stdEnergy,
-    }))
-    .filter(x => x.energy != null)
-    .sort((a, b) => a.energy - b.energy)[0]?.tool ?? null
+  const abortRef      = useRef(null)
 
   // ── Run pipeline ──────────────────────────────────────────────────────────
   const handleRun = useCallback(async () => {
@@ -45,16 +19,9 @@ export default function HomeSection() {
     if (!seq) return
 
     setPhase('running')
-    setViennaResult(null)
-    setGqrsMotifs([])
-    setQuadroResults({})
-    setActiveTab(null)
-    setProgressLog([])
-    setOnquadroResult(null)
-    setAlignerQuadroResults({})
-    setAlignerActiveTab(null)
-    setAlignerSteps({})
-    setAlignerDisplayedPdbUrl(null)
+    setResult(null)
+    setSteps({ std: null, alt: null })
+    setDisplayedPdbUrl(null)
 
     const abort = new AbortController()
     abortRef.current = abort
@@ -64,186 +31,54 @@ export default function HomeSection() {
         if (abort.signal.aborted) break
 
         switch (event.type) {
-          case 'start':
-            setProgressLog(['Pipeline started'])
+          case 'aligner_quadro_start':
+            setResult({ running: true })
             break
-
-          case 'viennarna_done': {
-            const { success, structure, energy, error } = event
-            setViennaResult({ success, structure, energy, error })
-            setProgressLog(prev => [...prev,
-              success
-                ? `ViennaRNA: structure predicted (${formatEnergy(energy)})`
-                : `ViennaRNA: failed — ${error}`,
-            ])
-            break
-          }
-
-          case 'gqrs_done': {
-            const { success, motifs, count, error } = event
-            if (success && motifs?.length) {
-              setGqrsMotifs(motifs)
-              setProgressLog(prev => [...prev,
-                `gqrs: ${count} G-quadruplex motif${count !== 1 ? 's' : ''} found`,
-              ])
-            } else {
-              setProgressLog(prev => [...prev,
-                success ? 'gqrs: no G-quadruplex motifs found' : `gqrs: failed — ${error}`,
-              ])
-            }
-            break
-          }
-
-          case 'quadro_start':
-            setProgressLog(prev => [...prev, `${event.tool}: running Quadro 3D…`])
-            break
-
-          case 'quadro_done': {
-            const { tool, motifId, success, jobId, stdEnergy, altEnergy, winner,
-                    hasAlt, error, inpContent, quadroOutput, combinedStructure,
-                    stdFrames: stdFramesMeta, altFrames: altFramesMeta,
-                    stdBestStep, altBestStep } = event
-            if (success) {
-              // Auto-set slider to best-energy step for this motif
-              setMotifSteps(prev => ({
-                ...prev,
-                [tool]: {
-                  std: stdBestStep ?? null,
-                  alt: altBestStep ?? null,
-                },
-              }))
-
-              const fetchBoth = async () => {
-                const pdbUrl    = await fetchPipelinePdb(jobId)
-                const altPdbUrl = hasAlt ? await fetchPipelineAltPdb(jobId) : null
-                return { pdbUrl, altPdbUrl }
-              }
-              fetchBoth().then(({ pdbUrl, altPdbUrl }) => {
-                setQuadroResults(prev => {
-                  const next = {
-                    ...prev,
-                    [tool]: {
-                      success: true, motifId, jobId, stdEnergy, altEnergy,
-                      winner, hasAlt, pdbUrl, altPdbUrl,
-                      stdFrames: stdFramesMeta ?? [],
-                      altFrames: altFramesMeta ?? [],
-                      stdBestStep: stdBestStep ?? null,
-                      altBestStep: altBestStep ?? null,
-                      combinedStructure: combinedStructure ?? null,
-                      displayVariant: winner ?? 'standard',
-                      inpContent, error: null,
-                    },
-                  }
-                  const best = Object.entries(next)
-                    .filter(([, r]) => r.success)
-                    .map(([t, r]) => ({ t, e: r.winner === 'alternative' ? r.altEnergy : r.stdEnergy }))
-                    .filter(x => x.e != null)
-                    .sort((a, b) => a.e - b.e)[0]
-                  if (best) setActiveTab(best.t)
-                  return next
-                })
-              })
-              setProgressLog(prev => [...prev,
-                `${tool}: 3D model ready (ΔG ${formatEnergy(winner === 'alternative' ? altEnergy : stdEnergy)})`,
-              ])
-            } else {
-              setQuadroResults(prev => ({
-                ...prev,
-                [tool]: {
-                  success: false, motifId, error: error ?? 'Unknown error',
-                  combinedStructure: combinedStructure ?? null,
-                  inpContent: inpContent ?? null,
-                  quadroOutput: quadroOutput ?? null,
-                },
-              }))
-              setProgressLog(prev => [...prev, `${tool}: Quadro failed — ${error}`])
-            }
-            setActiveTab(prev => prev ?? tool)
-            break
-          }
-
-          case 'onquadro_start':
-            setOnquadroResult({ running: true, success: false, matches: [], count: 0, error: null })
-            setProgressLog(prev => [...prev, 'ONQuadro Aligner: running…'])
-            break
-
-          case 'onquadro_done': {
-            const { success, matches, count, error } = event
-            setOnquadroResult({ running: false, success, matches: matches ?? [], count: count ?? 0, error: error ?? null })
-            setProgressLog(prev => [...prev,
-              success
-                ? `ONQuadro Aligner: ${count} match${count !== 1 ? 'es' : ''} found`
-                : `ONQuadro Aligner: failed — ${error}`,
-            ])
-            break
-          }
-
-          case 'aligner_quadro_start': {
-            const { tool } = event
-            setAlignerQuadroResults(prev => ({ ...prev, [tool]: { running: true } }))
-            setAlignerActiveTab(prev => prev ?? tool)
-            setProgressLog(prev => [...prev, `${tool}: running Quadro 3D (QRS topology)…`])
-            break
-          }
 
           case 'aligner_quadro_done': {
-            const { tool, qrs, success, jobId, stdEnergy, altEnergy, winner,
+            const { success, jobId, qrs, stdEnergy, altEnergy, winner,
                     hasAlt, error, inpContent, quadroOutput, combinedStructure,
                     stdFrames: stdFramesMeta, altFrames: altFramesMeta,
                     stdBestStep, altBestStep } = event
             if (success) {
-              setAlignerSteps(prev => ({
-                ...prev,
-                [tool]: { std: stdBestStep ?? null, alt: altBestStep ?? null },
-              }))
+              setSteps({ std: stdBestStep ?? null, alt: altBestStep ?? null })
               const fetchBoth = async () => {
                 const pdbUrl    = await fetchPipelinePdb(jobId)
                 const altPdbUrl = hasAlt ? await fetchPipelineAltPdb(jobId) : null
                 return { pdbUrl, altPdbUrl }
               }
               fetchBoth().then(({ pdbUrl, altPdbUrl }) => {
-                setAlignerQuadroResults(prev => ({
-                  ...prev,
-                  [tool]: {
-                    success: true, jobId, qrs, stdEnergy, altEnergy,
-                    winner, hasAlt, pdbUrl, altPdbUrl,
-                    stdFrames: stdFramesMeta ?? [],
-                    altFrames: altFramesMeta ?? [],
-                    stdBestStep: stdBestStep ?? null,
-                    altBestStep: altBestStep ?? null,
-                    combinedStructure: combinedStructure ?? null,
-                    displayVariant: winner ?? 'standard',
-                    inpContent, error: null,
-                  },
-                }))
-              })
-              setProgressLog(prev => [...prev,
-                `${tool}: 3D model ready (ΔG ${formatEnergy(winner === 'alternative' ? altEnergy : stdEnergy)})`,
-              ])
-            } else {
-              setAlignerQuadroResults(prev => ({
-                ...prev,
-                [tool]: {
-                  success: false, qrs, error: error ?? 'Unknown error',
+                setResult({
+                  running: false, success: true, jobId, qrs,
+                  stdEnergy, altEnergy, winner, hasAlt,
+                  pdbUrl, altPdbUrl,
+                  stdFrames: stdFramesMeta ?? [],
+                  altFrames: altFramesMeta ?? [],
+                  stdBestStep: stdBestStep ?? null,
+                  altBestStep: altBestStep ?? null,
                   combinedStructure: combinedStructure ?? null,
-                  inpContent: inpContent ?? null,
-                  quadroOutput: quadroOutput ?? null,
-                },
-              }))
-              setProgressLog(prev => [...prev, `${tool}: Quadro failed — ${error}`])
+                  displayVariant: winner ?? 'standard',
+                  inpContent, error: null,
+                })
+              })
+            } else {
+              setResult({
+                running: false, success: false, qrs, error: error ?? 'Unknown error',
+                inpContent: inpContent ?? null,
+                quadroOutput: quadroOutput ?? null,
+                combinedStructure: combinedStructure ?? null,
+              })
             }
-            setAlignerActiveTab(prev => prev ?? tool)
             break
           }
 
           case 'complete':
             setPhase('done')
-            setProgressLog(prev => [...prev, 'Pipeline complete.'])
             break
 
           case 'error':
+            setResult({ running: false, success: false, error: event.message })
             setPhase('done')
-            setProgressLog(prev => [...prev, `Error: ${event.message}`])
             break
 
           default:
@@ -251,170 +86,89 @@ export default function HomeSection() {
         }
       }
     } catch (err) {
-      if (!abort.signal.aborted) {
-        setProgressLog(prev => [...prev, `Pipeline error: ${err.message}`])
-        setPhase('done')
-      }
+      if (!abort.signal.aborted) setPhase('done')
     }
   }, [sequence])
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort()
     setPhase('done')
-    setProgressLog(prev => [...prev, 'Stopped by user.'])
   }, [])
 
-  const handleVariantToggle = useCallback((tool, variant) => {
+  const handleVariantToggle = useCallback((variant) => {
     setDisplayedPdbUrl(null)
-    setQuadroResults(prev => {
-      const r = prev[tool]
-      if (!r) return prev
-      return { ...prev, [tool]: { ...r, displayVariant: variant } }
-    })
+    setResult(prev => prev ? { ...prev, displayVariant: variant } : prev)
   }, [])
 
-  const handleAlignerVariantToggle = useCallback((tool, variant) => {
-    setAlignerDisplayedPdbUrl(null)
-    setAlignerQuadroResults(prev => {
-      const r = prev[tool]
-      if (!r) return prev
-      return { ...prev, [tool]: { ...r, displayVariant: variant } }
-    })
-  }, [])
+  // ── Derived state ─────────────────────────────────────────────────────────
+  const displayVariant = result?.displayVariant ?? 'standard'
+  const stdFrames      = result?.stdFrames ?? []
+  const altFrames      = result?.altFrames ?? []
+  const frames         = displayVariant === 'alternative' ? altFrames : stdFrames
+  const activeStep     = steps[displayVariant === 'alternative' ? 'alt' : 'std'] ?? null
+  const bestStep       = displayVariant === 'alternative' ? result?.altBestStep : result?.stdBestStep
+  const stdStepEnergy  = stdFrames.find(f => f.step === steps.std)?.energy ?? result?.stdEnergy ?? null
+  const altStepEnergy  = altFrames.find(f => f.step === steps.alt)?.energy ?? result?.altEnergy ?? null
 
-  // ── Active tab data ───────────────────────────────────────────────────────
-  const activeQuadro   = activeTab ? quadroResults[activeTab] : null
-  const displayVariant = activeQuadro?.displayVariant ?? 'standard'
-
-  const activeStdFrames = activeQuadro?.stdFrames ?? []
-  const activeAltFrames = activeQuadro?.altFrames ?? []
-  const activeFrames    = displayVariant === 'alternative' ? activeAltFrames : activeStdFrames
-  const activeStep      = motifSteps[activeTab]?.[displayVariant === 'alternative' ? 'alt' : 'std'] ?? null
-  const activeBestStep  = displayVariant === 'alternative'
-    ? activeQuadro?.altBestStep : activeQuadro?.stdBestStep
-
-  const stdStepEnergy = activeStdFrames.find(f => f.step === motifSteps[activeTab]?.std)?.energy
-    ?? activeQuadro?.stdEnergy ?? null
-  const altStepEnergy = activeAltFrames.find(f => f.step === motifSteps[activeTab]?.alt)?.energy
-    ?? activeQuadro?.altEnergy ?? null
-
-  // ── Aligner active tab data ───────────────────────────────────────────────
-  const alignerActiveQuadro   = alignerActiveTab ? alignerQuadroResults[alignerActiveTab] : null
-  const alignerDisplayVariant = alignerActiveQuadro?.displayVariant ?? 'standard'
-  const alignerStdFrames      = alignerActiveQuadro?.stdFrames ?? []
-  const alignerAltFrames      = alignerActiveQuadro?.altFrames ?? []
-  const alignerFrames         = alignerDisplayVariant === 'alternative' ? alignerAltFrames : alignerStdFrames
-  const alignerActiveStep     = alignerSteps[alignerActiveTab]?.[alignerDisplayVariant === 'alternative' ? 'alt' : 'std'] ?? null
-  const alignerBestStep       = alignerDisplayVariant === 'alternative'
-    ? alignerActiveQuadro?.altBestStep : alignerActiveQuadro?.stdBestStep
-  const alignerStdStepEnergy  = alignerStdFrames.find(f => f.step === alignerSteps[alignerActiveTab]?.std)?.energy
-    ?? alignerActiveQuadro?.stdEnergy ?? null
-  const alignerAltStepEnergy  = alignerAltFrames.find(f => f.step === alignerSteps[alignerActiveTab]?.alt)?.energy
-    ?? alignerActiveQuadro?.altEnergy ?? null
-
-  // Lazy-fetch frame PDB when tab / variant / step changes
+  // ── Lazy-fetch frame PDB ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!activeQuadro?.success || !activeQuadro.jobId) {
+    if (!result?.success || !result.jobId) {
       setDisplayedPdbUrl(
         displayVariant === 'alternative'
-          ? (activeQuadro?.altPdbUrl ?? activeQuadro?.pdbUrl ?? null)
-          : (activeQuadro?.pdbUrl ?? null)
+          ? (result?.altPdbUrl ?? result?.pdbUrl ?? null)
+          : (result?.pdbUrl ?? null)
       )
       return
     }
     const engine = displayVariant === 'alternative' ? 'alt' : 'std'
-    if (activeFrames.length <= 1 || !activeStep) {
+    if (frames.length <= 1 || !activeStep) {
       setDisplayedPdbUrl(
         displayVariant === 'alternative'
-          ? (activeQuadro.altPdbUrl ?? activeQuadro.pdbUrl ?? null)
-          : (activeQuadro.pdbUrl ?? null)
+          ? (result.altPdbUrl ?? result.pdbUrl ?? null)
+          : (result.pdbUrl ?? null)
       )
       return
     }
-    const cacheKey = `${activeQuadro.jobId}_${engine}_${activeStep}`
+    const cacheKey = `${result.jobId}_${engine}_${activeStep}`
     if (frameCacheRef.current[cacheKey]) {
       setDisplayedPdbUrl(frameCacheRef.current[cacheKey])
       return
     }
     let cancelled = false
-    fetchFrame(activeQuadro.jobId, engine, activeStep).then(result => {
-      if (!cancelled && result?.url) {
-        frameCacheRef.current[cacheKey] = result.url
-        setDisplayedPdbUrl(result.url)
+    fetchFrame(result.jobId, engine, activeStep).then(r => {
+      if (!cancelled && r?.url) {
+        frameCacheRef.current[cacheKey] = r.url
+        setDisplayedPdbUrl(r.url)
       }
     })
     return () => { cancelled = true }
-  }, [activeTab, displayVariant, activeStep, activeQuadro?.jobId, activeQuadro?.success])
-
-  // Lazy-fetch aligner frame PDB
-  useEffect(() => {
-    if (!alignerActiveQuadro?.success || !alignerActiveQuadro.jobId) {
-      setAlignerDisplayedPdbUrl(
-        alignerDisplayVariant === 'alternative'
-          ? (alignerActiveQuadro?.altPdbUrl ?? alignerActiveQuadro?.pdbUrl ?? null)
-          : (alignerActiveQuadro?.pdbUrl ?? null)
-      )
-      return
-    }
-    const engine = alignerDisplayVariant === 'alternative' ? 'alt' : 'std'
-    if (alignerFrames.length <= 1 || !alignerActiveStep) {
-      setAlignerDisplayedPdbUrl(
-        alignerDisplayVariant === 'alternative'
-          ? (alignerActiveQuadro.altPdbUrl ?? alignerActiveQuadro.pdbUrl ?? null)
-          : (alignerActiveQuadro.pdbUrl ?? null)
-      )
-      return
-    }
-    const cacheKey = `${alignerActiveQuadro.jobId}_${engine}_${alignerActiveStep}`
-    if (alignerFrameCacheRef.current[cacheKey]) {
-      setAlignerDisplayedPdbUrl(alignerFrameCacheRef.current[cacheKey])
-      return
-    }
-    let cancelled = false
-    fetchFrame(alignerActiveQuadro.jobId, engine, alignerActiveStep).then(result => {
-      if (!cancelled && result?.url) {
-        alignerFrameCacheRef.current[cacheKey] = result.url
-        setAlignerDisplayedPdbUrl(result.url)
-      }
-    })
-    return () => { cancelled = true }
-  }, [alignerActiveTab, alignerDisplayVariant, alignerActiveStep,
-      alignerActiveQuadro?.jobId, alignerActiveQuadro?.success])
-
-  const alignerPdbUrl = alignerDisplayedPdbUrl
-    ?? (alignerDisplayVariant === 'alternative'
-      ? (alignerActiveQuadro?.altPdbUrl ?? alignerActiveQuadro?.pdbUrl ?? null)
-      : (alignerActiveQuadro?.pdbUrl ?? null))
+  }, [displayVariant, activeStep, result?.jobId, result?.success])
 
   const activePdbUrl = displayedPdbUrl
     ?? (displayVariant === 'alternative'
-      ? (activeQuadro?.altPdbUrl ?? activeQuadro?.pdbUrl ?? null)
-      : (activeQuadro?.pdbUrl ?? null))
+      ? (result?.altPdbUrl ?? result?.pdbUrl ?? null)
+      : (result?.pdbUrl ?? null))
 
-  const quadroRunning = activeTab && gqrsMotifs.length > 0 && !quadroResults[activeTab]
-  const viewerState   = quadroRunning ? 'running'
-    : (activeQuadro?.success && activePdbUrl) ? 'done'
-    : activeQuadro && !activeQuadro.success ? 'error'
+  const viewerState = result?.running ? 'running'
+    : (result?.success && activePdbUrl) ? 'done'
+    : result && !result.running && !result.success ? 'error'
+    : phase === 'running' ? 'running'
     : 'idle'
-
-  const visibleTabs = gqrsMotifs.map(m => `G4_${m.id}`)
-  const quadroDone  = Object.keys(quadroResults).length
-  const totalMotifs = gqrsMotifs.length
 
   // ── Download handlers ─────────────────────────────────────────────────────
   function handleDownloadInp() {
-    if (!activeQuadro?.inpContent) return
-    downloadInp(activeQuadro.inpContent, activeTab ?? 'structure')
+    if (!result?.inpContent) return
+    downloadInp(result.inpContent, 'structure')
   }
 
   function handleDownloadPdb() {
     if (!activePdbUrl) return
     const engine = displayVariant === 'alternative' ? 'alt' : 'std'
-    const step   = motifSteps[activeTab]?.[engine] ?? null
-    const suffix = step && activeFrames.length > 1 ? `${engine}_${step}` : engine
+    const step   = steps[engine] ?? null
+    const suffix = step && frames.length > 1 ? `${engine}_${step}` : engine
     const a = document.createElement('a')
     a.href     = activePdbUrl
-    a.download = `${activeTab ?? 'structure'}_${suffix}.pdb`
+    a.download = `structure_${suffix}.pdb`
     a.click()
   }
 
@@ -459,231 +213,106 @@ export default function HomeSection() {
         )}
       </div>
 
-      {/* ── Progress area ────────────────────────────────────────────────── */}
-      {(phase === 'running' || (phase === 'done' && progressLog.length > 0)) && (
-        <div className={styles.progressArea} style={{ maxWidth: 780, margin: '0 auto 16px' }}>
-          {phase === 'running' && (
-            <div className={styles.progressBarRow}>
-              <div className={styles.progressTrack}>
-                <div
-                  className={styles.progressFill}
-                  style={{ width: totalMotifs > 0 ? `${Math.round((quadroDone / totalMotifs) * 100)}%` : '10%' }}
-                />
-              </div>
-              <span className={styles.progressLabel}>
-                {totalMotifs > 0
-                  ? `Quadro ${quadroDone}/${totalMotifs} motifs`
-                  : (viennaResult ? 'gqrs running…' : 'ViennaRNA running…')}
-                {progressLog.length > 0 && ` · ${progressLog[progressLog.length - 1]}`}
-              </span>
-            </div>
-          )}
-          {phase === 'done' && (
-            <div className={styles.progressLog}>
-              {progressLog.slice(-6).map((msg, i) => (
-                <span key={i} className={styles.logLine}>{msg}</span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Mode tabs: Predictor / Aligner ─────────────────────────────── */}
-      {(visibleTabs.length > 0 || onquadroResult) && (
-        <div className={styles.modeBar}>
-          <button
-            className={`${styles.modeTab} ${resultsMode === 'predictor' ? styles.modeTabActive : ''}`}
-            onClick={() => setResultsMode('predictor')}
-          >
-            G4 Predictor
-            {visibleTabs.length > 0 && (
-              <span className={styles.modeChip}>{Object.keys(quadroResults).length}/{visibleTabs.length}</span>
-            )}
-          </button>
-          <button
-            className={`${styles.modeTab} ${resultsMode === 'aligner' ? styles.modeTabActive : ''}`}
-            onClick={() => setResultsMode('aligner')}
-          >
-            G4 Aligner
-            {onquadroResult?.running && <span className={`${styles.tabDot} ${styles.tabDotPulse}`} style={{ marginLeft: 6 }} />}
-            {onquadroResult && !onquadroResult.running && (
-              <span className={styles.modeChip}>{onquadroResult.count}</span>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* ── Results panel ────────────────────────────────────────────────── */}
-      {visibleTabs.length > 0 && resultsMode === 'predictor' && (
+      {(phase !== 'idle') && (
         <div className={styles.resultsPanel}>
-          {/* Motif tab bar */}
-          <div className={styles.tabBar}>
-            <div className={styles.tabs}>
-              {visibleTabs.map(tool => {
-                const motif  = gqrsMotifs.find(m => `G4_${m.id}` === tool)
-                const quadro = quadroResults[tool]
-                const isBest = tool === bestTool
-                const dv     = quadro?.displayVariant ?? quadro?.winner ?? 'standard'
-                const energy = quadro?.success
-                  ? (dv === 'alternative' ? quadro.altEnergy : quadro.stdEnergy)
-                  : null
-
-                return (
+          {/* Action bar */}
+          {result?.success && (
+            <div className={styles.actionBar}>
+              <div className={styles.actionLeft} />
+              <div className={styles.actionRight}>
+                {result.inpContent && (
                   <button
-                    key={tool}
-                    className={`${styles.tab} ${activeTab === tool ? styles.tabActive : ''} ${quadro?.success === false ? styles.tabFailed : ''}`}
-                    onClick={() => setActiveTab(tool)}
+                    className={styles.actionBtn}
+                    onClick={handleDownloadInp}
+                    title="Download .inp input file"
                   >
-                    <TabDot quadro={quadro} running={!quadro && phase === 'running'} />
-                    <span className={styles.tabName}>
-                      G4_{motif?.id} · {motif?.tetrads}T
-                    </span>
-                    {isBest && <span className={styles.bestStar} title="Best energy">★</span>}
-                    {energy != null && (
-                      <span className={styles.energyChip}>{formatEnergy(energy)}</span>
-                    )}
-                    {quadro?.success === false && (
-                      <span className={styles.failChip}>!</span>
-                    )}
+                    ↓ .inp
                   </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Tab body */}
-          {activeTab && (
-            <div className={styles.tabBody}>
-
-              {/* Action bar — downloads */}
-              {activeQuadro && (
-                <div className={styles.actionBar}>
-                  <div className={styles.actionLeft} />
-                  <div className={styles.actionRight}>
-                    {activeQuadro.inpContent && (
-                      <button
-                        className={styles.actionBtn}
-                        onClick={handleDownloadInp}
-                        title="Download .inp input file"
-                      >
-                        ↓ .inp
-                      </button>
-                    )}
-                    <button
-                      className={`${styles.actionBtn} ${styles.actionPrimary}`}
-                      disabled={!activePdbUrl}
-                      onClick={handleDownloadPdb}
-                      title={`Download ${displayVariant} PDB`}
-                    >
-                      ↓ .pdb ({displayVariant === 'alternative' ? 'alt' : 'std'})
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Energy comparison bar + iteration slider */}
-              {activeQuadro?.success && (activeQuadro.stdEnergy != null || activeQuadro.altEnergy != null) && (
-                <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
-                  <div className={styles.energyBar}>
-                    <span className={styles.energyBarLabel}>Energy</span>
-                    <EnergyBadge
-                      label="Standard"
-                      energy={stdStepEnergy}
-                      isWinner={activeQuadro.winner === 'standard'}
-                      isActive={displayVariant === 'standard'}
-                      onClick={() => handleVariantToggle(activeTab, 'standard')}
-                    />
-                    {activeQuadro.altEnergy != null && (
-                      <EnergyBadge
-                        label="Alternative"
-                        energy={altStepEnergy}
-                        isWinner={activeQuadro.winner === 'alternative'}
-                        isActive={displayVariant === 'alternative'}
-                        onClick={() => handleVariantToggle(activeTab, 'alternative')}
-                      />
-                    )}
-                    <span className={styles.energyBarHint}>lower = better minimization</span>
-                  </div>
-                  {activeFrames.length > 1 && (
-                    <IterationSlider
-                      frames={activeFrames}
-                      activeStep={activeStep}
-                      bestStep={activeBestStep}
-                      onStep={step => setMotifSteps(prev => ({
-                        ...prev,
-                        [activeTab]: {
-                          ...(prev[activeTab] ?? {}),
-                          [displayVariant === 'alternative' ? 'alt' : 'std']: step,
-                        },
-                      }))}
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* Error row */}
-              {activeQuadro?.success === false && (
-                <div className={styles.metaRow}>
-                  <div className={styles.metaError}>
-                    3D model failed: {activeQuadro.error}
-                  </div>
-                </div>
-              )}
-
-              {/* Generated .inp */}
-              {activeQuadro?.inpContent && (
-                <details className={styles.inpDetails}>
-                  <summary className={styles.inpSummary}>Generated .inp input</summary>
-                  <pre className={styles.inpPre}>{filterInpDisplay(activeQuadro.inpContent)}</pre>
-                </details>
-              )}
-
-              {/* Quadro stdout/stderr — only on failure */}
-              {activeQuadro?.quadroOutput && (
-                <details className={styles.inpDetails} open>
-                  <summary className={styles.inpSummary}>Quadro output (stdout / stderr)</summary>
-                  <pre className={styles.inpPre}>{activeQuadro.quadroOutput}</pre>
-                </details>
-              )}
-
-              {/* 3D viewer */}
-              <div className={styles.viewerWrap}>
-                <MolstarViewer
-                  pdbUrl={activePdbUrl}
-                  runState={viewerState}
-                  runStatus={activeQuadro?.error ?? ''}
-                  structureName={activeTab}
-                />
+                )}
+                <button
+                  className={`${styles.actionBtn} ${styles.actionPrimary}`}
+                  disabled={!activePdbUrl}
+                  onClick={handleDownloadPdb}
+                  title={`Download ${displayVariant} PDB`}
+                >
+                  ↓ .pdb ({displayVariant === 'alternative' ? 'alt' : 'std'})
+                </button>
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* ── Aligner panel ───────────────────────────────────────────────── */}
-      {resultsMode === 'aligner' && (
-        <div className={styles.resultsPanel}>
-          <AlignerPanel
-            result={onquadroResult}
-            quadroResults={alignerQuadroResults}
-            activeTab={alignerActiveTab}
-            setActiveTab={setAlignerActiveTab}
-            activePdbUrl={alignerPdbUrl}
-            displayVariant={alignerDisplayVariant}
-            onVariantToggle={handleAlignerVariantToggle}
-            frames={alignerFrames}
-            activeStep={alignerActiveStep}
-            bestStep={alignerBestStep}
-            onStep={step => setAlignerSteps(prev => ({
-              ...prev,
-              [alignerActiveTab]: {
-                ...(prev[alignerActiveTab] ?? {}),
-                [alignerDisplayVariant === 'alternative' ? 'alt' : 'std']: step,
-              },
-            }))}
-            stdStepEnergy={alignerStdStepEnergy}
-            altStepEnergy={alignerAltStepEnergy}
-          />
+          {/* Energy bar + iteration slider */}
+          {result?.success && (result.stdEnergy != null || result.altEnergy != null) && (
+            <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
+              <div className={styles.energyBar}>
+                <span className={styles.energyBarLabel}>Energy</span>
+                <EnergyBadge
+                  label="Standard"
+                  energy={stdStepEnergy}
+                  isWinner={result.winner === 'standard'}
+                  isActive={displayVariant === 'standard'}
+                  onClick={() => handleVariantToggle('standard')}
+                />
+                {result.altEnergy != null && (
+                  <EnergyBadge
+                    label="Alternative"
+                    energy={altStepEnergy}
+                    isWinner={result.winner === 'alternative'}
+                    isActive={displayVariant === 'alternative'}
+                    onClick={() => handleVariantToggle('alternative')}
+                  />
+                )}
+                <span className={styles.energyBarHint}>lower = better minimization</span>
+              </div>
+              {frames.length > 1 && (
+                <IterationSlider
+                  frames={frames}
+                  activeStep={activeStep}
+                  bestStep={bestStep}
+                  onStep={step => setSteps(prev => ({
+                    ...prev,
+                    [displayVariant === 'alternative' ? 'alt' : 'std']: step,
+                  }))}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Error */}
+          {result?.success === false && !result.running && (
+            <div className={styles.metaRow}>
+              <div className={styles.metaError}>
+                3D model failed: {result.error}
+              </div>
+            </div>
+          )}
+
+          {/* Generated .inp */}
+          {result?.inpContent && (
+            <details className={styles.inpDetails}>
+              <summary className={styles.inpSummary}>Generated .inp input</summary>
+              <pre className={styles.inpPre}>{filterInpDisplay(result.inpContent)}</pre>
+            </details>
+          )}
+
+          {/* Quadro stdout/stderr — only on failure */}
+          {result?.quadroOutput && (
+            <details className={styles.inpDetails} open>
+              <summary className={styles.inpSummary}>Quadro output (stdout / stderr)</summary>
+              <pre className={styles.inpPre}>{result.quadroOutput}</pre>
+            </details>
+          )}
+
+          {/* 3D viewer */}
+          <div className={styles.viewerWrap}>
+            <MolstarViewer
+              pdbUrl={activePdbUrl}
+              runState={viewerState}
+              runStatus={result?.error ?? ''}
+              structureName="G4"
+            />
+          </div>
         </div>
       )}
 
@@ -692,12 +321,11 @@ export default function HomeSection() {
         <div className={styles.idlePlaceholder}>
           <G4Icon />
           <p className={styles.idleText}>
-            Enter a nucleotide sequence and click <strong>Run Pipeline</strong> to predict
-            secondary structure with ViennaRNA, detect G-quadruplex motifs with gqrs,
-            and generate 3D G4 models for each motif in parallel.
+            Enter a nucleotide sequence and click <strong>Run Pipeline</strong> to
+            predict the 3D G-quadruplex structure.
           </p>
           <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
-            Uppercase = RNA (parallel topology) · lowercase = DNA (antiparallel UDUD)
+            Uppercase = RNA · lowercase = DNA
           </p>
         </div>
       )}
@@ -706,13 +334,6 @@ export default function HomeSection() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function TabDot({ quadro, running }) {
-  if (running) return <span className={`${styles.tabDot} ${styles.tabDotPulse}`} />
-  if (!quadro) return <span className={`${styles.tabDot} ${styles.tabDotGrey}`} />
-  if (!quadro.success) return <span className={`${styles.tabDot} ${styles.tabDotRed}`} />
-  return <span className={`${styles.tabDot} ${styles.tabDotGreen}`} />
-}
 
 function EnergyBadge({ label, energy, isWinner, isActive, onClick }) {
   return (
@@ -777,180 +398,6 @@ function IterationSlider({ frames, activeStep, bestStep, onStep }) {
           )
         })}
       </div>
-    </div>
-  )
-}
-
-function AlignerPanel({
-  result, quadroResults, activeTab, setActiveTab,
-  activePdbUrl, displayVariant, onVariantToggle,
-  frames, activeStep, bestStep, onStep,
-  stdStepEnergy, altStepEnergy,
-}) {
-  const qrsTabs = Object.keys(quadroResults).sort()
-  const activeQ = activeTab ? quadroResults[activeTab] : null
-
-  const viewerState = activeQ?.running ? 'running'
-    : (activeQ?.success && activePdbUrl) ? 'done'
-    : activeQ && !activeQ.running && !activeQ.success ? 'error'
-    : 'idle'
-
-  return (
-    <div>
-      {/* ── Matches table ──────────────────────────────────────────────── */}
-      {!result ? (
-        <div className={styles.alignerEmpty}>Aligner results will appear here after the pipeline runs.</div>
-      ) : result.running ? (
-        <div className={styles.alignerEmpty}>
-          <span className={`${styles.tabDot} ${styles.tabDotPulse}`} style={{ marginRight: 8 }} />
-          ONQuadro Aligner running…
-        </div>
-      ) : !result.success ? (
-        <div className={styles.alignerEmpty} style={{ color: 'var(--err-text)' }}>
-          Aligner failed: {result.error}
-        </div>
-      ) : result.matches.length === 0 ? (
-        <div className={styles.alignerEmpty}>No matching structures found in the database.</div>
-      ) : (
-        <details open>
-          <summary className={styles.inpSummary}>
-            Found <strong>{result.count}</strong> matching structure{result.count !== 1 ? 's' : ''} · sorted by tract distance
-          </summary>
-          <div className={styles.alignerTableWrap}>
-            <table className={styles.alignerTable}>
-              <thead>
-                <tr>
-                  <th>QRS notation</th>
-                  <th>Tetrads</th>
-                  <th>Molecule</th>
-                  <th title="Lower is better">Tract dist ↑</th>
-                  <th title="Higher is better">Linker score ↓</th>
-                  <th>PDB / Files</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.matches.map((m, i) => (
-                  <tr key={i} className={i % 2 === 0 ? styles.alignerRowEven : ''}>
-                    <td className={styles.alignerQrs}>{m.qrs}</td>
-                    <td className={styles.alignerCenter}>{m.tetradCount}</td>
-                    <td className={styles.alignerCenter}>{m.molecule}</td>
-                    <td className={styles.alignerCenter}>{m.tractDistance.toFixed(4)}</td>
-                    <td className={styles.alignerCenter}>{m.linkerScore.toFixed(4)}</td>
-                    <td className={styles.alignerFiles}>{m.files}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      )}
-
-      {/* ── 3D predictions for unique QRS topologies ───────────────────── */}
-      {qrsTabs.length > 0 && (
-        <div style={{ marginTop: 16 }}>
-          <div className={styles.tabBar}>
-            <div className={styles.tabs}>
-              {qrsTabs.map(tool => {
-                const q      = quadroResults[tool]
-                const dv     = q?.displayVariant ?? q?.winner ?? 'standard'
-                const energy = q?.success ? (dv === 'alternative' ? q.altEnergy : q.stdEnergy) : null
-                return (
-                  <button
-                    key={tool}
-                    className={`${styles.tab} ${activeTab === tool ? styles.tabActive : ''} ${q?.success === false ? styles.tabFailed : ''}`}
-                    onClick={() => setActiveTab(tool)}
-                  >
-                    <TabDot quadro={q} running={q?.running} />
-                    <span className={styles.tabName}>{tool}</span>
-                    {q?.qrs && (
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-dim)', marginLeft: 4 }}>
-                        {q.qrs.length > 18 ? q.qrs.slice(0, 18) + '…' : q.qrs}
-                      </span>
-                    )}
-                    {energy != null && (
-                      <span className={styles.energyChip}>{formatEnergy(energy)}</span>
-                    )}
-                    {q?.success === false && !q?.running && (
-                      <span className={styles.failChip}>!</span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {activeTab && activeQ && (
-            <div className={styles.tabBody}>
-              {/* Energy bar + iteration slider */}
-              {activeQ.success && (activeQ.stdEnergy != null || activeQ.altEnergy != null) && (
-                <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
-                  <div className={styles.energyBar}>
-                    <span className={styles.energyBarLabel}>Energy</span>
-                    <EnergyBadge
-                      label="Standard"
-                      energy={stdStepEnergy}
-                      isWinner={activeQ.winner === 'standard'}
-                      isActive={displayVariant === 'standard'}
-                      onClick={() => onVariantToggle(activeTab, 'standard')}
-                    />
-                    {activeQ.altEnergy != null && (
-                      <EnergyBadge
-                        label="Alternative"
-                        energy={altStepEnergy}
-                        isWinner={activeQ.winner === 'alternative'}
-                        isActive={displayVariant === 'alternative'}
-                        onClick={() => onVariantToggle(activeTab, 'alternative')}
-                      />
-                    )}
-                    <span className={styles.energyBarHint}>lower = better minimization</span>
-                  </div>
-                  {frames.length > 1 && (
-                    <IterationSlider
-                      frames={frames}
-                      activeStep={activeStep}
-                      bestStep={bestStep}
-                      onStep={onStep}
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* Error row */}
-              {activeQ.success === false && !activeQ.running && (
-                <div className={styles.metaRow}>
-                  <div className={styles.metaError}>3D model failed: {activeQ.error}</div>
-                </div>
-              )}
-
-              {/* Generated .inp */}
-              {activeQ.inpContent && (
-                <details className={styles.inpDetails}>
-                  <summary className={styles.inpSummary}>Generated .inp input</summary>
-                  <pre className={styles.inpPre}>{filterInpDisplay(activeQ.inpContent)}</pre>
-                </details>
-              )}
-
-              {/* Quadro stdout/stderr — only on failure */}
-              {activeQ.quadroOutput && (
-                <details className={styles.inpDetails} open>
-                  <summary className={styles.inpSummary}>Quadro output (stdout / stderr)</summary>
-                  <pre className={styles.inpPre}>{activeQ.quadroOutput}</pre>
-                </details>
-              )}
-
-              {/* 3D viewer */}
-              <div className={styles.viewerWrap}>
-                <MolstarViewer
-                  pdbUrl={activePdbUrl}
-                  runState={viewerState}
-                  runStatus={activeQ?.error ?? ''}
-                  structureName={activeTab}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

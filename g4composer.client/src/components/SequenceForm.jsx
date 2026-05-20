@@ -334,7 +334,7 @@ export default function SequenceForm({ onRun, runState }) {
                             {[...(silvaData ?? [])].sort((a, b) => (SILVA_DISPLAY_ORDER[a.code] ?? 99) - (SILVA_DISPLAY_ORDER[b.code] ?? 99)).map(g => (
                                 <button
                                     key={g.code}
-                                    onClick={() => { setExFilterGroup(g.code); setMode('canonical') }}
+                                    onClick={() => { setExFilterGroup(g.code); setMode('canonical'); handleGroupChange(g.code) }}
                                     style={{
                                         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                                         padding: '6px 4px', fontSize: 12, fontWeight: 600, fontFamily: 'var(--mono)',
@@ -447,7 +447,11 @@ export default function SequenceForm({ onRun, runState }) {
                 ].map(({ id, label, desc }) => (
                     <button
                         key={id}
-                        onClick={() => setMode(id)}
+                        onClick={() => {
+                            setMode(id)
+                            if (id === 'noncanonical') setExFilterGroup('__nc__')
+                            else if (exFilterGroup === '__nc__') setExFilterGroup(silvaGroup)
+                        }}
                         title={desc}
                         style={{
                             padding: '8px 20px',

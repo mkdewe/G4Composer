@@ -292,7 +292,10 @@ export default function HomeSection() {
           {result?.inpContent && (
             <details className={styles.inpDetails}>
               <summary className={styles.inpSummary}>Generated .inp input</summary>
-              <pre className={styles.inpPre}>{filterInpDisplay(result.inpContent)}</pre>
+              <pre className={styles.inpPre}>
+                {result.qrs ? `# qrs    ${result.qrs}\n\n` : ''}
+                {filterInpDisplay(result.inpContent)}
+              </pre>
             </details>
           )}
 

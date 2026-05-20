@@ -334,7 +334,7 @@ export default function SequenceForm({ onRun, runState }) {
                             {[...(silvaData ?? [])].sort((a, b) => (SILVA_DISPLAY_ORDER[a.code] ?? 99) - (SILVA_DISPLAY_ORDER[b.code] ?? 99)).map(g => (
                                 <button
                                     key={g.code}
-                                    onClick={() => { setExFilterGroup(g.code); setMode('canonical'); handleGroupChange(g.code) }}
+                                    onClick={() => setExFilterGroup(g.code)}
                                     style={{
                                         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                                         padding: '6px 4px', fontSize: 12, fontWeight: 600, fontFamily: 'var(--mono)',
@@ -351,7 +351,7 @@ export default function SequenceForm({ onRun, runState }) {
                             ))}
                             {nonCanonical.length > 0 && (
                                 <button
-                                    onClick={() => { setExFilterGroup('__nc__'); setMode('noncanonical') }}
+                                    onClick={() => setExFilterGroup('__nc__')}
                                     style={{
                                         padding: '6px 10px', fontSize: 12, fontWeight: 600,
                                         borderRadius: 'var(--r-sm)', cursor: 'pointer',
@@ -447,11 +447,7 @@ export default function SequenceForm({ onRun, runState }) {
                 ].map(({ id, label, desc }) => (
                     <button
                         key={id}
-                        onClick={() => {
-                            setMode(id)
-                            if (id === 'noncanonical') setExFilterGroup('__nc__')
-                            else if (exFilterGroup === '__nc__') setExFilterGroup(silvaGroup)
-                        }}
+                        onClick={() => setMode(id)}
                         title={desc}
                         style={{
                             padding: '8px 20px',

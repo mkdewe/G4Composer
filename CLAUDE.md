@@ -32,6 +32,9 @@ Always write `migrationBuilder.Sql(...)` using **PostgreSQL syntax**. Never use 
   - `quadro14l:latest` — built from `docker-biotools/quadro14L/Dockerfile`
   - `quadro14g:latest` — separate image for the 14G engine
   - `gqrs:latest` — built from `docker-biotools/gqrsMapper/Dockerfile` (compiles qgrs-cpp)
+  - `onquadro-aligner:latest` — built from `docker-biotools/onquadroAligner/Dockerfile`
+  - `viennarna:latest` — built from `docker-biotools/ViennaRNA/Dockerfile`
+  - `eltetrado:latest` — built from `docker-biotools/eltetrado/Dockerfile`
 - **docker-biotools** is a git submodule pointing to `https://github.com/mkdewe/docker-quadro`
   - `qgrs-cpp` is a nested submodule inside docker-biotools — requires `git submodule update --init` after pulling
 
@@ -47,6 +50,9 @@ git checkout main && git pull origin main
 git submodule update --init
 docker build -t quadro14l:latest quadro14L/
 docker build -t gqrs:latest gqrsMapper/
+docker build -t onquadro-aligner:latest onquadroAligner/
+docker build -t viennarna:latest ViennaRNA/
+docker build -t eltetrado:latest eltetrado/
 ```
 
 The server may be in detached HEAD in the submodule — always `git checkout main` before `git pull`.

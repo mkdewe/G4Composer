@@ -10,6 +10,11 @@ import { serializeInp } from './utils/inpSerializer.js'
 
 export default function App() {
   const [activeSection, setActiveSection] = useState('home')
+  // Sections that have been visited at least once stay mounted (hidden via
+  // display:none) so their state — and any in-flight processing — survives tab
+  // switches. Mounting lazily (only when first shown) means Mol* initialises at
+  // the correct size instead of 0×0 while hidden.
+  const [mounted, setMounted] = useState({ home: true })
 
   // ── Multi-run state ────────────────────────────────────────────────────────
   // Each run: { id, name, state, status, pdbBlob, pdbUrl, jobInfo, inpContent }
@@ -17,16 +22,29 @@ export default function App() {
   const [activeRunId,   setActiveRunId]   = useState(null)
   const [currentStatus, setCurrentStatus] = useState('')
 
+  // Prefill payload handed from Home (a pipeline-generated structure) to the
+  // Build G4 form so the user can edit the exact parameters and re-run.
+  const [buildPrefill, setBuildPrefill] = useState(null)
+
   // Ref to the page content area — used for scrolling to top on section change
   const pageRef = useRef(null)
 
   // ── Navigation ────────────────────────────────────────────────────────────
   const navigate = useCallback((section) => {
     setActiveSection(section)
+    setMounted(m => m[section] ? m : { ...m, [section]: true })
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     })
   }, [])
+
+  // Hand a Home pipeline result over to the Build G4 form and switch sections.
+  const handleEditInBuild = useCallback((prefill) => {
+    // Stamp with a token so SequenceForm re-applies even if the same structure
+    // is sent twice in a row.
+    setBuildPrefill({ ...prefill, _token: crypto.randomUUID() })
+    navigate('build')
+  }, [navigate])
 
   // ── Run handler ───────────────────────────────────────────────────────────
   const handleRun = useCallback(async (inputs) => {
@@ -139,20 +157,33 @@ export default function App() {
       <Nav activeSection={activeSection} onNavigate={navigate} />
       {showHome && <Hero onNavigate={navigate} />}
       <div className="page" ref={pageRef}>
-        {showHome && <HomeSection />}
-        {showBuild && (
-          <BuildSection
-            runs={runs}
-            activeRunId={activeRunId}
-            activeRun={activeRun}
-            currentStatus={currentStatus}
-            onRun={handleRun}
-            onReset={handleReset}
-            onSelectRun={setActiveRunId}
-            onRemoveRun={handleRemoveRun}
-          />
+        {/* Home / Build / Batch stay mounted after first visit (hidden when
+            inactive) so their state and in-flight work persist across tabs. */}
+        {mounted.home && (
+          <div style={{ display: showHome ? 'block' : 'none' }}>
+            <HomeSection onEditInBuild={handleEditInBuild} />
+          </div>
         )}
-        {showBatch    && <BatchSection />}
+        {mounted.build && (
+          <div style={{ display: showBuild ? 'block' : 'none' }}>
+            <BuildSection
+              runs={runs}
+              activeRunId={activeRunId}
+              activeRun={activeRun}
+              currentStatus={currentStatus}
+              prefill={buildPrefill}
+              onRun={handleRun}
+              onReset={handleReset}
+              onSelectRun={setActiveRunId}
+              onRemoveRun={handleRemoveRun}
+            />
+          </div>
+        )}
+        {mounted.batch && (
+          <div style={{ display: showBatch ? 'block' : 'none' }}>
+            <BatchSection />
+          </div>
+        )}
         {showRetrieve && <RetrieveSection />}
         {showDocs     && <DocsSection />}
         {showContact  && <ContactSection />}

@@ -11,7 +11,31 @@ const STEPS = [
   ['Loading into Mol*…',            'chemical/x-pdb → viewer'],
 ]
 
-export default function MolstarViewer({ pdbUrl, runState, runStatus, structureName }) {
+// quadro outputs PDB in an Amber-ish style — residue names GUA/ADE/CYT/THY/URA and
+// an empty chain-ID column (the strand id lives in the segID, cols 73-76, e.g. STRA).
+// Mol* doesn't recognise those as a nucleic polymer, so cartoon comes out empty and
+// only ball-and-stick shows. Normalise to standard names + a real chain ID so Mol*
+// builds the polymer. Idempotent: already-standard PDBs (DG/G with a chain) are left
+// untouched.
+const RES_MAP_DNA = { GUA: ' DG', ADE: ' DA', CYT: ' DC', THY: ' DT', URA: '  U' }
+const RES_MAP_RNA = { GUA: '  G', ADE: '  A', CYT: '  C', URA: '  U', THY: ' DT' }
+function normalisePdb(text) {
+  if (!text || !/^(ATOM|HETATM).{13}(GUA|ADE|CYT|THY|URA)/m.test(text)) return text
+  const isRna = /\bURA\b/.test(text) || / O2'/.test(text)   // ribose → RNA
+  const map = isRna ? RES_MAP_RNA : RES_MAP_DNA
+  return text.split('\n').map(line => {
+    if (!/^(ATOM|HETATM)/.test(line)) return line
+    const l = line.padEnd(80, ' ').split('')
+    const res = line.substring(17, 20).trim().toUpperCase()
+    const m = map[res]
+    if (m) { l[17] = m[0]; l[18] = m[1]; l[19] = m[2] }
+    const seg = line.substring(72, 76).trim()      // e.g. STRA → chain A
+    if (seg && l[21] === ' ') l[21] = seg[seg.length - 1]
+    return l.join('').replace(/\s+$/, '')
+  }).join('\n')
+}
+
+export default function MolstarViewer({ pdbUrl, runState, runStatus, structureName, representation }) {
   const containerRef = useRef(null)
   const viewerRef    = useRef(null)   // holds the Mol* Viewer instance
   const [molReady, setMolReady] = useState(false)
@@ -116,10 +140,13 @@ export default function MolstarViewer({ pdbUrl, runState, runStatus, structureNa
         await plugin.clear()
         if (cancelled) return
 
-        // Load via builders so we can set a human-readable label
-        const label = structureName || 'G4 Structure'
-        const data  = await plugin.builders.data.download(
-          { url: pdbUrl, isBinary: false, label },
+        // Fetch the PDB text ourselves so we can normalise quadro's non-standard
+        // residue/chain naming before Mol* parses it (otherwise cartoon is empty).
+        const label   = structureName || 'G4 Structure'
+        const rawText = await (await fetch(pdbUrl)).text()
+        if (cancelled) return
+        const data  = await plugin.builders.data.rawData(
+          { data: normalisePdb(rawText), label },
           { state: { isGhost: true } }
         )
         if (cancelled) return
@@ -127,7 +154,19 @@ export default function MolstarViewer({ pdbUrl, runState, runStatus, structureNa
         const traj = await plugin.builders.structure.parseTrajectory(data, 'pdb')
         if (cancelled) return
 
-        await plugin.builders.structure.hierarchy.applyPreset(traj, 'default')
+        if (representation === 'cartoon') {
+          // Force cartoon regardless of size. The 'default' hierarchy preset is
+          // size-adaptive (small structures → full-atom ball-and-stick), which is
+          // the inconsistency. We build the structure and apply the built-in
+          // 'polymer-cartoon' REPRESENTATION preset — deterministic, polymer-only.
+          const model     = await plugin.builders.structure.createModel(traj)
+          if (cancelled) return
+          const structure = await plugin.builders.structure.createStructure(model)
+          if (cancelled) return
+          await plugin.builders.structure.representation.applyPreset(structure, 'polymer-cartoon')
+        } else {
+          await plugin.builders.structure.hierarchy.applyPreset(traj, 'default')
+        }
         if (!cancelled) plugin.canvas3d?.requestCameraReset?.({ durationMs: 250 })
       } catch (err) {
         if (!cancelled) console.error('Mol* load error:', err)
@@ -136,7 +175,7 @@ export default function MolstarViewer({ pdbUrl, runState, runStatus, structureNa
 
     load()
     return () => { cancelled = true }
-  }, [pdbUrl, molReady, structureName])
+  }, [pdbUrl, molReady, structureName, representation])
 
   const loaded  = pdbUrl && molReady && !molError
   const loading = runState === 'running'

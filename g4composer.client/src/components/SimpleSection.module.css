@@ -215,6 +215,11 @@
   border-color: var(--teal);
   color: var(--teal-dark);
 }
+.iconBtnView:hover:not(:disabled) {
+  background: var(--teal-light);
+  border-color: var(--teal);
+  color: var(--teal-dark);
+}
 .iconBtnDanger:hover:not(:disabled) {
   background: var(--err-bg);
   border-color: var(--err-border);

@@ -1,10 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import MolstarViewer from './MolstarViewer.jsx'
-import { runPipeline, fetchPipelinePdb, fetchPipelineAltPdb, fetchFrame } from '../services/apiService.js'
-import { downloadInp } from '../utils/inpSerializer.js'
+import {
+  runPipeline, fetchPipelinePdb, fetchPipelineAltPdb, fetchFrame,
+  fetchSilvaGroups, fetchExampleDetail, runQuadro11,
+} from '../services/apiService.js'
+import { downloadInp, parseInp, serializeInp } from '../utils/inpSerializer.js'
 import styles from './HomeSection.module.css'
 
-export default function HomeSection() {
+export default function HomeSection({ onEditInBuild }) {
   const [sequence,  setSequence]  = useState('')
   const [phase,     setPhase]     = useState('idle')   // 'idle' | 'running' | 'done'
   const [result,    setResult]    = useState(null)     // null | { running, success, ... }
@@ -12,6 +15,81 @@ export default function HomeSection() {
   const [displayedPdbUrl, setDisplayedPdbUrl] = useState(null)
   const frameCacheRef = useRef({})
   const abortRef      = useRef(null)
+
+  // ── Example sequences (deposited ONQuadro G4 structures) ───────────────────
+  // Each example carries its FULL deposited .inp input. Picking one loads the
+  // sequence into the field and holds the deposited input in the background; on
+  // Run we compute the model directly via Quadro from that input — skipping
+  // RNAfold / QRS / topology inference entirely (Build-G4-identical path).
+  const [examples,      setExamples]      = useState([])    // [{ pdbId, note, tetrads }]
+  const [examplesOpen,  setExamplesOpen]  = useState(false)
+  const [loadingExample, setLoadingExample] = useState(false)
+  // Full deposited input of the currently loaded example. Cleared the moment the
+  // user edits the sequence by hand (it's no longer that example → fall back to
+  // the pipeline).
+  const [loadedExampleInput, setLoadedExampleInput] = useState(null)  // QuadroInput | null
+  const examplesBoxRef = useRef(null)
+
+  // Load the example catalogue once — flat list of deposited structures.
+  useEffect(() => {
+    let cancelled = false
+    fetchSilvaGroups().then(groups => {
+      if (cancelled || !groups) return
+      const flat = []
+      for (const g of groups)
+        for (const sub of g.subtypes ?? [])
+          for (const ex of sub.examples ?? [])
+            if (!ex.isTheoretical)
+              flat.push({ pdbId: ex.pdbId, tetrads: ex.tetrads, note: ex.note })
+      // De-dupe by pdbId and sort alphabetically for a stable flat list.
+      const seen = new Set()
+      const list = flat.filter(e => !seen.has(e.pdbId) && seen.add(e.pdbId))
+      list.sort((a, b) => a.pdbId.localeCompare(b.pdbId))
+      setExamples(list)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  // Close the dropdown on outside click.
+  useEffect(() => {
+    if (!examplesOpen) return
+    const onDown = e => {
+      if (examplesBoxRef.current && !examplesBoxRef.current.contains(e.target)) setExamplesOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [examplesOpen])
+
+  const loadExampleSequence = useCallback(async (ex) => {
+    setExamplesOpen(false)
+    setLoadingExample(true)
+    try {
+      const detail = await fetchExampleDetail(ex.pdbId)
+      if (detail?.sequence) {
+        const seq = detail.sequence
+        // Build the exact QuadroInput from the deposited .inp (same shape Build
+        // submits). Path is a ';'-joined string in the DB → split to a list.
+        // Sugar pucker isn't stored — derive from sequence case (UPPER→N, lower→S).
+        const input = {
+          name:      detail.inpName || ex.pdbId,
+          sequence:  seq,
+          structure: detail.structure ?? '',
+          chi:       detail.chi ?? '',
+          orient:    detail.orient || 'A+;B-',
+          rise:      String(detail.rise ?? '3.4'),
+          twist:     String(detail.twist ?? '29'),
+          path:      detail.path
+            ? String(detail.path).split(';').map(s => s.trim()).filter(Boolean)
+            : null,
+          Shugar:    seq.split('').map(c => /[A-Z]/.test(c) ? 'N' : 'S').join(''),
+        }
+        setSequence(seq)
+        setLoadedExampleInput(input)
+      }
+    } finally {
+      setLoadingExample(false)
+    }
+  }, [])
 
   // ── Run pipeline ──────────────────────────────────────────────────────────
   const handleRun = useCallback(async () => {
@@ -22,6 +100,36 @@ export default function HomeSection() {
     setResult(null)
     setSteps({ std: null, alt: null })
     setDisplayedPdbUrl(null)
+
+    // ── Example path ────────────────────────────────────────────────────────
+    // A deposited example is loaded and the field still matches it → compute the
+    // model straight from the deposited .inp via Quadro (same engine as Build/
+    // Batch). No RNAfold, no QRS, no topology inference.
+    if (loadedExampleInput && loadedExampleInput.sequence === sequence) {
+      setResult({ running: true })
+      try {
+        const r = await runQuadro11([loadedExampleInput])
+        const pdbUrl = URL.createObjectURL(r.blob)
+        setSteps({ std: r.stdBestStep ?? null, alt: r.altBestStep ?? null })
+        setResult({
+          running: false, success: true, jobId: r.jobId,
+          stdEnergy: r.stdEnergy, altEnergy: r.altEnergy,
+          winner: r.winner, hasAlt: r.hasAlt,
+          pdbUrl, altPdbUrl: r.altUrl ?? null,
+          stdFrames: r.stdFrames ?? [], altFrames: r.altFrames ?? [],
+          stdBestStep: r.stdBestStep ?? null, altBestStep: r.altBestStep ?? null,
+          displayVariant: r.winner ?? 'standard',
+          inpContent: serializeInp(loadedExampleInput),
+          exampleInput: loadedExampleInput,
+          error: null,
+        })
+      } catch (err) {
+        setResult({ running: false, success: false, error: err.message })
+      } finally {
+        setPhase('done')
+      }
+      return
+    }
 
     const abort = new AbortController()
     abortRef.current = abort
@@ -92,7 +200,7 @@ export default function HomeSection() {
     } catch (err) {
       if (!abort.signal.aborted) setPhase('done')
     }
-  }, [sequence])
+  }, [sequence, loadedExampleInput])
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort()
@@ -176,6 +284,18 @@ export default function HomeSection() {
     a.click()
   }
 
+  function handleEditInBuild() {
+    if (!onEditInBuild) return
+    // Example run: carry the EXACT deposited input. Build recovers the Silva
+    // group/subtype by inverting the path (classifyPath), no hint needed.
+    if (result?.exampleInput) {
+      onEditInBuild({ ...result.exampleInput })
+      return
+    }
+    if (!result?.inpContent) return
+    onEditInBuild(parseInp(result.inpContent))
+  }
+
   return (
     <div className={styles.root}>
       {/* ── Input row ────────────────────────────────────────────────────── */}
@@ -189,13 +309,48 @@ export default function HomeSection() {
             className={styles.seqInput}
             type="text"
             value={sequence}
-            onChange={e => setSequence(e.target.value)}
+            onChange={e => { setSequence(e.target.value); setLoadedExampleInput(null) }}
             placeholder="e.g. GGGGAAGGGGAAGGGGAAGGGG  (uppercase = RNA, lowercase = DNA)"
             spellCheck={false}
             disabled={phase === 'running'}
             onKeyDown={e => e.key === 'Enter' && phase !== 'running' && handleRun()}
           />
         </div>
+
+        {/* Examples dropdown — known G4 sequences from the structure database */}
+        {examples.length > 0 && (
+          <div ref={examplesBoxRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className={styles.exampleBtn}
+              onClick={() => setExamplesOpen(o => !o)}
+              disabled={phase === 'running' || loadingExample}
+              title="Load a known G4 sequence from the database"
+            >
+              {loadingExample ? 'Loading…' : 'Examples'}
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 2 }}>
+                <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5"
+                      strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {examplesOpen && (
+              <div className={styles.exampleMenu}>
+                {examples.map(ex => (
+                  <button
+                    key={ex.pdbId}
+                    type="button"
+                    className={styles.exampleItem}
+                    onClick={() => loadExampleSequence(ex)}
+                    title={ex.note}
+                  >
+                    <span className={styles.exampleItemId}>{ex.pdbId.toUpperCase().replace(/^_/, '')}</span>
+                    <span className={styles.exampleItemNote}>{ex.note}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {phase !== 'running' ? (
           <button
             className={styles.runBtn}
@@ -225,6 +380,15 @@ export default function HomeSection() {
             <div className={styles.actionBar}>
               <div className={styles.actionLeft} />
               <div className={styles.actionRight}>
+                {result.inpContent && onEditInBuild && (
+                  <button
+                    className={styles.actionBtn}
+                    onClick={handleEditInBuild}
+                    title="Open these parameters in the Build G4 form to edit and re-run"
+                  >
+                    ✎ Edit in Build G4
+                  </button>
+                )}
                 {result.inpContent && (
                   <button
                     className={styles.actionBtn}
@@ -318,6 +482,7 @@ export default function HomeSection() {
               runState={viewerState}
               runStatus={result?.error ?? ''}
               structureName="G4"
+              representation="cartoon"
             />
           </div>
 

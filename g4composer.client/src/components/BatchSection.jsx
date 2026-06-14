@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import styles from './SimpleSection.module.css'
+import MolstarViewer from './MolstarViewer.jsx'
 import { parseFile } from '../utils/batchParser.js'
 import { runQuadro11, fetchSilvaGroups } from '../services/apiService.js'
 
@@ -18,6 +19,7 @@ export default function BatchSection() {
   const [silvaData, setSilvaData] = useState(null)  // classification data for topology validation
   const [isRunning, setIsRunning] = useState(false)
   const [globalErr, setGlobalErr] = useState(null)
+  const [viewItem,  setViewItem]  = useState(null)  // item currently previewed in Mol* modal
   const fileInputRef = useRef(null)
   const dropRef      = useRef(null)
   const idCounter    = useRef(0)
@@ -292,6 +294,14 @@ export default function BatchSection() {
                   {it.status === 'done' && (
                     <>
                       <button
+                        onClick={() => setViewItem(it)}
+                        className={`${styles.iconBtn} ${styles.iconBtnView}`}
+                        title="Preview in Mol*"
+                        aria-label="Preview in Mol*"
+                      >
+                        <EyeIcon />
+                      </button>
+                      <button
                         onClick={() => downloadOne(it, 'std')}
                         className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
                         title="Download standard .pdb"
@@ -381,6 +391,121 @@ export default function BatchSection() {
           </button>
         </div>
       )}
+
+      {/* ── Mol* preview modal ── */}
+      {viewItem && (
+        <BatchViewerModal item={viewItem} onClose={() => setViewItem(null)} />
+      )}
+    </div>
+  )
+}
+
+// ── Mol* preview modal ───────────────────────────────────────────────────────
+function BatchViewerModal({ item, onClose }) {
+  const [variant, setVariant] = useState('std')
+  const [urls, setUrls] = useState({ std: null, alt: null })
+  const hasAlt = !!item.altBlob
+
+  // Build object URLs INSIDE the effect (not useMemo) so React StrictMode's
+  // double-invoke creates fresh URLs each setup — otherwise the cleanup revokes
+  // a memoised URL that is still handed to Mol*, leaving the viewer blank.
+  useEffect(() => {
+    const std = item.pdbBlob ? URL.createObjectURL(item.pdbBlob) : null
+    const alt = item.altBlob ? URL.createObjectURL(item.altBlob) : null
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing external blob URLs into render state, with cleanup
+    setUrls({ std, alt })
+    return () => {
+      if (std) URL.revokeObjectURL(std)
+      if (alt) URL.revokeObjectURL(alt)
+    }
+  }, [item])
+
+  // Close on Escape.
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const pdbUrl = variant === 'alt' ? urls.alt : urls.std
+  const energy = variant === 'alt' ? item.altEnergy : item.stdEnergy
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(15, 23, 30, 0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: 'min(960px, 100%)', maxHeight: '90vh',
+          display: 'flex', flexDirection: 'column',
+          background: 'var(--surface)', border: '1px solid var(--border-med)',
+          borderRadius: 'var(--r-lg)', overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 16px', borderBottom: '1px solid var(--border)',
+          background: 'var(--surface2)', flexShrink: 0,
+        }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {item.name}
+          </span>
+          {/* Engine toggle (only when an alternative model exists) */}
+          {hasAlt && (
+            <div style={{ display: 'flex', borderRadius: 'var(--r-sm)', overflow: 'hidden', border: '1px solid var(--border-med)' }}>
+              {[['std', 'Standard'], ['alt', 'Alternative']].map(([v, label]) => (
+                <button
+                  key={v}
+                  onClick={() => setVariant(v)}
+                  style={{
+                    padding: '4px 12px', fontSize: 12, fontFamily: 'var(--sans)',
+                    border: 'none', cursor: 'pointer',
+                    background: variant === v ? 'var(--teal)' : 'var(--surface)',
+                    color: variant === v ? '#fff' : 'var(--text-dim)',
+                    transition: 'background 0.12s',
+                  }}
+                >{label}</button>
+              ))}
+            </div>
+          )}
+          {energy != null && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-dim)' }}>
+              Energy {energy.toFixed(1)}
+            </span>
+          )}
+          <button
+            onClick={onClose}
+            title="Close"
+            aria-label="Close"
+            style={{
+              marginLeft: 'auto', width: 28, height: 28, borderRadius: 'var(--r-sm)',
+              border: '1px solid var(--border-med)', background: 'var(--surface)',
+              cursor: 'pointer', fontSize: 16, lineHeight: 1, color: 'var(--text-dim)',
+            }}
+          >×</button>
+        </div>
+
+        {/* Viewer — explicit height so Mol* initialises with a real canvas size
+            (a flex-derived height can resolve to 0 at init → blank viewer). */}
+        <div style={{ height: 'min(560px, 70vh)', position: 'relative' }}>
+          <MolstarViewer
+            pdbUrl={pdbUrl}
+            runState={pdbUrl ? 'done' : 'idle'}
+            runStatus=""
+            structureName={item.name}
+            representation="cartoon"
+          />
+        </div>
+      </div>
     </div>
   )
 }
@@ -394,6 +519,16 @@ function DownloadIcon() {
       <path d="M8 1.5v9.5" />
       <path d="M4.5 7.5L8 11l3.5-3.5" />
       <path d="M2.5 13.5h11" />
+    </svg>
+  )
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"
+         strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" />
+      <circle cx="8" cy="8" r="2" />
     </svg>
   )
 }

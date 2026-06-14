@@ -52,7 +52,7 @@ const FULL_LINES_COUNT    = 11
 const ALLOWED_SEQ_CHARS = /^[ACGUacgt]+$/
 const KNOWN_KEYS = new Set([
   'name', 'sequence', 'structure', 'chi', 'orient',
-  'rise', 'twist', 'path', 'test', 'rm_level', 'iteration',
+  'rise', 'twist', 'path', 'test', 'rm_level', 'iteration', 'iteration_steps',
 ])
 
 /**
@@ -166,15 +166,19 @@ function parseMinimal(lines, silvaData) {
     path:        path ? path.split(';') : null,
     isTest:      false,
     RM_Level:    0,
-    Iterations:  100,
+    // Batch mode computes a single CYANA iteration (no slider range) to keep
+    // computation time low. Minimal format carries no iteration value → use 100.
+    iterationSteps: [100],
     sugarPucker: /[U]/.test(sequenceRaw) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
 }
 
 // ── FORMAT B — full positional (11 lines) ────────────────────────────────
 function parseFull(lines) {
+  // Positions 9 (test) and 10 (rm_level) are intentionally skipped — batch always
+  // forces test=n / rm_level=0. Line 11 (iteration) drives the single iteration step.
   const [name, sequenceRaw, structure, chi, orient,
-         riseRaw, twistRaw, pathRaw, testRaw, rmRaw, iterRaw] = lines
+         riseRaw, twistRaw, pathRaw, , , iterRaw] = lines
   const sequence = sequenceRaw.toLowerCase()
   validateSequence(sequence)
 
@@ -192,7 +196,9 @@ function parseFull(lines) {
     path:        pathRaw ? pathRaw.split(';').map(s => s.trim()).filter(Boolean) : null,
     isTest:      false,
     RM_Level:    0,
-    Iterations:  100,
+    // Iteration steps come directly from the input file's line 11 — single ("100")
+    // or comma-separated ("10,20,…,100"). Falls back to a single 100-step run.
+    iterationSteps: parseIterationSteps(iterRaw),
     sugarPucker: /[U]/.test(sequenceRaw) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
 }
@@ -240,9 +246,25 @@ function parseKeyValue(raw) {
                    : null,
     isTest:      false,
     RM_Level:    0,
-    Iterations:  100,
+    // Iteration steps from the .inp: prefer the comma-separated 'iteration_steps' field
+    // ("100" or "10,20,…,100"), then the legacy single 'iteration'. Batch honours both
+    // single- and multi-iteration files; falls back to a single 100-step run.
+    iterationSteps: parseIterationSteps(fields.iteration_steps ?? fields.iteration),
     sugarPucker: /[U]/.test(fields.sequence) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
+}
+
+// ── Shared helpers ─────────────────────────────────────────────────────────
+// Parse a CYANA iteration spec into a list of positive integers. Accepts a single
+// value ("100" → [100]) or a comma-separated list ("10,20,…,100" → [10,…,100]),
+// so batch mode honours both single-iteration and multi-iteration .inp files.
+// Returns the fallback (default a single 100-step run) when nothing usable is given.
+function parseIterationSteps(raw, fallback = [100]) {
+  const steps = String(raw ?? '')
+    .split(',')
+    .map(s => parseInt(s.trim(), 10))
+    .filter(n => Number.isFinite(n) && n > 0)
+  return steps.length > 0 ? steps : fallback
 }
 
 // ── Shared validators ────────────────────────────────────────────────────

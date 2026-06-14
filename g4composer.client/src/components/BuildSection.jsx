@@ -12,6 +12,7 @@ export default function BuildSection({
   activeRunId,
   activeRun,
   currentStatus,
+  prefill,
   onRun,
   onReset,
   onSelectRun,
@@ -123,7 +124,7 @@ export default function BuildSection({
       </p>
 
       {/* Form */}
-      <SequenceForm onRun={onRun} runState={activeRun?.state ?? 'idle'} />
+      <SequenceForm onRun={onRun} runState={activeRun?.state ?? 'idle'} prefill={prefill} />
 
       {/* Results panel — shown when there is at least one run */}
       {runs.length > 0 && (
@@ -255,6 +256,7 @@ export default function BuildSection({
                     runState={activeRun.state}
                     runStatus={activeRun.status}
                     structureName={activeRun.name}
+                    representation="cartoon"
                   />
                 )}
                 {activeTab === 'pdb' && (

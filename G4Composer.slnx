@@ -4,4 +4,5 @@
     <Deploy />
   </Project>
   <Project Path="G4Composer.Server/G4Composer.Server.csproj" />
+  <Project Path="G4Composer.Server.Tests/G4Composer.Server.Tests.csproj" />
 </Solution>

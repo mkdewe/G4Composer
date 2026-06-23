@@ -35,6 +35,7 @@ Always write `migrationBuilder.Sql(...)` using **PostgreSQL syntax**. Never use 
   - `onquadro-aligner:latest` — built from `docker-biotools/onquadroAligner/Dockerfile`
   - `viennarna:latest` — built from `docker-biotools/ViennaRNA/Dockerfile`
   - `eltetrado:latest` — built from `docker-biotools/eltetrado/Dockerfile`
+  - `dnatco:latest` — built from `docker-biotools/dnatco/Dockerfile` (DNATCO v5.0 offline CLI for NtC/CANA conformational analysis; `run.py` normalises input via gemmi then runs `rednatco.js`, emitting `*_extended.cif` + `summary.csv`/`summary.json`)
 - **docker-biotools** is a git submodule pointing to `https://github.com/mkdewe/docker-quadro`
   - `qgrs-cpp` is a nested submodule inside docker-biotools — requires `git submodule update --init` after pulling
 
@@ -53,6 +54,7 @@ docker build -t gqrs:latest gqrsMapper/
 docker build -t onquadro-aligner:latest onquadroAligner/
 docker build -t viennarna:latest ViennaRNA/
 docker build -t eltetrado:latest eltetrado/
+docker build -t dnatco:latest dnatco/
 ```
 
 The server may be in detached HEAD in the submodule — always `git checkout main` before `git pull`.

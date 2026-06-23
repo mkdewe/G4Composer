@@ -165,7 +165,7 @@ function parseMinimal(lines, silvaData) {
     twist,
     path:        path ? path.split(';') : null,
     isTest:      false,
-    RM_Level:    0,
+    rmLevel:     5,  // minimal format carries no rm_level → quadro/reference default 5
     // Batch mode computes a single CYANA iteration (no slider range) to keep
     // computation time low. Minimal format carries no iteration value → use 100.
     iterationSteps: [100],
@@ -175,10 +175,10 @@ function parseMinimal(lines, silvaData) {
 
 // ── FORMAT B — full positional (11 lines) ────────────────────────────────
 function parseFull(lines) {
-  // Positions 9 (test) and 10 (rm_level) are intentionally skipped — batch always
-  // forces test=n / rm_level=0. Line 11 (iteration) drives the single iteration step.
+  // Position 9 (test) is forced to n. Position 10 (rm_level) is honoured (default 5);
+  // it only governs work-file cleanup, not geometry. Line 11 (iteration) drives the step.
   const [name, sequenceRaw, structure, chi, orient,
-         riseRaw, twistRaw, pathRaw, , , iterRaw] = lines
+         riseRaw, twistRaw, pathRaw, , rmLevelRaw, iterRaw] = lines
   const sequence = sequenceRaw.toLowerCase()
   validateSequence(sequence)
 
@@ -195,7 +195,7 @@ function parseFull(lines) {
     twist:       twistRaw,
     path:        pathRaw ? pathRaw.split(';').map(s => s.trim()).filter(Boolean) : null,
     isTest:      false,
-    RM_Level:    0,
+    rmLevel:     parseRmLevel(rmLevelRaw),
     // Iteration steps come directly from the input file's line 11 — single ("100")
     // or comma-separated ("10,20,…,100"). Falls back to a single 100-step run.
     iterationSteps: parseIterationSteps(iterRaw),
@@ -245,7 +245,7 @@ function parseKeyValue(raw) {
                    ? fields.path.split(';').map(s => s.trim()).filter(Boolean)
                    : null,
     isTest:      false,
-    RM_Level:    0,
+    rmLevel:     parseRmLevel(fields.rm_level),
     // Iteration steps from the .inp: prefer the comma-separated 'iteration_steps' field
     // ("100" or "10,20,…,100"), then the legacy single 'iteration'. Batch honours both
     // single- and multi-iteration files; falls back to a single 100-step run.
@@ -265,6 +265,13 @@ function parseIterationSteps(raw, fallback = [100]) {
     .map(s => parseInt(s.trim(), 10))
     .filter(n => Number.isFinite(n) && n > 0)
   return steps.length > 0 ? steps : fallback
+}
+
+// rm_level governs cleanup of quadro14L work files only (no geometry effect).
+// Default to 5 (quadro/reference default) when the file omits or malforms it.
+function parseRmLevel(raw, fallback = 5) {
+  const v = parseInt(String(raw ?? '').trim(), 10)
+  return Number.isFinite(v) && v >= 0 ? v : fallback
 }
 
 // ── Shared validators ────────────────────────────────────────────────────

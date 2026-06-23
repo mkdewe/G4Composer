@@ -214,11 +214,18 @@ export default function SequenceForm({ onRun, runState, prefill }) {
         setOrientVal(prev => scaleOrientToTetrads(prev, n))
     }, [silvaData, silvaGroup, subtype, seqVal, structVal, orientVal])
 
-    // Apply a prefill handed from Home (pipeline-generated structure). The shared
-    // input fields (name/seq/structure/chi/orient/…) are filled, and the SAME
-    // snapshot is seeded into savedStates for BOTH modes so toggling Canonical ↔
-    // Non-canonical never wipes the loaded data. Lands in non-canonical so the
-    // exact pipeline parameters are visible.
+    // Apply a prefill handed from Home (deposited example OR pipeline-generated
+    // structure). The shared input fields (name/seq/structure/chi/orient/…) are filled,
+    // and the SAME snapshot is seeded into savedStates for BOTH modes so toggling
+    // Canonical ↔ Non-canonical never wipes the loaded data.
+    //
+    // Mode: land in CANONICAL when a Silva classification is recovered (i.e. a deposited
+    // example with a canonical threading — the group/subtype selectors are then useful);
+    // land in NON-CANONICAL only when the path is not a canonical threading (a
+    // pipeline-from-sequence structure or a non-canonical example like 5zev), so the exact
+    // parameters stay visible and untouched. NOTE: silvaData is fetched async on mount and
+    // is usually null at first apply, so the classification (and the canonical landing) is
+    // typically settled in the refinement branch below once silvaData resolves.
     //
     // Silva classification (group + subtype): the pipeline emits orient/path/twist,
     // not a Silva subtype. We recover it by INVERTING the forward algorithm — for
@@ -267,7 +274,9 @@ export default function SequenceForm({ onRun, runState, prefill }) {
 
             // Block the auto-derive effect from overwriting the loaded params on load.
             skipNextAutoDerive.current = true
-            setMode('noncanonical')
+            // Canonical when the topology classified (deposited canonical example),
+            // otherwise non-canonical (sequence-pipeline / non-canonical example).
+            setMode(matchedGroup && matchedSub ? 'canonical' : 'noncanonical')
             setNameVal(snapshot.nameVal)
             setSeqVal(snapshot.seqVal)
             setStructVal(snapshot.structVal)
@@ -281,16 +290,20 @@ export default function SequenceForm({ onRun, runState, prefill }) {
             setSubtype(matchedSub)
             setAdvOpen(true)
             setParseError(null)
-        } else if (matchedGroup && matchedGroup !== savedStates.current.canonical?.silvaGroup) {
+        } else if (matchedGroup && matchedSub && matchedGroup !== savedStates.current.canonical?.silvaGroup) {
             // silvaData arrived (or improved the result) after the initial apply —
             // refine the classification so canonical mode reflects the real topology.
             // The matched path equals the generated path, so auto-derive won't change it.
+            // This is the usual path for deposited examples (silvaData is null at first
+            // apply): now that the topology classifies, also land in canonical mode so the
+            // group/subtype selectors are shown instead of staying stuck in non-canonical.
             const patch = { silvaGroup: matchedGroup, subtype: matchedSub }
             savedStates.current.canonical    = { ...savedStates.current.canonical, ...patch }
             savedStates.current.noncanonical = { ...savedStates.current.noncanonical, ...patch }
             skipNextAutoDerive.current = true
             setSilvaGroup(matchedGroup)
             setSubtype(matchedSub)
+            setMode('canonical')
         }
     }, [prefill, silvaData])
 
@@ -393,6 +406,13 @@ export default function SequenceForm({ onRun, runState, prefill }) {
         setPucker(exSeq.split('').map(ch => /[A-Z]/.test(ch) ? 'N' : 'S').join(''))
         if (groupCode) setSilvaGroup(groupCode)
         if (subtypeCode) setSubtype(subtypeCode)
+        // Non-canonical examples have no Silva classification. Clear any stale
+        // group/subtype (e.g. the default UDUD/6a) so the auto-derive effect bails
+        // (`if (!sub?.loop) return`) instead of recomputing — and thereby
+        // overwriting — the deposited path/orient/twist the moment the user edits
+        // the structure. This was the "as if something is in memory" regression:
+        // loaded example = good, first edit = silently re-threaded = bad.
+        if (!groupCode) deselect()
     }
 
     function handleSubmit() {

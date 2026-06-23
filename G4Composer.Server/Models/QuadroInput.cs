@@ -58,6 +58,11 @@ public class QuadroInput
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsTest { get; } = false;
 
-    [System.Text.Json.Serialization.JsonIgnore]
-    public int RmLevel { get; } = 0;
+    /// <summary>
+    /// quadro14L <c>rm_level</c> — controls cleanup of intermediate work files only
+    /// (it has no effect on the resulting geometry/energy). Mirrors quadro14L's own
+    /// default of 5 and the reference .inp files (pz74, 1hap). Level ≥5 removes all
+    /// temporary files; 0 keeps them.
+    /// </summary>
+    public int RmLevel { get; set; } = 5;
 }

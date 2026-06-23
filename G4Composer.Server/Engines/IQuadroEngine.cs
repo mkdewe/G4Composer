@@ -57,7 +57,9 @@ public abstract class QuadroEngineBase : IQuadroEngine
         var twist = string.IsNullOrWhiteSpace(input.Twist) ? "29" : input.Twist.Trim();
         var pathStr   = input.Path is { Count: > 0 } ? string.Join(';', input.Path) : string.Empty;
         const string test    = "n";
-        const int    rmLevel = 0;
+        // rm_level only controls cleanup of quadro14L's intermediate work files —
+        // it does not affect geometry or energy. Honour the input (default 5).
+        var rmLevel = input.RmLevel;
 
         var steps = input.IterationSteps is { Length: > 0 }
             ? input.IterationSteps

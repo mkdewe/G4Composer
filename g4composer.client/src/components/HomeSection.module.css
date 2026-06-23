@@ -731,3 +731,105 @@ details[open] .inpSummary::before { content: '▼ '; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Topology candidate tabs (browser-tab style, like Build G4 runs) ───────── */
+.topoTabBar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 8px 16px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.topoTabBarLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  padding-bottom: 8px;
+  flex-shrink: 0;
+}
+.topoTabs {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.topoTabs::-webkit-scrollbar { display: none; }
+
+.topoTab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--bg);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+  position: relative;
+  top: 1px;
+}
+.topoTab:hover:not(:disabled) { background: var(--surface); color: var(--text); }
+
+.topoTabActive {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-bottom-color: var(--surface);
+  z-index: 1;
+}
+
+.topoTabFailed {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.topoTabName {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.topoTabNotation {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--teal);
+}
+.topoTabMeta {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.topoTabBest {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--teal-dark);
+  background: var(--teal-light);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+.topoTabConf {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 9px;
+}
+.topoNote {
+  padding: 6px 16px 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}

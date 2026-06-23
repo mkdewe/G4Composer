@@ -28,7 +28,9 @@ export function serializeInp(input) {
     ? input.path.join(';')
     : (input.path || '')
   const test      = 'n'
-  const rmLevel   = 0
+  // rm_level only affects cleanup of quadro14L work files, not geometry. Mirror the
+  // backend/quadro default of 5; honour an explicit value if the payload carries one.
+  const rmLevel   = input.rmLevel ?? input.RM_Level ?? 5
   const steps     = Array.isArray(input.iterationSteps) && input.iterationSteps.length > 0
     ? input.iterationSteps
     : [20, 40, 60, 80, 100]

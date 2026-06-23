@@ -1,0 +1,57 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: Client (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: g4composer.client
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: g4composer.client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  backend:
+    name: Server (xUnit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The server project references the Vite client (.esproj) for build ordering,
+      # so the .NET build needs node_modules present even though it never runs Vite.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: g4composer.client/package-lock.json
+
+      - name: Restore client packages
+        run: npm ci
+        working-directory: g4composer.client
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run unit tests
+        run: dotnet test G4Composer.Server.Tests/G4Composer.Server.Tests.csproj --configuration Release

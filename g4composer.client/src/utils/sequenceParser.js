@@ -122,7 +122,7 @@ function parseInpFormat(raw) {
     path:        pathList,
     pathRaw:     result.path || '',
     isTest:      false,
-    RM_Level:    0,
+    rmLevel:     5,  // cleanup level only (no geometry effect); quadro/reference default
     Iterations:  100,
     sugarPucker: detectSugarPucker(result.sequence),
     twistKey:    '>>',
@@ -186,7 +186,7 @@ export function parseInputLines(raw) {
     path:        null,
     pathRaw:     '',
     isTest:      false,
-    RM_Level:    0,
+    rmLevel:     5,  // cleanup level only (no geometry effect); quadro/reference default
     Iterations:  100,
     _format:     '3line',
     _tetradCount: tetradCount,

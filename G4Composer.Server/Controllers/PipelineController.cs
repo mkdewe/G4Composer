@@ -153,8 +153,9 @@ public sealed class PipelineController : ControllerBase
                 matchRnaStructure = rnaStructure.Substring(matchStart, best.MatchedSequence.Length);
         }
 
-        var input = G4TopologyGenerator.TryGenerateFromQrs("GQ", best.MatchedSequence, best.Qrs, matchRnaStructure);
-        if (input is null)
+        var candidates = G4TopologyGenerator.GenerateCandidatesFromQrs(
+            "GQ", best.MatchedSequence, best.Qrs, best.TetradCount, matchRnaStructure);
+        if (candidates.Count == 0)
         {
             // The aligner matched, but its QRS could not be turned into a topology
             // (e.g. QRS/sequence length mismatch, or fewer than four G-runs). Fall back to
@@ -166,7 +167,7 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        await RunQuadroAndEmitAsync("GQ", best.Qrs, input, matchRnaStructure, ct);
+        await RunQuadroCandidatesAndEmitAsync("GQ", best.Qrs, candidates, matchRnaStructure, ct);
     }
 
     // Fallback when the ONQuadro aligner finds no similar structure in the database:
@@ -209,23 +210,23 @@ public sealed class PipelineController : ControllerBase
         // Build the topology from the gqrs motif when available; otherwise fall back to a
         // direct G-tract scan of the sequence. A 3D model is always attempted when the
         // sequence can fold into a G4 — only a sequence with fewer than four G-tracts fails.
-        QuadroInput? input = null;
+        IReadOnlyList<G4TopologyGenerator.GeneratedTopology> candidates = [];
         string qrs = "";
 
         if (motif is not null)
         {
-            input = G4TopologyGenerator.TryGenerateFromGqrs(label, sequence, rnaStructure, motif);
-            if (input is not null) qrs = BuildQrsFromMotif(sequence, motif);
+            candidates = G4TopologyGenerator.GenerateCandidatesFromGqrs(label, sequence, rnaStructure, motif);
+            if (candidates.Count > 0) qrs = BuildQrsFromMotif(sequence, motif);
         }
 
-        if (input is null)
+        if (candidates.Count == 0)
         {
             // Last-resort fallback: scan the raw sequence for four G-tracts directly.
-            input = G4TopologyGenerator.TryGenerate(label, sequence, rnaStructure);
-            if (input is not null) qrs = BuildQrsFromStructure(input.Structure);
+            candidates = G4TopologyGenerator.GenerateCandidates(label, sequence, rnaStructure);
+            if (candidates.Count > 0) qrs = BuildQrsFromStructure(candidates[0].Input.Structure);
         }
 
-        if (input is null)
+        if (candidates.Count == 0)
         {
             await SendEventAsync("aligner_quadro_done", new
             {
@@ -237,18 +238,22 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        await RunQuadroAndEmitAsync(label, qrs, input, rnaStructure, ct);
+        await RunQuadroCandidatesAndEmitAsync(label, qrs, candidates, rnaStructure, ct);
     }
 
-    // Runs Quadro on an already-generated topology and streams the aligner_quadro_* events.
+    // Runs Quadro on every predicted topology candidate and streams a single
+    // aligner_quadro_done event whose primary fields describe the lowest-energy model,
+    // with a `candidates` array carrying each alternative (own jobId, energy, .inp).
     // Shared by the ONQuadro-aligner path and the gqrs fallback path.
-    private async Task RunQuadroAndEmitAsync(
-        string label, string qrs, QuadroInput? input, string? rnaStructure, CancellationToken ct)
+    private async Task RunQuadroCandidatesAndEmitAsync(
+        string label, string qrs,
+        IReadOnlyList<G4TopologyGenerator.GeneratedTopology> candidates,
+        string? rnaStructure, CancellationToken ct)
     {
         await SendEventAsync("aligner_quadro_start",
             new { type = "aligner_quadro_start", tool = label, qrs }, ct);
 
-        if (input is null)
+        if (candidates.Count == 0)
         {
             await SendEventAsync("aligner_quadro_done", new
             {
@@ -261,20 +266,126 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
+        // Run quadro for each candidate (cap at 3 to bound compute time).
+        var runs = new List<CandidateRun>();
+        foreach (var cand in candidates.Take(3))
+            runs.Add(await RunOneCandidateAsync(label, cand, ct));
+
+        object ProjectCandidate(CandidateRun r) => new
+        {
+            jobId             = r.JobId,
+            label             = r.Label,
+            confidence        = r.Confidence,
+            rationale         = r.Rationale,
+            loopNotation      = r.LoopNotation,
+            success           = r.Success,
+            error             = r.Error,
+            stdEnergy         = r.StdEnergy,
+            altEnergy         = r.AltEnergy,
+            winner            = r.Winner,
+            hasAlt            = r.HasAlt,
+            stdFrames         = r.StdFrames,
+            altFrames         = r.AltFrames,
+            stdBestStep       = r.StdBestStep,
+            altBestStep       = r.AltBestStep,
+            inpContent        = r.InpContent,
+            combinedStructure = r.CombinedStructure,
+        };
+
+        var succeeded = runs.Where(r => r.Success).ToList();
+        if (succeeded.Count == 0)
+        {
+            var first = runs[0];
+            await SendEventAsync("aligner_quadro_done", new
+            {
+                type              = "aligner_quadro_done",
+                tool              = label,
+                qrs,
+                success           = false,
+                error             = first.Error ?? "Quadro produced no model for any topology",
+                inpContent        = first.InpContent,
+                combinedStructure = first.CombinedStructure,
+                candidates        = runs.Select(ProjectCandidate).ToList(),
+            }, ct);
+            return;
+        }
+
+        // Best = lowest standard energy (CYANA/Xplor — lower is better).
+        var best = succeeded.OrderBy(r => r.StdEnergy ?? double.PositiveInfinity).First();
+
+        // ElTetrado on the winning model only (non-fatal).
+        string? eltetradoOutput = null;
+        string? eltetradoError  = null;
+        if (best.StdPdb is { Length: > 0 })
+        {
+            try
+            {
+                using var eltCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                eltCts.CancelAfter(TimeSpan.FromSeconds(90));
+                var elt = await _eltetrado.AnalyseAsync(best.StdPdb, eltCts.Token);
+                eltetradoOutput = elt.Output;
+                eltetradoError  = elt.Error;
+            }
+            catch (OperationCanceledException) { eltetradoError = "eltetrado timeout"; }
+            catch (Exception ex) { eltetradoError = ex.Message; }
+        }
+
+        await SendEventAsync("aligner_quadro_done", new
+        {
+            type               = "aligner_quadro_done",
+            tool               = label,
+            qrs,
+            rnaStructure,
+            success            = true,
+            jobId              = best.JobId,
+            stdEnergy          = best.StdEnergy,
+            altEnergy          = best.AltEnergy,
+            winner             = best.Winner,
+            hasAlt             = best.HasAlt,
+            stdFrames          = best.StdFrames,
+            altFrames          = best.AltFrames,
+            stdBestStep        = best.StdBestStep,
+            altBestStep        = best.AltBestStep,
+            inpContent         = best.InpContent,
+            combinedStructure  = best.CombinedStructure,
+            topologyLabel      = best.Label,
+            topologyConfidence = best.Confidence,
+            topologyRationale  = best.Rationale,
+            loopNotation       = best.LoopNotation,
+            candidates         = runs.Select(ProjectCandidate).ToList(),
+            eltetradoOutput,
+            eltetradoError,
+        }, ct);
+    }
+
+    private sealed record CandidateRun(
+        string JobId, string Label, string Confidence, string Rationale, string LoopNotation,
+        bool Success, string? Error, string InpContent, string CombinedStructure,
+        double? StdEnergy, double? AltEnergy, string Winner, bool HasAlt,
+        object StdFrames, object AltFrames, int? StdBestStep, int? AltBestStep,
+        byte[]? StdPdb);
+
+    // Runs quadro for a single topology candidate, stores its PDB/frames under a fresh jobId,
+    // and returns the data needed to surface it. Never throws — failures become a failed run.
+    private async Task<CandidateRun> RunOneCandidateAsync(
+        string label, G4TopologyGenerator.GeneratedTopology cand, CancellationToken ct)
+    {
         var jobId  = $"aq_{Guid.NewGuid():N}"[..16];
         var jobDir = Path.Combine(Path.GetTempPath(), $"g4_aligner_{jobId}");
-        string? inpContent        = null;
-        string? combinedStructure = null;
         Directory.CreateDirectory(jobDir);
+
+        var inpContent        = _engineSelector.Active.SerializeInput(cand.Input);
+        var combinedStructure = cand.Input.Structure ?? "";
+
+        CandidateRun Failed(string error) => new(
+            jobId, cand.Label, cand.Confidence, cand.Rationale, cand.LoopNotation,
+            false, error, inpContent, combinedStructure,
+            null, null, "standard", false,
+            Array.Empty<object>(), Array.Empty<object>(), null, null, null);
 
         try
         {
-            var engine = _engineSelector.Active;
-
-            inpContent        = engine.SerializeInput(input);
-            combinedStructure = input.Structure;
-            var items  = new List<QuadroJobItem> { new(0, "struct_000.inp", inpContent) };
-
+            var items = new List<QuadroJobItem> { new(0, "struct_000.inp", inpContent) };
             using var jobCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             jobCts.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
 
@@ -282,21 +393,7 @@ public sealed class PipelineController : ControllerBase
 
             var stdOk = result.Standard.Success    && result.Standard.Pdb    is { Length: > 0 };
             var altOk = result.Alternative.Success && result.Alternative.Pdb is { Length: > 0 };
-
-            if (!stdOk)
-            {
-                await SendEventAsync("aligner_quadro_done", new
-                {
-                    type              = "aligner_quadro_done",
-                    tool              = label,
-                    qrs,
-                    success           = false,
-                    error             = "Quadro produced no PDB",
-                    inpContent,
-                    combinedStructure,
-                }, ct);
-                return;
-            }
+            if (!stdOk) return Failed("Quadro produced no PDB");
 
             _pipelinePdbStore.Store(jobId, result.Standard.Pdb!);
             if (altOk && result.Alternative.Pdb is not null)
@@ -308,75 +405,27 @@ public sealed class PipelineController : ControllerBase
                 foreach (var frame in result.Alternative.Frames)
                     _frameStore.Store(jobId, "alt", frame.Step, frame.Pdb);
 
-            // Run eltetrado analysis on the final PDB (non-fatal if it fails)
-            string? eltetradoOutput = null;
-            string? eltetradoError  = null;
-            try
-            {
-                using var eltCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                eltCts.CancelAfter(TimeSpan.FromSeconds(90));
-                var elt = await _eltetrado.AnalyseAsync(result.Standard.Pdb!, eltCts.Token);
-                eltetradoOutput = elt.Output;
-                eltetradoError  = elt.Error;
-            }
-            catch (OperationCanceledException) { eltetradoError = "eltetrado timeout"; }
-            catch (Exception ex) { eltetradoError = ex.Message; }
-
             var stdFramesMeta = result.Standard.Frames
-                .Select(f => new { step = f.Step, energy = f.Etotal });
+                .Select(f => (object)new { step = f.Step, energy = f.Etotal }).ToList();
             var altFramesMeta = result.Alternative.Frames
-                .Select(f => new { step = f.Step, energy = f.Etotal });
+                .Select(f => (object)new { step = f.Step, energy = f.Etotal }).ToList();
 
-            await SendEventAsync("aligner_quadro_done", new
-            {
-                type              = "aligner_quadro_done",
-                tool              = label,
-                qrs,
-                rnaStructure,
-                success           = true,
-                jobId,
-                stdEnergy         = result.Standard.Etotal,
-                altEnergy         = result.Alternative.Etotal,
-                winner            = result.Winner ?? "standard",
-                hasAlt            = altOk,
-                stdFrames         = stdFramesMeta,
-                altFrames         = altFramesMeta,
-                stdBestStep       = result.Standard.BestFrame?.Step,
-                altBestStep       = result.Alternative.BestFrame?.Step,
-                inpContent,
-                combinedStructure,
-                eltetradoOutput,
-                eltetradoError,
-            }, ct);
+            return new CandidateRun(
+                jobId, cand.Label, cand.Confidence, cand.Rationale, cand.LoopNotation,
+                true, null, inpContent, combinedStructure,
+                result.Standard.Etotal, result.Alternative.Etotal, result.Winner ?? "standard", altOk,
+                stdFramesMeta, altFramesMeta,
+                result.Standard.BestFrame?.Step, result.Alternative.BestFrame?.Step,
+                result.Standard.Pdb);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            await SendEventAsync("aligner_quadro_done", new
-            {
-                type              = "aligner_quadro_done",
-                tool              = label,
-                qrs,
-                success           = false,
-                error             = $"Quadro timeout after {_options.TimeoutSeconds}s",
-                inpContent,
-                combinedStructure,
-            }, ct);
+            return Failed($"Quadro timeout after {_options.TimeoutSeconds}s");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Quadro failed for aligner {Label}", label);
-            var quadroOutput = ex is DockerException dx ? dx.DockerOutput : null;
-            await SendEventAsync("aligner_quadro_done", new
-            {
-                type              = "aligner_quadro_done",
-                tool              = label,
-                qrs,
-                success           = false,
-                error             = ex.Message,
-                inpContent,
-                combinedStructure,
-                quadroOutput,
-            }, ct);
+            _logger.LogError(ex, "Quadro failed for candidate {Label} ({Notation})", cand.Label, cand.LoopNotation);
+            return Failed(ex.Message);
         }
         finally
         {
@@ -405,15 +454,19 @@ public sealed class PipelineController : ControllerBase
 
             var lines = result.Stdout.Split('\n', StringSplitOptions.None);
             var structLine = lines.LastOrDefault(l =>
-                l.Trim().Length > 0 && (l.Contains('.') || l.Contains('(') || l.Contains('+')));
+                l.Trim().Length > 0 &&
+                (l.Contains('.') || l.Contains('(') || l.Contains('+') || l.Contains('~')));
 
             if (structLine is null)
                 return new ToolStructureResult(tool, false, null, null,
                     $"Unexpected output: {Truncate(result.Stdout)}");
 
             var parts     = structLine.Trim().Split(' ', 2);
-            // Strip '+' from --g-quadruplex output (replaced by gqrs positions as '^')
-            var structure = parts[0].Trim().Replace('+', '.');
+            // Neutralise ViennaRNA's G-quadruplex markers to '.' (these positions are
+            // re-stamped from the QRS/gqrs motif as '^'). RNAfold --gquad marks every G of
+            // a quadruplex with VRNA_GQUAD_DB_SYMBOL '+' and the LAST G with the terminator
+            // VRNA_GQUAD_DB_SYMBOL_END '~' — both must be stripped, not just '+'.
+            var structure = parts[0].Trim().Replace('+', '.').Replace('~', '.');
             double? energy = parts.Length > 1 ? ParseParenEnergy(parts[1]) : null;
 
             return new ToolStructureResult(tool, true, structure, energy, null);

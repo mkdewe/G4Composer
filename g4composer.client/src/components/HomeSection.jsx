@@ -148,7 +148,8 @@ export default function HomeSection({ onEditInBuild }) {
                     hasAlt, error, inpContent, quadroOutput, combinedStructure,
                     stdFrames: stdFramesMeta, altFrames: altFramesMeta,
                     stdBestStep, altBestStep,
-                    eltetradoOutput, eltetradoError } = event
+                    eltetradoOutput, eltetradoError,
+                    candidates, topologyLabel, topologyRationale, loopNotation } = event
             if (success) {
               setSteps({ std: stdBestStep ?? null, alt: altBestStep ?? null })
               const fetchBoth = async () => {
@@ -171,6 +172,11 @@ export default function HomeSection({ onEditInBuild }) {
                   rnaStructure: rnaStructure ?? null,
                   eltetradoOutput: eltetradoOutput ?? null,
                   eltetradoError: eltetradoError ?? null,
+                  candidates: candidates ?? null,
+                  selectedJobId: jobId,
+                  topologyLabel: topologyLabel ?? null,
+                  topologyRationale: topologyRationale ?? null,
+                  loopNotation: loopNotation ?? null,
                 })
               })
             } else {
@@ -296,6 +302,31 @@ export default function HomeSection({ onEditInBuild }) {
     onEditInBuild(parseInp(result.inpContent))
   }
 
+  // Switch the displayed model to another predicted topology candidate. Each candidate
+  // has its own jobId / PDB / frames stored server-side, so we just refetch by jobId.
+  const selectCandidate = useCallback(async (c) => {
+    if (!c || !c.success || !c.jobId) return
+    const pdbUrl    = await fetchPipelinePdb(c.jobId)
+    const altPdbUrl = c.hasAlt ? await fetchPipelineAltPdb(c.jobId) : null
+    frameCacheRef.current = {}
+    setSteps({ std: c.stdBestStep ?? null, alt: c.altBestStep ?? null })
+    setDisplayedPdbUrl(null)
+    setResult(r => ({
+      ...r,
+      selectedJobId: c.jobId,
+      jobId: c.jobId,
+      stdEnergy: c.stdEnergy, altEnergy: c.altEnergy,
+      winner: c.winner, hasAlt: c.hasAlt,
+      pdbUrl, altPdbUrl,
+      stdFrames: c.stdFrames ?? [], altFrames: c.altFrames ?? [],
+      stdBestStep: c.stdBestStep ?? null, altBestStep: c.altBestStep ?? null,
+      combinedStructure: c.combinedStructure ?? null,
+      displayVariant: c.winner ?? 'standard',
+      inpContent: c.inpContent,
+      topologyLabel: c.label, topologyRationale: c.rationale, loopNotation: c.loopNotation,
+    }))
+  }, [])
+
   return (
     <div className={styles.root}>
       {/* ── Input row ────────────────────────────────────────────────────── */}
@@ -409,6 +440,62 @@ export default function HomeSection({ onEditInBuild }) {
               </div>
             </div>
           )}
+
+          {/* Predicted topology candidates — one tab per model (like Build G4 runs) */}
+          {result?.success && result.candidates && result.candidates.length > 1 && (() => {
+            const bestJob = result.candidates
+              .filter(c => c.success)
+              .reduce((a, c) => (a == null || Number(c.stdEnergy) < Number(a.stdEnergy) ? c : a), null)?.jobId
+            const activeCand = result.candidates.find(c => c.jobId === result.selectedJobId)
+            return (
+              <>
+                <div className={styles.topoTabBar}>
+                  <span className={styles.topoTabBarLabel}>Topology</span>
+                  <div className={styles.topoTabs}>
+                    {result.candidates.map((c, i) => {
+                      const sel  = c.jobId === result.selectedJobId
+                      const name = (c.label || '').split(' (')[0]
+                      const e = c.success
+                        ? (c.stdEnergy != null ? Number(c.stdEnergy).toFixed(1) : '—')
+                        : 'no model'
+                      return (
+                        <button
+                          key={c.jobId || i}
+                          type="button"
+                          disabled={!c.success}
+                          onClick={() => selectCandidate(c)}
+                          title={c.rationale || ''}
+                          className={[
+                            styles.topoTab,
+                            sel && styles.topoTabActive,
+                            !c.success && styles.topoTabFailed,
+                          ].filter(Boolean).join(' ')}
+                        >
+                          <span className={styles.topoTabName}>
+                            {name}
+                            <span className={styles.topoTabNotation}>{c.loopNotation}</span>
+                            {c.success && c.jobId === bestJob && (
+                              <span className={styles.topoTabBest}>best</span>
+                            )}
+                          </span>
+                          <span className={styles.topoTabMeta}>
+                            <span>E = {e}</span>
+                            <span className={styles.topoTabConf}>· {c.confidence}</span>
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {activeCand?.rationale && (
+                  <div className={styles.topoNote} style={{ background: 'var(--surface2)' }}>
+                    Showing <strong>{(activeCand.label || '').split(' (')[0]}</strong> ({activeCand.loopNotation}) — {activeCand.rationale}.
+                    The lowest-energy model is marked <em>best</em>; switch tabs to compare.
+                  </div>
+                )}
+              </>
+            )
+          })()}
 
           {/* Energy bar + iteration slider */}
           {result?.success && (result.stdEnergy != null || result.altEnergy != null) && (

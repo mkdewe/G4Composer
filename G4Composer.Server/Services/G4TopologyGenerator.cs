@@ -11,13 +11,33 @@ namespace G4Composer.Server.Services;
 ///   TryGenerateFromGqrs — new: uses gqrs motif positions for G-tract placement.
 ///
 /// Topology defaults:
-///   RNA (uppercase U present) → parallel topology (+P+P+P), orient all-+, twist 29°.
+///   RNA (uppercase U present) → parallel topology UUUU-1a (-P-P-P), orient all-−, twist 29°.
 ///   DNA (no uppercase U)       → antiparallel UDUD (-Lw-Ln-Lw), alternating orient, twist 19°/37°/…
+///
+/// The parallel default is the canonical Silva UUUU-1a threading (-P-P-P with all-−
+/// orient and positive rise/twist), which is what every verified parallel example in
+/// the database uses (e.g. 7qa2, 6w9p, 9cb5 — orient A-;B-;C-, twist 29, rise 3.4).
+/// Earlier this emitted UUUU-1b (+P+P+P, orient all-+, twist 27): an inconsistent
+/// path/orient/sign combination that builds a strained stack and minimises to a
+/// clashing, positive-energy model. (The equivalent right-handed parallel G4 can also
+/// be reproduced by keeping orient all-+ and flipping rise/twist to negative — that
+/// was a manual workaround; UUUU-1a is the canonical positive-sign representation.)
 /// </summary>
 public static class G4TopologyGenerator
 {
-    private const string ParallelLoops     = "+P+P+P";
+    private const string ParallelLoops     = "-P-P-P";      // UUUU 1a (canonical all-parallel)
     private const string AntiparallelLoops = "-Lw-Ln-Lw";   // UDUD 6a (most common antiparallel chair)
+
+    /// <summary>
+    /// One generated topology candidate: a ready-to-serialise <see cref="QuadroInput"/> plus
+    /// the metadata describing which Silva fold it represents and how confident the prediction is.
+    /// </summary>
+    public sealed record GeneratedTopology(
+        QuadroInput Input,
+        string Label,
+        string Confidence,
+        string Rationale,
+        string LoopNotation);
 
     /// <summary>
     /// Returns a fully populated QuadroInput ready for serialisation, or null
@@ -137,6 +157,140 @@ public static class G4TopologyGenerator
         };
     }
 
+    // ── Multi-candidate generation (TopologyPredictor) ───────────────────────────
+
+    /// <summary>
+    /// Generates one QuadroInput per probable topology (ranked, most likely first) for a
+    /// sequence whose four G-tracts were found by direct scan. Empty if not a valid G4.
+    /// </summary>
+    public static IReadOnlyList<GeneratedTopology> GenerateCandidates(
+        string name, string sequence, string? rnaStructure)
+    {
+        if (string.IsNullOrWhiteSpace(sequence)) return [];
+        if (sequence.Contains('T')) sequence = sequence.ToLowerInvariant();
+
+        var gTracts = FindGTracts(sequence);
+        if (gTracts.Count < 4) return [];
+
+        var four = gTracts.Take(4).ToList();
+        int n = Math.Min(4, four.Min(t => t.Length));
+        if (n < 1) return [];
+
+        return BuildCandidates(name, sequence, four, n, rnaStructure);
+    }
+
+    /// <summary>Generates ranked topology candidates from a gqrs motif.</summary>
+    public static IReadOnlyList<GeneratedTopology> GenerateCandidatesFromGqrs(
+        string name, string sequence, string? rnaStructure, GqrsMotif motif)
+    {
+        if (string.IsNullOrWhiteSpace(sequence)) return [];
+        if (motif.Tetrads < 1 || motif.Tetrads > 4) return [];
+        if (sequence.Contains('T')) sequence = sequence.ToLowerInvariant();
+
+        int n = motif.Tetrads;
+        var gTracts = new List<(int Start, int Length)>
+        {
+            (motif.Tetrad1, n), (motif.Tetrad2, n), (motif.Tetrad3, n), (motif.Tetrad4, n),
+        };
+        foreach (var (start, len) in gTracts)
+            if (start < 0 || start + len > sequence.Length) return [];
+
+        return BuildCandidates(name, sequence, gTracts, n, rnaStructure);
+    }
+
+    /// <summary>Generates ranked topology candidates from an ONQuadro aligner QRS match.</summary>
+    public static IReadOnlyList<GeneratedTopology> GenerateCandidatesFromQrs(
+        string name, string matchedSequence, string qrs, int tetradCount, string? rnaStructure = null)
+    {
+        if (string.IsNullOrWhiteSpace(matchedSequence) || string.IsNullOrWhiteSpace(qrs)) return [];
+        if (matchedSequence.Length != qrs.Length) return [];
+
+        var runPos = FindQrsRunPositions(qrs);
+        if (runPos.Count < 4) return [];
+
+        int n = tetradCount is >= 1 and <= 4 ? tetradCount : runPos[0].Len;
+        if (n is < 1 or > 4) return [];
+
+        var gTracts = runPos.Take(4).Select(r => (Start: r.Start, Length: n)).ToList();
+        foreach (var (start, length) in gTracts)
+        {
+            if (start < 0 || start + length > matchedSequence.Length) return [];
+            for (int k = 0; k < length; k++)
+                if (char.ToLowerInvariant(matchedSequence[start + k]) != 'g') return [];
+        }
+
+        string seq = matchedSequence.Contains('T') ? matchedSequence.ToLowerInvariant() : matchedSequence;
+        return BuildCandidates(name, seq, gTracts, n, rnaStructure);
+    }
+
+    /// <summary>
+    /// Shared core: builds a QuadroInput for every topology returned by the predictor.
+    /// Structure / chi / sugar are identical across candidates; only the topology fields
+    /// (path, orient, twist) differ.
+    /// </summary>
+    private static IReadOnlyList<GeneratedTopology> BuildCandidates(
+        string name, string sequence,
+        IReadOnlyList<(int Start, int Length)> gTracts, int n, string? rnaStructure)
+    {
+        var ordered = gTracts.OrderBy(t => t.Start).ToList();
+        var loops = new[]
+        {
+            ordered[1].Start - (ordered[0].Start + ordered[0].Length),
+            ordered[2].Start - (ordered[1].Start + ordered[1].Length),
+            ordered[3].Start - (ordered[2].Start + ordered[2].Length),
+        }.Select(l => Math.Max(0, l)).ToArray();
+
+        bool isRna = sequence.Any(char.IsUpper);
+        var aRich = Enumerable.Range(0, 3)
+            .Select(i => IsATrack(sequence, ordered[i].Start + ordered[i].Length, loops[i]))
+            .ToArray();
+
+        var structure = BuildCombinedStructure(sequence, gTracts, n, rnaStructure);
+        var chi       = new string('.', sequence.Length);
+        var shugar    = BuildShugar(sequence);
+
+        var candidates = TopologyPredictor.Predict(n, loops, isRna, aRich);
+        var result = new List<GeneratedTopology>();
+
+        foreach (var cand in candidates)
+        {
+            List<string> path;
+            try { path = SilvaTopology.BuildPath(cand.LoopNotation, n).Split(';').ToList(); }
+            catch { continue; } // skip a notation SilvaTopology cannot thread
+
+            var orient = cand.IsParallel ? BuildParallelOrient(n) : SilvaTopology.BuildDefaultOrient(n);
+            var twist  = cand.IsParallel ? BuildTwist(n) : BuildTwistFromOrient(orient);
+
+            var input = new QuadroInput
+            {
+                Name      = name,
+                Sequence  = sequence,
+                Structure = structure,
+                Chi       = chi,
+                Sugar     = shugar,
+                Orient    = orient,
+                Rise      = BuildRise(n),
+                Twist     = twist,
+                Path      = path,
+            };
+            result.Add(new GeneratedTopology(
+                input, cand.Label, cand.Confidence, cand.Rationale, cand.LoopNotation));
+        }
+
+        return result;
+    }
+
+    // A loop is "A-rich" (rigid, resists lateral/diagonal folding) when ≥50% of its residues
+    // are adenine and it is at least 2 nt long (Webba da Silva A-track effect).
+    private static bool IsATrack(string sequence, int loopStart, int loopLen)
+    {
+        if (loopLen < 2) return false;
+        int a = 0;
+        for (int i = loopStart; i < loopStart + loopLen && i < sequence.Length; i++)
+            if (char.ToLowerInvariant(sequence[i]) == 'a') a++;
+        return a * 2 >= loopLen;
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -210,8 +364,10 @@ public static class G4TopologyGenerator
     private static string BuildShugar(string sequence)
         => new(sequence.Select(c => char.IsUpper(c) ? 'N' : 'S').ToArray());
 
+    // Canonical all-parallel (UUUU-1a) uses all-− orient. Paired with the -P-P-P path
+    // and positive rise/twist this reproduces the verified parallel examples (7qa2, 6w9p).
     private static string BuildParallelOrient(int n)
-        => string.Join(";", "ABCD".Take(n).Select(l => $"{l}+"));
+        => string.Join(";", "ABCD".Take(n).Select(l => $"{l}-"));
 
     private static string BuildRise(int n)
         => n <= 1 ? "3.4" : string.Join(";", Enumerable.Repeat("3.4", n - 1));
@@ -251,8 +407,14 @@ public static class G4TopologyGenerator
     /// Orient and topology are derived from sequence type (RNA=parallel, DNA=antiparallel UDUD)
     /// using the same rules as <see cref="TryGenerateFromGqrs"/>.
     /// </summary>
+    /// <param name="tetradCount">
+    /// Number of tetrads reported by the aligner match. This is authoritative — the QRS
+    /// runs can be uneven (a short first run would otherwise yield too few tetrads, e.g.
+    /// IL-27 matched 5o4d as "qR..rQS..srQS.....Rqs": first run length 2 → 2 tetrads
+    /// instead of 3). Falls back to the first run length only when out of the 1..4 range.
+    /// </param>
     public static QuadroInput? TryGenerateFromQrs(
-        string name, string matchedSequence, string qrs, string? rnaStructure = null)
+        string name, string matchedSequence, string qrs, int tetradCount, string? rnaStructure = null)
     {
         if (string.IsNullOrWhiteSpace(matchedSequence)) return null;
         if (string.IsNullOrWhiteSpace(qrs)) return null;
@@ -261,11 +423,24 @@ public static class G4TopologyGenerator
         var runPos = FindQrsRunPositions(qrs);
         if (runPos.Count < 4) return null;
 
-        int n = runPos[0].Len;
-        if (n < 1) return null;
+        // Tetrad count from the aligner match, not the first QRS run's length (see param doc).
+        int n = tetradCount is >= 1 and <= 4 ? tetradCount : runPos[0].Len;
+        if (n is < 1 or > 4) return null;
+
+        // Stamp `n` tetrads from each of the first four QRS run starts. Reject the match
+        // (→ caller falls back to the cleaner gqrs prediction) unless every tetrad position
+        // lands on a real G-run of length ≥ n. This guards against irregular QRS matches —
+        // e.g. IL-11 matched a 4-tetrad template (6k84) whose first four runs place a tract
+        // on "GGAG", which would build an invalid topology and fail with quadro ERROR 105.
+        var gTracts = runPos.Take(4).Select(r => (Start: r.Start, Length: n)).ToList();
+        foreach (var (start, length) in gTracts)
+        {
+            if (start < 0 || start + length > matchedSequence.Length) return null;
+            for (int k = 0; k < length; k++)
+                if (char.ToLowerInvariant(matchedSequence[start + k]) != 'g') return null;
+        }
 
         // Overlay QRS G-tetrad positions onto the RNA secondary structure base
-        var gTracts = runPos.Take(4).Select(r => (Start: r.Start, Length: r.Len)).ToList();
         var structure = BuildCombinedStructure(matchedSequence, gTracts, n, rnaStructure);
 
         // Normalize: uppercase T → DNA

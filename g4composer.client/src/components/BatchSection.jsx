@@ -273,12 +273,18 @@ export default function BatchSection() {
                 <span style={{ width: 140, fontSize: 12, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {it.source}
                 </span>
-                <span style={{ width: 110 }}>
-                  {it.status === 'running'
-                    ? <ItemProgress progress={it.progress} />
-                    : <StatusBadge status={it.status} />}
-                </span>
-                <span style={{ width: 130, fontFamily: 'var(--mono)', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {it.status === 'running' ? (
+                  /* While running, Energy + Actions cells are empty — let the live status use
+                     the whole right side of the row so the action label has room. */
+                  <span style={{ width: 350, paddingRight: 8 }}>
+                    <ItemProgress progress={it.progress} />
+                  </span>
+                ) : (
+                  <>
+                  <span style={{ width: 110 }}>
+                    <StatusBadge status={it.status} />
+                  </span>
+                  <span style={{ width: 130, fontFamily: 'var(--mono)', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {it.stdEnergy != null && (
                     <span title="Standard engine">
                       <span style={{ color: 'var(--text-dim)', marginRight: 3 }}>std</span>
@@ -339,6 +345,8 @@ export default function BatchSection() {
                     </button>
                   )}
                 </span>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -581,7 +589,7 @@ function ItemProgress({ progress }) {
   return (
     <span style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}
           title={progress?.label || 'Running…'}>
-      <span style={{ fontSize: 10, color: 'var(--text)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+      <span style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
         {progress?.label ? progress.label.replace(/\s*\(.*\)$/, '') : 'Running…'}{pct != null ? ` · ${pct}%` : ''}
       </span>
       <span style={{ height: 5, width: '100%', background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>

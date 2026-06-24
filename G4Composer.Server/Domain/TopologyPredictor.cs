@@ -242,9 +242,9 @@ public static class TopologyPredictor
         bool atrack = false;
         for (int i = 0; i < 3; i++)
             if (aRich[i] && t[i] != LoopType.Propeller) { raw *= ATrackPenalty; atrack = true; }
-        return $"{Token(t[0])}(l{loops[0]})={f0 * 100:F0}% · "
-             + $"{Token(t[1])}(l{loops[1]})={f1 * 100:F0}% · "
-             + $"{Token(t[2])}(l{loops[2]})={f2 * 100:F0}%"
+        return $"{Token(t[0])}@{loops[0]}nt={f0 * 100:F0}% · "
+             + $"{Token(t[1])}@{loops[1]}nt={f1 * 100:F0}% · "
+             + $"{Token(t[2])}@{loops[2]}nt={f2 * 100:F0}%"
              + (atrack ? " ×A-track" : "")
              + $" = {raw:F4} raw → {FamilyLabel(t)}";
     }

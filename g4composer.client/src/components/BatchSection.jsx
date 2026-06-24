@@ -274,11 +274,16 @@ export default function BatchSection() {
                   {it.source}
                 </span>
                 {it.status === 'running' ? (
-                  /* While running, Energy + Actions cells are empty — let the live status use
-                     the whole right side of the row so the action label has room. */
-                  <span style={{ width: 350, paddingRight: 8 }}>
+                  /* While running, Energy + Actions are empty — give the live status their room
+                     for the label. Keep the SAME cell count (one wide + two zero-width) so the
+                     flex gaps match other rows and nothing shifts. */
+                  <>
+                  <span style={{ width: 350, minWidth: 0, overflow: 'hidden' }}>
                     <ItemProgress progress={it.progress} />
                   </span>
+                  <span style={{ width: 0 }} />
+                  <span style={{ width: 0 }} />
+                  </>
                 ) : (
                   <>
                   <span style={{ width: 110 }}>
@@ -592,7 +597,7 @@ function ItemProgress({ progress }) {
       <span style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
         {progress?.label ? progress.label.replace(/\s*\(.*\)$/, '') : 'Running…'}{pct != null ? ` · ${pct}%` : ''}
       </span>
-      <span style={{ height: 5, width: '100%', background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+      <span style={{ height: 5, width: '100%', maxWidth: 200, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
         <span style={{
           display: 'block', height: '100%',
           width: pct != null ? `${pct}%` : '40%',

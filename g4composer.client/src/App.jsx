@@ -5,7 +5,7 @@ import HomeSection from './components/HomeSection.jsx'
 import BuildSection from './components/BuildSection.jsx'
 import BatchSection from './components/BatchSection.jsx'
 import { RetrieveSection, DocsSection, ContactSection, Footer } from './components/SectionPages.jsx'
-import { runQuadro11 } from './services/apiService.js'
+import { runQuadro11Stream } from './services/apiService.js'
 import { serializeInp } from './utils/inpSerializer.js'
 
 export default function App() {
@@ -59,36 +59,37 @@ export default function App() {
       id:         runId,
       name:       runName,
       state:      'running',
-      status:     'Starting Quadro container…',
+      status:     'Preparing…',
+      progress:   { stage: 'preparing', label: 'Preparing…', percent: 0 },
       pdbBlob:    null,
       pdbUrl:     null,
       jobInfo:    null,
       inpContent,
     }])
     setActiveRunId(runId)
-    setCurrentStatus('Starting Quadro container…')
+    setCurrentStatus('Preparing…')
 
     const updateRun = (patch) =>
       setRuns(prev => prev.map(r => r.id === runId ? { ...r, ...patch } : r))
 
     try {
       const {
-        blob, headers, dockerLog, stdEnergy, altEnergy, hasAlt, winner,
+        blob, dockerLog, stdEnergy, altEnergy, hasAlt, winner,
         altBlob, altUrl, stdFrames, altFrames, stdBestStep, altBestStep,
-        jobId: returnedJobId,
-      } = await runQuadro11(inputs, (msg) => {
-        setCurrentStatus(msg)
-        updateRun({ status: msg })
+        jobId, atoms,
+      } = await runQuadro11Stream(inputs, {
+        onProgress: (p) => {
+          setCurrentStatus(p.label)
+          updateRun({ status: p.label, progress: p })
+        },
       })
 
-      const url    = URL.createObjectURL(blob)
-      const jobId  = returnedJobId || headers.get('X-Job-Id') || '–'
-      const atoms  = headers.get('X-Atom-Count') || '?'
-      const elapsed = headers.get('X-Elapsed-Ms') || null
+      const url = URL.createObjectURL(blob)
 
       updateRun({
         state:      'done',
-        status:     `Model generated · ${atoms} atoms · Job ${jobId}`,
+        status:     `Model generated · ${atoms ?? '?'} atoms · Job ${jobId}`,
+        progress:   null,
         pdbBlob:    blob,
         pdbUrl:     url,
         dockerLog:  dockerLog || '',
@@ -103,17 +104,18 @@ export default function App() {
         altBestStep:  altBestStep || null,
         jobInfo: {
           jobId,
-          atoms,
-          elapsed,
+          atoms: atoms ?? '?',
+          elapsed: null,
           structures: inputs.length,
           name: runName,
         },
       })
-      setCurrentStatus(`Model generated · ${atoms} atoms · Job ${jobId}`)
+      setCurrentStatus(`Model generated · ${atoms ?? '?'} atoms · Job ${jobId}`)
     } catch (err) {
       updateRun({
         state:  'error',
         status: err?.details || err?.message || 'Unknown server error',
+        progress: null,
       })
       setCurrentStatus(err?.details || err?.message || 'Unknown server error')
     }

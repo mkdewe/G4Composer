@@ -1,38 +1,26 @@
 namespace G4Composer.Server.Domain;
 
 /// <summary>
-/// Predicts the most probable canonical (Webba da Silva) G-quadruplex topologies for an
-/// arbitrary nucleotide sequence, from the number of tetrads (N) and the three loop lengths.
+/// Predicts canonical (Webba da Silva) G-quadruplex topologies for a sequence from the three
+/// loop lengths, using an EMPIRICAL loop-type probability grid learned from deposited unimolecular
+/// G4 structures (see <see cref="Outer"/>/<see cref="Central"/>).
 ///
-/// The output is a RANKED list of candidates (most probable first). Multiple candidates are
-/// returned whenever the rules do not single out one fold — the pipeline then builds and runs
-/// quadro on each, letting the computed energy arbitrate. This deliberately mirrors the
-/// experimental reality that loop length narrows, but does not uniquely fix, the topology.
+/// Model: each fold is an assignment of a loop type (Propeller / Lateral / Diagonal) to the three
+/// loops. Its prior probability is the product of the per-loop probabilities
+///     P(fold) ∝ P(t1 | l1, outer) · P(t2 | l2, central) · P(t3 | l3, outer)
+/// restricted to folds that are combinatorially valid and thread all four G-tracts, then
+/// normalised over that admissible space. Every fold with P &gt; 0 is returned (and modelled by the
+/// pipeline) — loop length narrows but does not uniquely fix the topology, so the computed energy
+/// is the final arbiter.
 ///
-/// Scientific basis:
-///   * Webba da Silva, Chem. Eur. J. 2007, 13, 9738 — geometric formalism; steric minimum
-///     loop lengths per loop type (1 nt → propeller; ≥3 nt → diagonal possible; etc.),
-///     forbidden combinations (no two adjacent diagonals; no diagonal-lateral-diagonal).
-///   * Woś et al., Nucleic Acids Res. 2026, gkag590 — for TWO-tetrad G4s the central loop
-///     length is the main determinant (l2=3 → antiparallel chair; l2=4 → antiparallel basket;
-///     l2∈{1,2} → basket/chair). Two-tetrad short-loop folds are essentially all antiparallel.
-///   * Guédin / Bugaut-Balasubramanian consensus — three-tetrad: all-short loops (with a 1-nt
-///     loop) → parallel propeller; long central loop → antiparallel/hybrid.
-///   * RNA G4s are almost exclusively parallel (2'-OH + C3'-endo disfavour syn).
-///
-/// A 0-nt loop forces a propeller at that position (parallel contribution) — it cannot be
-/// lateral or diagonal.
+/// Provenance: the grid is the smoothed P(type | position, length) measured over ~285 deposited
+/// DNA G4 structures (out-quadro/inp), Dirichlet-smoothed (α=0.5). RNA is handled by a gate
+/// (2'-OH / C3'-endo → parallel), validated against the same set (canonical RNA = 100% propeller).
 /// </summary>
 public static class TopologyPredictor
 {
-    public enum LoopType { Propeller, Lateral, Diagonal }
+    public enum LoopType { Propeller, Lateral, Diagonal }   // enum order = matrix column order
 
-    /// <param name="LoopNotation">Silva loop notation in <see cref="SilvaTopology"/> vocabulary
-    /// (e.g. <c>-P-P-P</c>, <c>-L-L-L</c>, <c>-L+D+L</c>) — guaranteed to thread all four G-tracts.</param>
-    /// <param name="IsParallel">True for the all-propeller parallel fold (drives orient/twist defaults).</param>
-    /// <param name="Label">Human-readable family name for UI.</param>
-    /// <param name="Confidence">"high" | "medium" | "low".</param>
-    /// <param name="Rationale">Which rule produced this candidate (logs/UI).</param>
     public sealed record TopologyCandidate(
         string LoopNotation,
         bool IsParallel,
@@ -40,129 +28,199 @@ public static class TopologyPredictor
         string Confidence,
         string Rationale);
 
+    /// <summary>A fold with its normalised prior probability (0..1).</summary>
+    public sealed record ScoredCandidate(TopologyCandidate Candidate, double Prob);
+
     private const int StrandCount = 4;
 
-    /// <summary>
-    /// Ranks the probable topologies. <paramref name="loops"/> must have exactly three elements
-    /// (l1, l2, l3). <paramref name="aRich"/> (optional) flags loops that are ≥50% adenine and
-    /// thus too rigid to fold as lateral/diagonal (A-track effect).
-    /// </summary>
+    // ── Empirical loop-type probability grid P(type | position, length) ───────────────
+    // Rows = loop length 0..6 (index 6 = tail bin, length ≥6). Columns = {Propeller, Lateral,
+    // Diagonal} (LoopType enum order). A 0 entry is sterically forbidden and keeps any fold using
+    // it at probability 0. Derived from the deposited DNA G4 set, Dirichlet α=0.5 —
+    // regenerate with tools/gen_loop_matrix.py.
+    private const int MaxLenBin = 6;
+    private static readonly double[][] Outer =
+    {
+        new[] { 1.0000, 0.0000, 0.0000 },   // 0
+        new[] { 0.9669, 0.0331, 0.0000 },   // 1
+        new[] { 0.3697, 0.6303, 0.0000 },   // 2
+        new[] { 0.4613, 0.5354, 0.0034 },   // 3
+        new[] { 0.0704, 0.8310, 0.0986 },   // 4
+        new[] { 0.5294, 0.2941, 0.1765 },   // 5
+        new[] { 0.0545, 0.9273, 0.0182 },   // 6+
+    };
+    private static readonly double[][] Central =
+    {
+        new[] { 1.0000, 0.0000, 0.0000 },   // 0
+        new[] { 0.9342, 0.0658, 0.0000 },   // 1
+        new[] { 0.7090, 0.2910, 0.0000 },   // 2
+        new[] { 0.2487, 0.7056, 0.0457 },   // 3
+        new[] { 0.0794, 0.3016, 0.6190 },   // 4
+        new[] { 0.2195, 0.0244, 0.7561 },   // 5
+        new[] { 0.3333, 0.4359, 0.2308 },   // 6+
+    };
+
+    // An A-rich loop is rigid and resists folding back (lateral/diagonal); downweight strongly
+    // (enough to override even a high diagonal prior) but keep > 0 so the fold is still offered.
+    private const double ATrackPenalty = 0.05;
+
+    private static double LoopProb(bool central, int length, LoopType t)
+        => (central ? Central : Outer)[Math.Clamp(length, 0, MaxLenBin)][(int)t];
+
+    private static double FoldWeight(LoopType[] t, int[] loops, bool[] aRich)
+    {
+        double p = LoopProb(false, loops[0], t[0])
+                 * LoopProb(true,  loops[1], t[1])
+                 * LoopProb(false, loops[2], t[2]);
+        for (int i = 0; i < 3; i++)
+            if (aRich[i] && t[i] != LoopType.Propeller) p *= ATrackPenalty;
+        return p;
+    }
+
+    /// <summary>Every admissible fold (P &gt; 0), most probable first. All are modelled by Quadro.</summary>
     public static IReadOnlyList<TopologyCandidate> Predict(
+        int n, int[] loops, bool isRna, bool[]? aRich = null)
+        => RankAll(n, loops, isRna, aRich).Select(s => s.Candidate).ToList();
+
+    /// <summary>
+    /// The admissible fold space with normalised prior probabilities — the basis for both
+    /// <see cref="Predict"/> and <see cref="Determine"/>.
+    /// </summary>
+    public static IReadOnlyList<ScoredCandidate> RankAll(
         int n, int[] loops, bool isRna, bool[]? aRich = null)
     {
         aRich ??= new bool[3];
         if (loops.Length != 3)
-            return [ParallelFallback("loop count ≠ 3")];
+            return [new(ParallelFallback("loop count ≠ 3"), 1.0)];
 
-        // R2 — RNA gate: parallel, high confidence.
+        // RNA gate: 2'-OH / C3'-endo almost always forces a parallel propeller fold.
         if (isRna)
-            return [new TopologyCandidate(
+            return [new(new TopologyCandidate(
                 "-P-P-P", true, "parallel (propeller×3)", "high",
-                "RNA: 2'-OH / C3'-endo sugar almost always forces a parallel fold")];
+                "RNA: 2'-OH / C3'-endo sugar almost always forces a parallel fold"), 1.0)];
 
-        int central = loops[1];
-        bool anyZero    = loops.Any(l => l == 0);
-        bool allShort   = loops.All(l => l <= 2);
-        bool hasOne     = loops.Any(l => l <= 1);
-
-        var scored = new List<(TopologyCandidate Cand, int Score)>();
-
-        // Enumerate all sterically allowed loop-type triples, score by literature priors.
-        var allowed = loops.Select(AllowedTypes).ToArray();
-        foreach (var t1 in allowed[0])
-        foreach (var t2 in allowed[1])
-        foreach (var t3 in allowed[2])
+        var allTypes = new[] { LoopType.Propeller, LoopType.Lateral, LoopType.Diagonal };
+        var raw = new List<(TopologyCandidate Cand, double W)>();
+        foreach (var t1 in allTypes)
+        foreach (var t2 in allTypes)
+        foreach (var t3 in allTypes)
         {
             var types = new[] { t1, t2, t3 };
-            if (!CombinatoriallyValid(types)) continue;          // R4.5 — no D-D, no D-L-D
-            var notation = TryBuildValidNotation(types);          // must thread all 4 tracks
+            if (!CombinatoriallyValid(types)) continue;       // no D-D, no D-L-D
+            var notation = TryBuildValidNotation(types);       // must thread all four tracks
             if (notation is null) continue;
-
-            int score = Score(types, n, central, loops, aRich, anyZero, allShort, hasOne);
-            if (score <= 0) continue;
-
-            bool parallel = types.All(t => t == LoopType.Propeller);
-            scored.Add((new TopologyCandidate(
-                notation, parallel, FamilyLabel(types),
-                ConfidenceOf(score), RationaleOf(types, n, central, anyZero)), score));
+            double w = FoldWeight(types, loops, aRich);
+            if (w <= 0) continue;                              // a loop type is forbidden here
+            bool parallel = types.All(x => x == LoopType.Propeller);
+            raw.Add((new TopologyCandidate(
+                notation, parallel, FamilyLabel(types), "", RationaleOf(types, loops, aRich)), w));
         }
 
-        // Always keep a parallel option on the table (most common / most stable fold).
-        if (!scored.Any(s => s.Cand.IsParallel))
-            scored.Add((ParallelFallback("parallel always offered as fallback"), 1));
+        if (raw.Count == 0)                                    // degenerate — always offer parallel
+            raw.Add((ParallelFallback("no admissible fold for these loops"), 1.0));
 
-        return scored
-            .GroupBy(s => s.Cand.LoopNotation)
-            .Select(g => g.OrderByDescending(x => x.Score).First())
-            .OrderByDescending(s => s.Score)
-            .Take(3)
-            .Select(s => s.Cand)
+        double sum = raw.Sum(x => x.W);
+        return raw
+            .Select(x =>
+            {
+                double prob = sum > 0 ? x.W / sum : 0;
+                return new ScoredCandidate(x.Cand with { Confidence = ConfidenceOf(prob) }, prob);
+            })
+            .OrderByDescending(s => s.Prob)
             .ToList();
     }
 
-    // ── Steric allowed loop types per loop length (Webba da Silva minima) ─────────
-    private static LoopType[] AllowedTypes(int len) => len switch
+    /// <summary>
+    /// Human-facing determination: the inputs plus the full fold space. Admissible folds carry a
+    /// probability and are all modelled; ruled-out folds appear at 0% with the reason.
+    /// </summary>
+    public static TopologyDetermination Determine(
+        int n, int[] loops, bool isRna, bool[]? aRich = null)
     {
-        0 => [LoopType.Propeller],                                   // forced propeller
-        1 => [LoopType.Propeller, LoopType.Lateral],
-        2 => [LoopType.Lateral, LoopType.Propeller],
-        3 => [LoopType.Diagonal, LoopType.Lateral, LoopType.Propeller],
-        _ => [LoopType.Lateral, LoopType.Diagonal, LoopType.Propeller], // ≥4 (lateral = wide)
-    };
+        aRich ??= new bool[3];
+        var ranked = RankAll(n, loops, isRna, aRich);
+        var admissible = ranked
+            .Select(r => new ScoredTopology(
+                r.Candidate.LoopNotation, r.Candidate.Label, r.Candidate.Confidence,
+                r.Candidate.Rationale,
+                Score: (int)Math.Round(r.Prob * 1000),   // prior per-mille (monotonic with probability)
+                Probability: Math.Round(r.Prob * 100, 1),
+                Built: true))                              // every admissible fold is modelled
+            .ToList();
+
+        var seen     = admissible.Select(a => a.LoopNotation).ToHashSet();
+        var excluded = EnumerateExcluded(loops, isRna, seen);
+
+        return new TopologyDetermination(
+            n, loops.ToList(), isRna, aRich.ToList(),
+            admissible.Concat(excluded).ToList());
+    }
+
+    // Enumerates the full P/L/D cube and reports the folds that did NOT make the admissible space,
+    // each with the reason. Skipped for the RNA gate and the loops≠3 fallback.
+    private static IReadOnlyList<ScoredTopology> EnumerateExcluded(
+        int[] loops, bool isRna, HashSet<string> already)
+    {
+        if (isRna || loops.Length != 3) return [];
+        var allTypes = new[] { LoopType.Propeller, LoopType.Lateral, LoopType.Diagonal };
+
+        var result = new List<ScoredTopology>();
+        foreach (var t1 in allTypes)
+        foreach (var t2 in allTypes)
+        foreach (var t3 in allTypes)
+        {
+            var types  = new[] { t1, t2, t3 };
+            var reason = ExclusionReason(types, loops);
+            if (reason is null) continue;                          // admissible — already listed
+            var notation = TryBuildValidNotation(types) ?? DisplayPattern(types);
+            if (already.Contains(notation)) continue;
+            result.Add(new ScoredTopology(
+                notation, FamilyLabel(types), "—", Rationale: "", Score: 0, Probability: 0,
+                Built: false, ExcludedReason: reason));
+        }
+        return result.OrderBy(r => r.ExcludedReason).ThenBy(r => r.LoopNotation).ToList();
+    }
+
+    // null if the fold is admissible (P > 0 and threadable), else why it was ruled out.
+    private static string? ExclusionReason(LoopType[] t, int[] loops)
+    {
+        // 1. Structurally forbidden for ANY loop length (Webba da Silva geometry).
+        if ((t[0] == LoopType.Diagonal && t[1] == LoopType.Diagonal) ||
+            (t[1] == LoopType.Diagonal && t[2] == LoopType.Diagonal))
+            return "forbidden: two adjacent diagonal loops (any loop length)";
+        if (t[0] == LoopType.Diagonal && t[1] == LoopType.Lateral && t[2] == LoopType.Diagonal)
+            return "forbidden: diagonal–lateral–diagonal cannot form (any loop length)";
+
+        // 2. Sequence-specific: a loop type never observed (probability 0) at this length/position.
+        for (int i = 0; i < 3; i++)
+        {
+            bool central = i == 1;
+            if (LoopProb(central, loops[i], t[i]) == 0)
+                return t[i] switch
+                {
+                    LoopType.Diagonal => $"diagonal not formed at l{i + 1}={loops[i]} nt (needs ≥3)",
+                    LoopType.Lateral  => $"lateral needs l{i + 1} ≥ 1 (l{i + 1}={loops[i]})",
+                    _                 => $"propeller excluded at l{i + 1}={loops[i]}",
+                };
+        }
+
+        if (TryBuildValidNotation(t) is null) return "cannot thread all four G-tracts";
+        return null;
+    }
+
+    // Sign-free display for a non-threadable triple (real notations use +/- signs, e.g. -P-D+L).
+    private static string DisplayPattern(LoopType[] t) => string.Join("·", t.Select(Token));
 
     private static bool CombinatoriallyValid(LoopType[] t)
     {
-        // No two adjacent diagonals; diagonal-lateral-diagonal is essentially impossible.
         if (t[0] == LoopType.Diagonal && t[1] == LoopType.Diagonal) return false;
         if (t[1] == LoopType.Diagonal && t[2] == LoopType.Diagonal) return false;
         if (t[0] == LoopType.Diagonal && t[1] == LoopType.Lateral && t[2] == LoopType.Diagonal) return false;
         return true;
     }
 
-    // ── Literature-prior scoring ──────────────────────────────────────────────────
-    private static int Score(
-        LoopType[] t, int n, int central, int[] loops, bool[] aRich,
-        bool anyZero, bool allShort, bool hasOne)
-    {
-        bool parallel = t.All(x => x == LoopType.Propeller);
-        bool chair    = t.All(x => x == LoopType.Lateral);
-        bool basket   = t.Count(x => x == LoopType.Diagonal) == 1 && !parallel;
-
-        int score = parallel ? 50 : chair ? 30 : basket ? 30 : 18; // base by family (hybrid=18)
-
-        // Strong parallel drivers (Guédin consensus; 0-nt loop forces propeller).
-        if (parallel)
-        {
-            if (anyZero)                 score += 60;
-            if (allShort && hasOne)      score += 45;
-        }
-
-        if (n == 2)
-        {
-            // Woś gkag590 — two-tetrad central-loop determinant (antiparallel family).
-            switch (central)
-            {
-                case 1: if (basket) score += 40; break;   // d+pd
-                case 2: if (chair)  score += 35; else if (basket) score += 12; break; // −l−l−l
-                case 3: if (chair)  score += 48; break;   // +l+l+l (most prevalent)
-                case 4: if (basket) score += 40; break;   // −ld+l
-            }
-            if (parallel) score -= 10; // two-tetrad short-loop folds are rarely parallel
-        }
-        else // n ≥ 3
-        {
-            if (central >= 4 && (basket || chair)) score += 35;  // long central → antiparallel/hybrid
-            if (allShort && hasOne && parallel)    score += 30;
-        }
-
-        // A-track effect: a rigid A-rich loop resists lateral/diagonal folding.
-        for (int i = 0; i < 3; i++)
-            if (aRich[i] && t[i] != LoopType.Propeller) score -= 25;
-
-        return score;
-    }
-
-    private static string ConfidenceOf(int s) => s >= 85 ? "high" : s >= 45 ? "medium" : "low";
+    // Confidence band from the normalised prior probability.
+    private static string ConfidenceOf(double p) => p >= 0.40 ? "high" : p >= 0.15 ? "medium" : "low";
 
     private static string FamilyLabel(LoopType[] t)
     {
@@ -172,22 +230,29 @@ public static class TopologyPredictor
         return "hybrid (mixed loops)";
     }
 
-    private static string RationaleOf(LoopType[] t, int n, int central, bool anyZero)
+    // Spells out the probability arithmetic: the three per-loop priors, the A-track factor if any,
+    // their raw product, and the family. The UI normalises this raw product over the admissible
+    // space to get the displayed probability (Σ = 100%).
+    private static string RationaleOf(LoopType[] t, int[] loops, bool[] aRich)
     {
-        if (t.All(x => x == LoopType.Propeller))
-            return anyZero
-                ? "0-nt loop forces propeller → parallel"
-                : $"short loops favour parallel propeller (N={n})";
-        if (n == 2)
-            return $"two-tetrad, central loop = {central} (Woś gkag590)";
-        return $"central loop = {central} admits {FamilyLabel(t)}";
+        double f0 = LoopProb(false, loops[0], t[0]);
+        double f1 = LoopProb(true,  loops[1], t[1]);
+        double f2 = LoopProb(false, loops[2], t[2]);
+        double raw = f0 * f1 * f2;
+        bool atrack = false;
+        for (int i = 0; i < 3; i++)
+            if (aRich[i] && t[i] != LoopType.Propeller) { raw *= ATrackPenalty; atrack = true; }
+        return $"{Token(t[0])}(l{loops[0]})={f0 * 100:F0}% · "
+             + $"{Token(t[1])}(l{loops[1]})={f1 * 100:F0}% · "
+             + $"{Token(t[2])}(l{loops[2]})={f2 * 100:F0}%"
+             + (atrack ? " ×A-track" : "")
+             + $" = {raw:F4} raw → {FamilyLabel(t)}";
     }
 
     private static TopologyCandidate ParallelFallback(string why) =>
         new("-P-P-P", true, "parallel (propeller×3)", "low", $"fallback: {why}");
 
     // ── Sign search: pick a sign assignment that threads all four G-tracts ────────
-    // Tries all-negative first so the canonical parallel fold comes out as "-P-P-P".
     private static readonly int[][] SignCombos =
     [
         [-1, -1, -1], [-1, -1, 1], [-1, 1, -1], [1, -1, -1],
@@ -207,7 +272,6 @@ public static class TopologyPredictor
         return null;
     }
 
-    // Walks the four G-tracts; returns true iff all four distinct tracks are visited.
     private static bool Walk(LoopType[] types, int[] signs)
     {
         int track = 1;

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import styles from './SimpleSection.module.css'
 import MolstarViewer from './MolstarViewer.jsx'
 import { parseFile } from '../utils/batchParser.js'
-import { runQuadro11, fetchSilvaGroups } from '../services/apiService.js'
+import { runQuadro11Stream, fetchSilvaGroups } from '../services/apiService.js'
 
 /**
  * BatchSection — upload multiple .inp / .txt files, run them sequentially,
@@ -125,17 +125,21 @@ export default function BatchSection() {
       if (!item.input) continue // pre-parse error — skip
       // Mark running
       setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, status: 'running', error: null } : i
+        i.id === item.id ? { ...i, status: 'running', error: null, progress: null } : i
       ))
       try {
-        const { blob, altBlob, stdEnergy, altEnergy, winner } = await runQuadro11([item.input])
+        const { blob, altBlob, stdEnergy, altEnergy, winner } = await runQuadro11Stream(
+          [item.input],
+          { onProgress: (p) => setItems(prev => prev.map(i =>
+              i.id === item.id ? { ...i, progress: p } : i)) }
+        )
         setItems(prev => prev.map(i =>
-          i.id === item.id ? { ...i, status: 'done', pdbBlob: blob, altBlob: altBlob || null, stdEnergy: stdEnergy || null, altEnergy: altEnergy || null, winner: winner || 'standard' } : i
+          i.id === item.id ? { ...i, status: 'done', progress: null, pdbBlob: blob, altBlob: altBlob || null, stdEnergy: stdEnergy || null, altEnergy: altEnergy || null, winner: winner || 'standard' } : i
         ))
       } catch (err) {
         setItems(prev => prev.map(i =>
           i.id === item.id
-            ? { ...i, status: 'error_runtime', error: err.details || err.message || 'Unknown error' }
+            ? { ...i, status: 'error_runtime', progress: null, error: err.details || err.message || 'Unknown error' }
             : i
         ))
         // continue with the next item — resilient mode
@@ -270,7 +274,9 @@ export default function BatchSection() {
                   {it.source}
                 </span>
                 <span style={{ width: 110 }}>
-                  <StatusBadge status={it.status} />
+                  {it.status === 'running'
+                    ? <ItemProgress progress={it.progress} />
+                    : <StatusBadge status={it.status} />}
                 </span>
                 <span style={{ width: 130, fontFamily: 'var(--mono)', fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {it.stdEnergy != null && (
@@ -290,7 +296,7 @@ export default function BatchSection() {
                     </span>
                   )}
                 </span>
-                <span style={{ width: 110, textAlign: 'right', display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                <span style={{ width: 110, textAlign: 'right', display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
                   {it.status === 'done' && (
                     <>
                       <button
@@ -358,6 +364,27 @@ export default function BatchSection() {
           )}
         </div>
       )}
+
+      {/* ── Overall progress (while running) ── */}
+      {isRunning && items.length > 0 && (() => {
+        const finished = stats.done + stats.failed
+        const pct = items.length ? Math.round((finished / items.length) * 100) : 0
+        return (
+          <div style={{ margin: '0 0 12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
+              <span>Processing queue…</span>
+              <span>{finished}/{items.length} · {pct}%</span>
+            </div>
+            <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{
+                width: `${pct}%`, height: '100%',
+                background: 'linear-gradient(90deg, #2D9AC5, #5DCAA5)',
+                borderRadius: 4, transition: 'width 0.4s ease',
+              }} />
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Action bar ── */}
       {items.length > 0 && (
@@ -542,6 +569,32 @@ function TrashIcon() {
       <path d="M3.5 4l.7 9a1 1 0 001 .9h5.6a1 1 0 001-.9l.7-9" />
       <path d="M6.5 7v4M9.5 7v4" />
     </svg>
+  )
+}
+
+// Advanced per-item status shown in the Status column while a job runs — a real stage label
+// plus a percent bar, replacing the plain "running…" badge.
+function ItemProgress({ progress }) {
+  const pct = progress?.percent != null
+    ? Math.round(Math.min(Math.max(progress.percent, 0), 100))
+    : null
+  return (
+    <span style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}
+          title={progress?.label || 'Running…'}>
+      <span style={{ fontSize: 10, color: 'var(--text)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+        {progress?.label ? progress.label.replace(/\s*\(.*\)$/, '') : 'Running…'}{pct != null ? ` · ${pct}%` : ''}
+      </span>
+      <span style={{ height: 5, width: '100%', background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+        <span style={{
+          display: 'block', height: '100%',
+          width: pct != null ? `${pct}%` : '40%',
+          background: 'linear-gradient(90deg, #2D9AC5, #5DCAA5)',
+          borderRadius: 3, transition: 'width 0.4s ease',
+          ...(pct == null ? { animation: 'batchIndeterminate 1.1s ease-in-out infinite' } : {}),
+        }} />
+      </span>
+      <style>{`@keyframes batchIndeterminate{0%{transform:translateX(-60%)}100%{transform:translateX(160%)}}`}</style>
+    </span>
   )
 }
 

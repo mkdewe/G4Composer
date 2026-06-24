@@ -735,13 +735,11 @@ details[open] .inpSummary::before { content: '▼ '; }
 /* ── Topology candidate tabs (browser-tab style, like Build G4 runs) ───────── */
 .topoTabBar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 10px;
-  padding: 8px 16px 0;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface2);
-  overflow-x: auto;
-  scrollbar-width: thin;
 }
 .topoTabBarLabel {
   font-size: 11px;
@@ -749,18 +747,45 @@ details[open] .inpSummary::before { content: '▼ '; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-dim);
-  padding-bottom: 8px;
   flex-shrink: 0;
 }
+/* Sliding strip: arrow buttons flank a single horizontally-scrolling row of chips, so any
+   number of candidate topologies stays reachable without wrapping into many rows. */
+.topoScroller {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.topoArrow {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-med);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s, opacity 0.12s;
+}
+.topoArrow:hover:not(:disabled) { background: var(--teal-light); color: var(--teal-dark); }
+.topoArrow:disabled { opacity: 0.3; cursor: default; }
 .topoTabs {
   display: flex;
-  gap: 2px;
+  gap: 6px;
   flex: 1;
   min-width: 0;
   overflow-x: auto;
-  scrollbar-width: none;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
 }
-.topoTabs::-webkit-scrollbar { display: none; }
 
 .topoTab {
   display: flex;
@@ -769,23 +794,20 @@ details[open] .inpSummary::before { content: '▼ '; }
   gap: 1px;
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
+  border-radius: 6px;
   background: var(--bg);
   color: var(--text-dim);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, color 0.12s;
-  position: relative;
-  top: 1px;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .topoTab:hover:not(:disabled) { background: var(--surface); color: var(--text); }
 
 .topoTabActive {
-  background: var(--surface) !important;
+  background: var(--teal-light) !important;
   color: var(--text) !important;
-  border-bottom-color: var(--surface);
-  z-index: 1;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 1px var(--teal);
 }
 
 .topoTabFailed {

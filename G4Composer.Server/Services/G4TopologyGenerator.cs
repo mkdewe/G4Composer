@@ -40,6 +40,19 @@ public static class G4TopologyGenerator
         string LoopNotation);
 
     /// <summary>
+    /// The topologies that will be modelled, paired with the determination that explains how the
+    /// whole candidate space was scored (so the UI can show why this set was chosen).
+    /// </summary>
+    public sealed record CandidateSet(
+        IReadOnlyList<GeneratedTopology> Topologies,
+        TopologyDetermination? Determination)
+    {
+        public static readonly CandidateSet Empty = new([], null);
+        public int Count => Topologies.Count;
+        public GeneratedTopology this[int i] => Topologies[i];
+    }
+
+    /// <summary>
     /// Returns a fully populated QuadroInput ready for serialisation, or null
     /// if the sequence cannot form a valid G4 (fewer than 4 G-tracts, or any
     /// G-tract shorter than 1).
@@ -163,28 +176,28 @@ public static class G4TopologyGenerator
     /// Generates one QuadroInput per probable topology (ranked, most likely first) for a
     /// sequence whose four G-tracts were found by direct scan. Empty if not a valid G4.
     /// </summary>
-    public static IReadOnlyList<GeneratedTopology> GenerateCandidates(
+    public static CandidateSet GenerateCandidates(
         string name, string sequence, string? rnaStructure)
     {
-        if (string.IsNullOrWhiteSpace(sequence)) return [];
+        if (string.IsNullOrWhiteSpace(sequence)) return CandidateSet.Empty;
         if (sequence.Contains('T')) sequence = sequence.ToLowerInvariant();
 
         var gTracts = FindGTracts(sequence);
-        if (gTracts.Count < 4) return [];
+        if (gTracts.Count < 4) return CandidateSet.Empty;
 
         var four = gTracts.Take(4).ToList();
         int n = Math.Min(4, four.Min(t => t.Length));
-        if (n < 1) return [];
+        if (n < 1) return CandidateSet.Empty;
 
         return BuildCandidates(name, sequence, four, n, rnaStructure);
     }
 
     /// <summary>Generates ranked topology candidates from a gqrs motif.</summary>
-    public static IReadOnlyList<GeneratedTopology> GenerateCandidatesFromGqrs(
+    public static CandidateSet GenerateCandidatesFromGqrs(
         string name, string sequence, string? rnaStructure, GqrsMotif motif)
     {
-        if (string.IsNullOrWhiteSpace(sequence)) return [];
-        if (motif.Tetrads < 1 || motif.Tetrads > 4) return [];
+        if (string.IsNullOrWhiteSpace(sequence)) return CandidateSet.Empty;
+        if (motif.Tetrads < 1 || motif.Tetrads > 4) return CandidateSet.Empty;
         if (sequence.Contains('T')) sequence = sequence.ToLowerInvariant();
 
         int n = motif.Tetrads;
@@ -193,30 +206,30 @@ public static class G4TopologyGenerator
             (motif.Tetrad1, n), (motif.Tetrad2, n), (motif.Tetrad3, n), (motif.Tetrad4, n),
         };
         foreach (var (start, len) in gTracts)
-            if (start < 0 || start + len > sequence.Length) return [];
+            if (start < 0 || start + len > sequence.Length) return CandidateSet.Empty;
 
         return BuildCandidates(name, sequence, gTracts, n, rnaStructure);
     }
 
     /// <summary>Generates ranked topology candidates from an ONQuadro aligner QRS match.</summary>
-    public static IReadOnlyList<GeneratedTopology> GenerateCandidatesFromQrs(
+    public static CandidateSet GenerateCandidatesFromQrs(
         string name, string matchedSequence, string qrs, int tetradCount, string? rnaStructure = null)
     {
-        if (string.IsNullOrWhiteSpace(matchedSequence) || string.IsNullOrWhiteSpace(qrs)) return [];
-        if (matchedSequence.Length != qrs.Length) return [];
+        if (string.IsNullOrWhiteSpace(matchedSequence) || string.IsNullOrWhiteSpace(qrs)) return CandidateSet.Empty;
+        if (matchedSequence.Length != qrs.Length) return CandidateSet.Empty;
 
         var runPos = FindQrsRunPositions(qrs);
-        if (runPos.Count < 4) return [];
+        if (runPos.Count < 4) return CandidateSet.Empty;
 
         int n = tetradCount is >= 1 and <= 4 ? tetradCount : runPos[0].Len;
-        if (n is < 1 or > 4) return [];
+        if (n is < 1 or > 4) return CandidateSet.Empty;
 
         var gTracts = runPos.Take(4).Select(r => (Start: r.Start, Length: n)).ToList();
         foreach (var (start, length) in gTracts)
         {
-            if (start < 0 || start + length > matchedSequence.Length) return [];
+            if (start < 0 || start + length > matchedSequence.Length) return CandidateSet.Empty;
             for (int k = 0; k < length; k++)
-                if (char.ToLowerInvariant(matchedSequence[start + k]) != 'g') return [];
+                if (char.ToLowerInvariant(matchedSequence[start + k]) != 'g') return CandidateSet.Empty;
         }
 
         string seq = matchedSequence.Contains('T') ? matchedSequence.ToLowerInvariant() : matchedSequence;
@@ -228,7 +241,7 @@ public static class G4TopologyGenerator
     /// Structure / chi / sugar are identical across candidates; only the topology fields
     /// (path, orient, twist) differ.
     /// </summary>
-    private static IReadOnlyList<GeneratedTopology> BuildCandidates(
+    private static CandidateSet BuildCandidates(
         string name, string sequence,
         IReadOnlyList<(int Start, int Length)> gTracts, int n, string? rnaStructure)
     {
@@ -249,6 +262,7 @@ public static class G4TopologyGenerator
         var chi       = new string('.', sequence.Length);
         var shugar    = BuildShugar(sequence);
 
+        var determination = TopologyPredictor.Determine(n, loops, isRna, aRich);
         var candidates = TopologyPredictor.Predict(n, loops, isRna, aRich);
         var result = new List<GeneratedTopology>();
 
@@ -277,7 +291,7 @@ public static class G4TopologyGenerator
                 input, cand.Label, cand.Confidence, cand.Rationale, cand.LoopNotation));
         }
 
-        return result;
+        return new CandidateSet(result, determination);
     }
 
     // A loop is "A-rich" (rigid, resists lateral/diagonal folding) when ≥50% of its residues

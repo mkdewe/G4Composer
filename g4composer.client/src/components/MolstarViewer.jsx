@@ -1,16 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import styles from './MolstarViewer.module.css'
 
-const STEPS = [
-  ['Connecting to backend…',        'POST /api/Quadro11/run'],
-  ['Starting Docker container…',    'quadro14g:latest'],
-  ['Generating .inp files…',        'struct_000.inp'],
-  ['Running CYANA minimization…',   '100 iterations'],
-  ['Convergence achieved…',         'Energy minimization complete'],
-  ['Reading PDB output…',           'Parsing coordinates'],
-  ['Loading into Mol*…',            'chemical/x-pdb → viewer'],
-]
-
 // quadro outputs PDB in an Amber-ish style — residue names GUA/ADE/CYT/THY/URA and
 // an empty chain-ID column (the strand id lives in the segID, cols 73-76, e.g. STRA).
 // Mol* doesn't recognise those as a nucleic polymer, so cartoon comes out empty and
@@ -35,19 +25,11 @@ function normalisePdb(text) {
   }).join('\n')
 }
 
-export default function MolstarViewer({ pdbUrl, runState, runStatus, structureName, representation }) {
+export default function MolstarViewer({ pdbUrl, runState, runStatus, structureName, representation, progress }) {
   const containerRef = useRef(null)
   const viewerRef    = useRef(null)   // holds the Mol* Viewer instance
   const [molReady, setMolReady] = useState(false)
   const [molError, setMolError] = useState(null)
-  const [stepIdx, setStepIdx]   = useState(0)
-
-  // Animate loading steps while running
-  useEffect(() => {
-    if (runState !== 'running') { setStepIdx(0); return }
-    const iv = setInterval(() => setStepIdx(i => Math.min(i + 1, STEPS.length - 1)), 800)
-    return () => clearInterval(iv)
-  }, [runState])
 
   // Init Mol* once — using Viewer.create() API (Mol* >= 3.x / 4.x)
   useEffect(() => {
@@ -190,20 +172,45 @@ export default function MolstarViewer({ pdbUrl, runState, runStatus, structureNa
         style={{ visibility: loaded ? 'visible' : 'hidden' }}
       />
 
-      {/* Loading overlay */}
-      {loading && !loaded && (
-        <div className={styles.overlay}>
-          <div className={styles.center}>
-            <div className={styles.rings}>
-              <div className={`${styles.ring} ${styles.ring1}`} />
-              <div className={`${styles.ring} ${styles.ring2}`} />
-              <div className={`${styles.ring} ${styles.ring3}`} />
+      {/* Loading overlay — current stage label + a real percent bar (no fake timer, no
+          growing checklist: phases differ in length and Home can have many, so we show only
+          the stage in flight, weighted by percent). */}
+      {loading && !loaded && (() => {
+        const pct = progress?.percent != null
+          ? Math.round(Math.min(Math.max(progress.percent, 0), 100))
+          : progress?.total > 0
+            ? Math.round(Math.min(Math.max(progress.index ?? 0, 0), progress.total) / progress.total * 100)
+            : null
+        return (
+          <div className={styles.overlay}>
+            <div className={styles.center}>
+              <div className={styles.rings}>
+                <div className={`${styles.ring} ${styles.ring1}`} />
+                <div className={`${styles.ring} ${styles.ring2}`} />
+                <div className={`${styles.ring} ${styles.ring3}`} />
+              </div>
+              <p className={styles.loadTitle}>{progress?.label || 'Working…'}</p>
+              {progress?.detail && <p className={styles.loadStep}>{progress.detail}</p>}
+
+              {pct != null && (
+                <>
+                  <div style={{
+                    width: 260, maxWidth: '72%', height: 6, marginTop: 14,
+                    background: 'rgba(255,255,255,0.12)', borderRadius: 4, overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      width: `${pct}%`, height: '100%',
+                      background: 'linear-gradient(90deg, #2D9AC5, #5DCAA5)',
+                      borderRadius: 4, transition: 'width 0.4s ease',
+                    }} />
+                  </div>
+                  <p className={styles.loadStep} style={{ marginTop: 6 }}>{pct}%</p>
+                </>
+              )}
             </div>
-            <p className={styles.loadTitle}>{STEPS[stepIdx]?.[0]}</p>
-            <p className={styles.loadStep}>{STEPS[stepIdx]?.[1]}</p>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Idle — no run yet */}
       {!loading && !hasError && !loaded && (

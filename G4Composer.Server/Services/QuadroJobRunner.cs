@@ -14,6 +14,7 @@ public interface IQuadroJobRunner
     Task<DualRunResult> RunAsync(
         string jobId, string jobDir,
         IReadOnlyList<QuadroJobItem> items,
+        IProgress<JobProgress>? progress,
         CancellationToken cancellationToken);
 }
 
@@ -52,11 +53,14 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
     public async Task<DualRunResult> RunAsync(
         string jobId, string jobDir,
         IReadOnlyList<QuadroJobItem> items,
+        IProgress<JobProgress>? progress,
         CancellationToken cancellationToken)
     {
         var empty = SingleRunResult.Empty;
         if (items.Count == 0) return new DualRunResult(empty, empty);
 
+        // Writing the .inp files is instant — no separate milestone for it; the first visible
+        // stage is the container start (which actually takes a moment).
         foreach (var item in items)
             await File.WriteAllTextAsync(Path.Combine(jobDir, item.InpFileName),
                 item.InpContent, cancellationToken);
@@ -68,9 +72,14 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         {
             // Batch: sequential, standard engine only
             SingleRunResult last = empty;
+            var i = 0;
             foreach (var item in items)
+            {
+                i++;
+                progress?.Report(new("minimizing", $"Running structure {i}/{items.Count}", i, items.Count, item.InpFileName, (double)i / items.Count * 100));
                 last = await CoreAsync(jobId, jobDir, item.InpFileName,
-                    engine.Executable, engine.Image, "std", cancellationToken);
+                    engine.Executable, engine.Image, "std", null, cancellationToken);
+            }
             return new DualRunResult(last, empty);
         }
 
@@ -88,12 +97,14 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
 
         _logStore.Append(jobId, $"=== Dual run: {engine.Executable} + {altExe ?? "(no alternative)"} ===");
 
+        // Only the standard run reports coarse progress — std + alt run in parallel on the
+        // same stages, so reporting both would interleave/duplicate milestones.
         var stdTask = CoreAsync(jobId, stdDir, item0.InpFileName,
-            engine.Executable, engine.Image, "std", cancellationToken);
+            engine.Executable, engine.Image, "std", progress, cancellationToken);
 
         var altTask = altExe is not null
             ? CoreAsync(jobId + "_alt", altDir, item0.InpFileName,
-                altExe, engine.Image, "alt", cancellationToken)
+                altExe, engine.Image, "alt", null, cancellationToken)
             : Task.FromResult(SingleRunResult.Empty);
 
         SingleRunResult stdRes = empty;
@@ -122,6 +133,7 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
     private async Task<SingleRunResult> CoreAsync(
         string jobId, string jobDir, string inpFile,
         string executable, string image, string prefix,
+        IProgress<JobProgress>? progress,
         CancellationToken ct)
     {
         var safeId  = jobId.Length > 12 ? jobId[..12] : jobId;
@@ -131,6 +143,8 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         var workDir = _options.ContainerWorkDirectory;
 
         _logStore.Append(jobId, $"=== Job {jobId} | {inpFile} | engine {executable} ===");
+
+        progress?.Report(new("starting", "Starting Docker container", 1, 3, Percent: 12));
 
         var run = await _docker.RunAsync(
             ["run", "-d", "--name", cname, "--entrypoint", "/bin/sh",
@@ -148,8 +162,12 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
             await ExecChecked(jobId, cname, ct, "cp", $"{dataDir}/{inpFile}", $"{workDir}/{inpFile}");
             await ExecDebug  (jobId, cname, ct, "ls", "-lh", $"{workDir}/");
 
+            progress?.Report(new("minimizing", "Running energy minimization", 2, 3, Percent: 45));
+
             var quadro = await ExecIgnore(jobId, cname, ct,
                 "/bin/sh", "-c", $"cd {workDir} && ./{executable} {inpFile}");
+
+            progress?.Report(new("collecting", "Collecting structures", 3, 3, Percent: 90));
 
             await ExecDebug  (jobId, cname, ct, "ls", "-lh", $"{workDir}/");
             await ExecChecked(jobId, cname, ct, "/bin/sh", "-c",

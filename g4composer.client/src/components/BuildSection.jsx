@@ -257,6 +257,7 @@ export default function BuildSection({
                     runStatus={activeRun.status}
                     structureName={activeRun.name}
                     representation="cartoon"
+                    progress={activeRun.state === 'running' ? activeRun.progress : null}
                   />
                 )}
                 {activeTab === 'pdb' && (

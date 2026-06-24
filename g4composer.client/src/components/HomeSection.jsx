@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import MolstarViewer from './MolstarViewer.jsx'
 import {
   runPipeline, fetchPipelinePdb, fetchPipelineAltPdb, fetchFrame,
-  fetchSilvaGroups, fetchExampleDetail, runQuadro11,
+  fetchSilvaGroups, fetchExampleDetail, runQuadro11Stream,
 } from '../services/apiService.js'
 import { downloadInp, parseInp, serializeInp } from '../utils/inpSerializer.js'
 import styles from './HomeSection.module.css'
@@ -12,6 +12,7 @@ export default function HomeSection({ onEditInBuild }) {
   const [phase,     setPhase]     = useState('idle')   // 'idle' | 'running' | 'done'
   const [result,    setResult]    = useState(null)     // null | { running, success, ... }
   const [steps,     setSteps]     = useState({ std: null, alt: null })
+  const [progress,  setProgress]  = useState(null)   // { stage, label, percent, detail } — live stage
   const [displayedPdbUrl, setDisplayedPdbUrl] = useState(null)
   const frameCacheRef = useRef({})
   const abortRef      = useRef(null)
@@ -99,6 +100,7 @@ export default function HomeSection({ onEditInBuild }) {
     setPhase('running')
     setResult(null)
     setSteps({ std: null, alt: null })
+    setProgress(null)
     setDisplayedPdbUrl(null)
 
     // ── Example path ────────────────────────────────────────────────────────
@@ -106,9 +108,11 @@ export default function HomeSection({ onEditInBuild }) {
     // model straight from the deposited .inp via Quadro (same engine as Build/
     // Batch). No RNAfold, no QRS, no topology inference.
     if (loadedExampleInput && loadedExampleInput.sequence === sequence) {
+      const abort = new AbortController()
+      abortRef.current = abort
       setResult({ running: true })
       try {
-        const r = await runQuadro11([loadedExampleInput])
+        const r = await runQuadro11Stream([loadedExampleInput], { onProgress: setProgress, signal: abort.signal })
         const pdbUrl = URL.createObjectURL(r.blob)
         setSteps({ std: r.stdBestStep ?? null, alt: r.altBestStep ?? null })
         setResult({
@@ -124,8 +128,13 @@ export default function HomeSection({ onEditInBuild }) {
           error: null,
         })
       } catch (err) {
-        setResult({ running: false, success: false, error: err.message })
+        // Stop button aborts the request — that's a user action, not an error.
+        if (abort.signal.aborted || err?.name === 'AbortError')
+          setResult(null)
+        else
+          setResult({ running: false, success: false, error: err.message })
       } finally {
+        setProgress(null)
         setPhase('done')
       }
       return
@@ -135,10 +144,14 @@ export default function HomeSection({ onEditInBuild }) {
     abortRef.current = abort
 
     try {
-      for await (const event of runPipeline(seq)) {
+      for await (const event of runPipeline(seq, false, abort.signal)) {
         if (abort.signal.aborted) break
 
         switch (event.type) {
+          case 'progress':
+            setProgress(event)
+            break
+
           case 'aligner_quadro_start':
             setResult({ running: true })
             break
@@ -149,7 +162,7 @@ export default function HomeSection({ onEditInBuild }) {
                     stdFrames: stdFramesMeta, altFrames: altFramesMeta,
                     stdBestStep, altBestStep,
                     eltetradoOutput, eltetradoError,
-                    candidates, topologyLabel, topologyRationale, loopNotation } = event
+                    candidates, determination, topologyLabel, topologyRationale, loopNotation } = event
             if (success) {
               setSteps({ std: stdBestStep ?? null, alt: altBestStep ?? null })
               const fetchBoth = async () => {
@@ -173,6 +186,7 @@ export default function HomeSection({ onEditInBuild }) {
                   eltetradoOutput: eltetradoOutput ?? null,
                   eltetradoError: eltetradoError ?? null,
                   candidates: candidates ?? null,
+                  determination: determination ?? null,
                   selectedJobId: jobId,
                   topologyLabel: topologyLabel ?? null,
                   topologyRationale: topologyRationale ?? null,
@@ -191,10 +205,12 @@ export default function HomeSection({ onEditInBuild }) {
           }
 
           case 'complete':
+            setProgress(null)
             setPhase('done')
             break
 
           case 'error':
+            setProgress(null)
             setResult({ running: false, success: false, error: event.message })
             setPhase('done')
             break
@@ -209,8 +225,10 @@ export default function HomeSection({ onEditInBuild }) {
   }, [sequence, loadedExampleInput])
 
   const handleStop = useCallback(() => {
-    abortRef.current?.abort()
-    setPhase('done')
+    abortRef.current?.abort()   // closes the SSE/stream connection → backend cancels via RequestAborted
+    setProgress(null)
+    setResult(null)
+    setPhase('idle')
   }, [])
 
   const handleVariantToggle = useCallback((variant) => {
@@ -450,8 +468,8 @@ export default function HomeSection({ onEditInBuild }) {
             return (
               <>
                 <div className={styles.topoTabBar}>
-                  <span className={styles.topoTabBarLabel}>Topology</span>
-                  <div className={styles.topoTabs}>
+                  <span className={styles.topoTabBarLabel}>Topology ({result.candidates.length})</span>
+                  <TopoScroller>
                     {result.candidates.map((c, i) => {
                       const sel  = c.jobId === result.selectedJobId
                       const name = (c.label || '').split(' (')[0]
@@ -485,7 +503,7 @@ export default function HomeSection({ onEditInBuild }) {
                         </button>
                       )
                     })}
-                  </div>
+                  </TopoScroller>
                 </div>
                 {activeCand?.rationale && (
                   <div className={styles.topoNote} style={{ background: 'var(--surface2)' }}>
@@ -570,13 +588,23 @@ export default function HomeSection({ onEditInBuild }) {
               runStatus={result?.error ?? ''}
               structureName="G4"
               representation="cartoon"
+              progress={viewerState === 'running' ? progress : null}
             />
           </div>
 
-          {/* Analysis — eltetrado vs input comparison */}
-          {result?.success && (result.eltetradoOutput || result.eltetradoError) && (
-            <details className={styles.inpDetails}>
+          {/* Analysis — topology selection procedure + eltetrado vs input comparison */}
+          {result?.success && (result.determination || result.candidates?.length || result.eltetradoOutput || result.eltetradoError) && (
+            <details className={styles.inpDetails} open>
               <summary className={styles.inpSummary}>Analysis</summary>
+
+              {/* Topology selection — how the candidate set was determined + why this model won */}
+              {(result.determination || result.candidates?.length > 0) && (
+                <TopologySelection
+                  determination={result.determination}
+                  candidates={result.candidates ?? []}
+                  selectedJobId={result.selectedJobId}
+                />
+              )}
 
               {/* Info strip: QRS + ViennaRNA */}
               {(result.qrs || result.rnaStructure) && (
@@ -648,6 +676,210 @@ export default function HomeSection({ onEditInBuild }) {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+// Horizontal sliding strip for the topology chips — there can be many (every fold with P>0 is
+// modelled), so the row scrolls and arrow buttons appear/enable only when it overflows.
+function TopoScroller({ children }) {
+  const ref = useRef(null)
+  const [atStart, setAtStart] = useState(true)
+  const [atEnd, setAtEnd] = useState(true)
+
+  const update = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    setAtStart(el.scrollLeft <= 2)
+    setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 2)
+  }, [])
+
+  useEffect(() => {
+    update()
+    const el = ref.current
+    if (!el) return
+    el.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => { el.removeEventListener('scroll', update); window.removeEventListener('resize', update) }
+  }, [update, children])
+
+  const scroll = (dir) => ref.current?.scrollBy({ left: dir * 240, behavior: 'smooth' })
+
+  return (
+    <div className={styles.topoScroller}>
+      <button type="button" className={styles.topoArrow} onClick={() => scroll(-1)}
+              disabled={atStart} aria-label="Scroll topologies left">‹</button>
+      <div className={styles.topoTabs} ref={ref}>{children}</div>
+      <button type="button" className={styles.topoArrow} onClick={() => scroll(1)}
+              disabled={atEnd} aria-label="Scroll topologies right">›</button>
+    </div>
+  )
+}
+
+// Shows HOW the candidate set was determined and WHY one model won. Combines two pieces of
+// data: the determination (full Webba da Silva scored space → which folds were even considered
+// and with what prior probability) and the built candidates (their actual minimised energy).
+function TopologySelection({ determination, candidates = [], selectedJobId }) {
+  // Map built candidates (with energy) by loop notation so each scored fold can show its energy.
+  const builtByNotation = new Map()
+  for (const c of candidates) if (c.loopNotation) builtByNotation.set(c.loopNotation, c)
+
+  const okEnergies = candidates.filter(c => c.success && c.stdEnergy != null).map(c => Number(c.stdEnergy))
+  const bestEnergy = okEnergies.length ? Math.min(...okEnergies) : null
+
+  // Rows = the full determination space when available, else fall back to the built candidates.
+  const rows = determination?.ranked?.length
+    ? determination.ranked.map(s => ({
+        notation: s.loopNotation, label: s.label, confidence: s.confidence,
+        rationale: s.rationale, score: s.score, probability: s.probability, built: s.built,
+        excludedReason: s.excludedReason ?? null,
+        cand: builtByNotation.get(s.loopNotation) ?? null,
+      }))
+    : candidates.map(c => ({
+        notation: c.loopNotation, label: c.label, confidence: c.confidence,
+        rationale: c.rationale, score: null, probability: null, built: true,
+        excludedReason: null, cand: c,
+      }))
+
+  const cell = { padding: '6px 9px', borderBottom: '1px solid var(--border)', verticalAlign: 'top', whiteSpace: 'nowrap' }
+  const head = { ...cell, fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.5 }
+  const loops = determination?.loops
+  const aRich = determination?.aRichLoops ?? []
+  const builtCount = rows.filter(r => r.built).length
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+        Topology selection
+      </div>
+
+      {/* The determinant: the inputs that fix the allowed fold space. */}
+      {determination && (
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginBottom: 10,
+          fontFamily: 'var(--mono)', fontSize: 12,
+        }}>
+          <span><span style={{ color: 'var(--text-dim)' }}>tetrads (N) </span><strong>{determination.tetrads}</strong></span>
+          {loops && (
+            <span>
+              <span style={{ color: 'var(--text-dim)' }}>loop lengths </span>
+              <strong>{loops.join(' · ')}</strong>
+              {aRich.some(Boolean) && (
+                <span style={{ color: 'var(--text-dim)' }}> (A-rich: {aRich.map((a, i) => a ? `l${i + 1}` : null).filter(Boolean).join(', ')})</span>
+              )}
+            </span>
+          )}
+          <span><span style={{ color: 'var(--text-dim)' }}>molecule </span><strong>{determination.isRna ? 'RNA' : 'DNA'}</strong></span>
+        </div>
+      )}
+
+      <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 10px', lineHeight: 1.5 }}>
+        The candidate set is <strong>determined</strong> from N and the three loop lengths by Webba da Silva
+        steric rules (minimum loop length per loop type; no adjacent diagonals) — only folds that can
+        thread all four G-tracts survive. Each is scored by literature priors (loop lengths, RNA gate,
+        A-track effect); the <strong>probability</strong> below is that score normalised over the whole
+        admissible space (a heuristic prior, not a calibrated probability). The top folds — <strong>plus
+        any tied at the cutoff</strong>, so equally-ranked topologies are never dropped — are built with
+        Quadro ({builtCount} here); the model with the <strong>lowest energy</strong> (kcal/mol) is
+        selected. Folds that were ruled out (sterically impossible, forbidden combination, can't thread,
+        or penalised to ≤0) are listed at <strong>0%</strong> with the reason.
+      </p>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--mono)' }}>
+          <thead>
+            <tr>
+              <th style={{ ...head, textAlign: 'left' }}>Topology</th>
+              <th style={{ ...head, textAlign: 'left' }}>Loops</th>
+              <th style={{ ...head, textAlign: 'right' }} title="Normalised loop-prior product">Prob.</th>
+              <th style={{ ...head, textAlign: 'right' }}>E std</th>
+              <th style={{ ...head, textAlign: 'right' }}>ΔE vs best</th>
+              <th style={{ ...head, textAlign: 'left' }}>Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const c        = r.cand
+              const excluded = !!r.excludedReason
+              const e        = c?.success && c.stdEnergy != null ? Number(c.stdEnergy) : null
+              const isBest   = e != null && bestEnergy != null && e === bestEnergy
+              const delta    = e != null && bestEnergy != null ? e - bestEnergy : null
+              const isShown  = c?.jobId && c.jobId === selectedJobId
+              const name     = (r.label || '').split(' (')[0]
+              return (
+                <tr key={r.notation || i} style={{
+                  background: isBest ? 'var(--teal-light)' : 'transparent',
+                  opacity: excluded ? 0.6 : 1,
+                }}>
+                  <td style={{ ...cell, fontWeight: isBest ? 700 : 400 }}>
+                    {name}
+                    {isShown && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--teal-dark)' }}>(shown)</span>}
+                  </td>
+                  <td style={cell}>{r.notation || '—'}</td>
+                  <td style={{ ...cell, textAlign: 'right' }}>{r.probability != null ? `${r.probability}%` : '—'}</td>
+                  <td style={{ ...cell, textAlign: 'right' }}>{e != null ? e.toFixed(1) : '—'}</td>
+                  <td style={{ ...cell, textAlign: 'right' }}>
+                    {delta == null ? '—' : isBest ? '0.0' : `+${delta.toFixed(1)}`}
+                  </td>
+                  <td style={{ ...cell, fontFamily: 'var(--sans)', whiteSpace: 'normal' }}>
+                    {excluded
+                      ? <span style={{ color: 'var(--text-dim)' }}>ruled out — {r.excludedReason}</span>
+                      : isBest
+                        ? <span style={{ color: 'var(--teal-dark)', fontWeight: 700 }}>★ selected (lowest energy)</span>
+                        : c?.success
+                          ? <span style={{ color: 'var(--text-dim)' }}>built · higher energy</span>
+                          : c && !c.success
+                            ? <span style={{ color: 'var(--err-text)' }} title={c.error || ''}>built · no model</span>
+                            : r.built
+                              ? <span style={{ color: 'var(--text-dim)' }}>modelled</span>
+                              : <span style={{ color: 'var(--text-dim)', opacity: 0.7 }}>not modelled (below cutoff)</span>}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* How the winner was scored — the explicit probability arithmetic for the selected fold. */}
+      {(() => {
+        const winner = rows.find(r =>
+          r.cand?.success && bestEnergy != null && Number(r.cand.stdEnergy) === bestEnergy)
+        if (!winner) return null
+        return (
+          <div style={{
+            marginTop: 12, padding: '10px 12px', background: 'var(--teal-light)',
+            border: '1px solid var(--teal)', borderRadius: 6, fontSize: 12, lineHeight: 1.6,
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>
+              How the winner was scored — {(winner.label || '').split(' (')[0]} ({winner.notation})
+            </div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{winner.rationale}</div>
+            <div style={{ marginTop: 4 }}>
+              → normalised over {builtCount} admissible folds = <strong>{winner.probability}%</strong> prior probability.
+              It was then <strong>selected by lowest minimised energy</strong> ({Number(winner.cand.stdEnergy).toFixed(1)} kcal/mol):
+              the loop-prior probability ranks candidates a priori, the computed energy decides the winner.
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Per-topology rationale: the same loop-prior arithmetic for every admissible fold. */}
+      {rows.some(r => r.rationale) && (
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer' }}>
+            Loop-prior breakdown for every fold
+          </summary>
+          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {rows.filter(r => r.rationale).map((r, i) => (
+              <div key={r.notation || i} style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                <strong style={{ color: 'var(--text)' }}>{(r.label || '').split(' (')[0]}</strong>
+                {r.notation ? ` (${r.notation})` : ''} — {r.rationale}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  )
+}
 
 function EnergyBadge({ label, energy, isWinner, isActive, onClick }) {
   return (

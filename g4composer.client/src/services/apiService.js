@@ -185,6 +185,94 @@ export async function runQuadro11(inputs, onProgress) {
 }
 
 /**
+ * Run Quadro11 over Server-Sent Events so the caller sees real per-stage progress.
+ * Mirrors {@link runQuadro11}'s resolved shape, but the PDB is fetched by jobId after the
+ * stream's terminal `done` event (the stream itself carries only metadata + progress).
+ *
+ * @param {Array<object>} inputs      – Quadro11Input objects
+ * @param {object}        opts
+ * @param {function}      opts.onProgress – callback({stage,label,index,total,detail}) per milestone
+ * @returns {Promise<object>} { blob, altBlob, altUrl, dockerLog, stdEnergy, altEnergy, hasAlt,
+ *                              winner, stdFrames, altFrames, stdBestStep, altBestStep, jobId, atoms }
+ */
+export async function runQuadro11Stream(inputs, { onProgress, signal } = {}) {
+  const response = await fetch('/api/quadro11/run-stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(inputs),
+    signal,
+  })
+
+  if (!response.ok) {
+    const { message, details } = await parseErrorBody(response)
+    throw new ApiError(message || `HTTP ${response.status}`, response.status, details)
+  }
+
+  const reader  = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer    = ''
+  let done      = null
+  let failure   = null
+
+  while (true) {
+    const { done: streamDone, value } = await reader.read()
+    if (streamDone) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      let evt
+      try { evt = JSON.parse(line.slice(6)) } catch { continue }
+      if      (evt.type === 'progress') onProgress?.(evt)
+      else if (evt.type === 'done')     done = evt
+      else if (evt.type === 'error')    failure = evt
+    }
+  }
+
+  if (failure) {
+    const details = Array.isArray(failure.details) ? failure.details.join('\n') : failure.details
+    throw new ApiError(details ? `${failure.message}:\n${details}` : failure.message, 500, details)
+  }
+  if (!done) throw new ApiError('Computation stream ended without a result', 0, 'empty_stream')
+
+  const { jobId, hasAlt, stdFrames = [], altFrames = [] } = done
+  const stdStep = done.stdBestStep ?? stdFrames[stdFrames.length - 1]?.step ?? null
+
+  // Std best-frame PDB is the primary result (the blob the old endpoint used to return).
+  const stdFrame = stdStep != null ? await fetchFrame(jobId, 'std', stdStep) : null
+  if (!stdFrame?.blob) throw new ApiError('Server did not produce a PDB file', 500, 'no_pdb')
+  // fetchFrame mints its own object URL; callers create theirs from the blob, so drop this one.
+  if (stdFrame.url) URL.revokeObjectURL(stdFrame.url)
+
+  let altBlob = null, altUrl = null
+  if (hasAlt) {
+    try {
+      const altRes = await fetch(`/api/quadro11/alt-pdb/${jobId}`)
+      if (altRes.ok) {
+        const raw = await altRes.blob()
+        altBlob = raw.type === 'chemical/x-pdb' ? raw : new Blob([raw], { type: 'chemical/x-pdb' })
+        altUrl  = URL.createObjectURL(altBlob)
+      }
+    } catch { /* alt is best-effort */ }
+  }
+
+  const dockerLog = await fetchDockerLog(jobId)
+
+  return {
+    blob: stdFrame.blob, altBlob, altUrl, dockerLog,
+    stdEnergy: done.stdEnergy ?? null,
+    altEnergy: done.altEnergy ?? null,
+    hasAlt: !!hasAlt,
+    winner: done.winner || 'standard',
+    stdFrames, altFrames,
+    stdBestStep: done.stdBestStep ?? null,
+    altBestStep: done.altBestStep ?? null,
+    jobId, atoms: done.atoms ?? null,
+  }
+}
+
+/**
  * Check backend health.
  * @returns {Promise<{ok: boolean, status: string, dockerAvailable: boolean, imageExists: boolean}>}
  */
@@ -222,11 +310,12 @@ export async function fetchExample() {
  * @param {boolean} useGquadruplex  Enable ViennaRNA --g-quadruplex flag
  * @yields {object} SSE event objects
  */
-export async function* runPipeline(sequence, useGquadruplex = false) {
+export async function* runPipeline(sequence, useGquadruplex = false, signal = undefined) {
   const response = await fetch('/api/pipeline/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sequence, useGquadruplex }),
+    signal,
   })
 
   if (!response.ok) throw new Error(`HTTP ${response.status}`)

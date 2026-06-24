@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json;
+using System.Threading.Channels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.Annotations;
@@ -26,6 +28,10 @@ namespace G4Composer.Server.Controllers;
 public sealed class QuadroController : ControllerBase
 {
     private const string SwaggerTag = "Quadro";
+
+    private static readonly JsonSerializerOptions JsonOpts =
+        new(JsonSerializerDefaults.Web)
+        { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
 
     private readonly ILogger<QuadroController> _logger;
     private readonly IQuadroEngineSelector _engineSelector;
@@ -139,7 +145,7 @@ public sealed class QuadroController : ControllerBase
                     InpContent: engine.SerializeInput(inp)))
                 .ToList();
 
-            var result = await _jobRunner.RunAsync(jobId, jobDir, items, jobCts.Token);
+            var result = await _jobRunner.RunAsync(jobId, jobDir, items, progress: null, jobCts.Token);
 
             if (!result.Standard.Success || result.Standard.Pdb is null || result.Standard.Pdb.Length == 0)
                 return StatusCode(StatusCodes.Status500InternalServerError,
@@ -212,6 +218,133 @@ public sealed class QuadroController : ControllerBase
         }
     }
 
+    // ── Run (streaming) ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Same computation as <see cref="Run"/>, but streamed over Server-Sent Events so the
+    /// client can show real progress. Emits <c>progress</c> events for each coarse stage and a
+    /// terminal <c>done</c> event carrying the metadata (jobId, energies, frames). The PDB
+    /// itself is fetched afterwards via <c>GET frame/{jobId}/std/{bestStep}</c> and
+    /// <c>GET alt-pdb/{jobId}</c> — identical retrieval to the pipeline path.
+    /// </summary>
+    [HttpPost("run-stream")]
+    [Consumes("application/json")]
+    public async Task RunStream([FromBody] List<QuadroInput> inputs, CancellationToken cancellationToken)
+    {
+        Response.ContentType = "text/event-stream";
+        Response.Headers["Cache-Control"]     = "no-cache";
+        Response.Headers["X-Accel-Buffering"] = "no";
+        Response.Headers["Connection"]        = "keep-alive";
+
+        if (inputs is null || inputs.Count == 0)
+        {
+            await SendEventAsync("error", new { type = "error", message = "No input data. A list of QuadroInput is required." }, cancellationToken);
+            return;
+        }
+
+        var validationErrors = inputs
+            .SelectMany((inp, i) => _validator.Validate(inp).Errors.Select(e => $"[{i}] {e}"))
+            .ToList();
+        if (validationErrors.Count > 0)
+        {
+            await SendEventAsync("error", new { type = "error", message = "Validation failed.", details = validationErrors }, cancellationToken);
+            return;
+        }
+
+        var engine = _engineSelector.Active;
+        var jobId  = Guid.NewGuid().ToString("N")[..12];
+        var jobDir = Path.Combine(Path.GetTempPath(), $"g4composer_{jobId}");
+        Directory.CreateDirectory(jobDir);
+
+        _logger.LogInformation(
+            "Job {JobId}: streaming run, engine={Version}, {Count} structure(s)",
+            jobId, engine.Version, inputs.Count);
+
+        using var jobCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        jobCts.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
+
+        // Bridge IProgress (reported from the background run) → SSE writes (drained here).
+        var channel  = Channel.CreateUnbounded<JobProgress>();
+        var progress = new ChannelProgress(channel.Writer);
+
+        var items = inputs
+            .Select((inp, i) => new QuadroJobItem(i, $"struct_{i:D3}.inp", engine.SerializeInput(inp)))
+            .ToList();
+
+        var runTask = Task.Run(async () =>
+        {
+            try { return await _jobRunner.RunAsync(jobId, jobDir, items, progress, jobCts.Token); }
+            finally { channel.Writer.TryComplete(); }
+        });
+
+        try
+        {
+            // Forward every milestone as it arrives; loop ends when the run completes the writer.
+            await foreach (var p in channel.Reader.ReadAllAsync(cancellationToken))
+                await SendEventAsync("progress", new
+                {
+                    type  = "progress",
+                    stage = p.Stage, label = p.Label, index = p.Index, total = p.Total,
+                    detail = p.Detail, percent = p.Percent,
+                }, cancellationToken);
+
+            var result = await runTask;   // surfaces any exception thrown by the run
+
+            if (!result.Standard.Success || result.Standard.Pdb is null || result.Standard.Pdb.Length == 0)
+            {
+                await SendEventAsync("error", new { type = "error", message = "Container did not produce a PDB file." }, cancellationToken);
+                return;
+            }
+
+            // Store frames + alt PDB so the client can fetch them by jobId (same as the blob path).
+            foreach (var frame in result.Standard.Frames)
+                _frameStore.Store(jobId, "std", frame.Step, frame.Pdb);
+            if (result.Alternative.Success)
+                foreach (var frame in result.Alternative.Frames)
+                    _frameStore.Store(jobId, "alt", frame.Step, frame.Pdb);
+            if (result.Alternative.Success && result.Alternative.Pdb is not null)
+                _altPdbStore.Store(jobId, result.Alternative.Pdb);
+
+            await SendEventAsync("done", new
+            {
+                type        = "done",
+                jobId,
+                atoms       = CountPdbAtoms(result.Standard.Pdb),
+                stdEnergy   = result.Standard.Etotal,
+                altEnergy   = result.Alternative.Etotal,
+                hasAlt      = result.Alternative.Success,
+                winner      = result.Winner ?? "standard",
+                stdFrames   = result.Standard.Frames.Select(f => new { step = f.Step, energy = f.Etotal }).ToList(),
+                altFrames   = result.Alternative.Frames.Select(f => new { step = f.Step, energy = f.Etotal }).ToList(),
+                stdBestStep = result.Standard.BestFrame?.Step,
+                altBestStep = result.Alternative.BestFrame?.Step,
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException) when (jobCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("Job {JobId}: timeout after {Sec}s", jobId, _options.TimeoutSeconds);
+            await SendEventAsync("error", new { type = "error", message = $"Container timeout after {_options.TimeoutSeconds}s" }, CancellationToken.None);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Client disconnected — nothing to send.
+        }
+        catch (DockerException ex)
+        {
+            _logger.LogError(ex, "Job {JobId}: Docker error", jobId);
+            await SendEventAsync("error", new { type = "error", message = $"Docker container error: {ex.Message}", details = ex.DockerOutput }, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Job {JobId}: unexpected stream error", jobId);
+            await SendEventAsync("error", new { type = "error", message = $"Internal error: {ex.Message}" }, CancellationToken.None);
+        }
+        finally
+        {
+            _ = Task.Run(() => CleanupJobDir(jobDir));
+        }
+    }
+
     // ── Frame PDB ────────────────────────────────────────────────────────────
 
     [HttpGet("frame/{jobId}/{engine}/{step:int}")]
@@ -255,6 +388,28 @@ public sealed class QuadroController : ControllerBase
             return NotFound(new ErrorDto($"Log for job '{jobId}' not found (may have expired)."));
 
         return Content(log, "text/plain");
+    }
+
+    // ── SSE helper ─────────────────────────────────────────────────────────────
+
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+
+    private async Task SendEventAsync(string eventType, object data, CancellationToken ct)
+    {
+        if (ct.IsCancellationRequested) return;
+
+        var line  = $"data: {JsonSerializer.Serialize(data, JsonOpts)}\n\n";
+        var bytes = Encoding.UTF8.GetBytes(line);
+
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            await Response.Body.WriteAsync(bytes, ct);
+            await Response.Body.FlushAsync(ct);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _logger.LogWarning("SSE write failed: {Msg}", ex.Message); }
+        finally { _writeLock.Release(); }
     }
 
     // ── Utility ──────────────────────────────────────────────────────────────

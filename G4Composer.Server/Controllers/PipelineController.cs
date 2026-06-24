@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using G4Composer.Server.Configuration;
+using G4Composer.Server.Domain;
 using G4Composer.Server.Engines;
 using G4Composer.Server.Models;
 using G4Composer.Server.Services;
@@ -78,6 +79,7 @@ public sealed class PipelineController : ControllerBase
 
         await SendEventAsync("start", new { type = "start" }, cancellationToken);
 
+        await SendProgressAsync("rnafold", "Folding RNA secondary structure (ViennaRNA)", 8, cancellationToken);
         var rnaResult = await RunViennaRnaAsync(sequence, cancellationToken);
         await RunOnquadroAsync(sequence, rnaResult.Success ? rnaResult.Structure : null, cancellationToken);
 
@@ -108,6 +110,7 @@ public sealed class PipelineController : ControllerBase
     {
         OnquadroResult? result = null;
         string? failReason = null;
+        await SendProgressAsync("align", "Searching ONQuadro database for similar structures", 20, ct);
         try
         {
             result = await _onquadro.AlignAsync(sequence, ct);
@@ -167,7 +170,7 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        await RunQuadroCandidatesAndEmitAsync("GQ", best.Qrs, candidates, matchRnaStructure, ct);
+        await RunQuadroCandidatesAndEmitAsync("GQ", best.Qrs, candidates.Topologies, candidates.Determination, matchRnaStructure, ct);
     }
 
     // Fallback when the ONQuadro aligner finds no similar structure in the database:
@@ -179,6 +182,7 @@ public sealed class PipelineController : ControllerBase
 
         GqrsResult? gqrs = null;
         string? failReason = null;
+        await SendProgressAsync("predict", "Predicting G-quadruplex topology (gqrs)", 20, ct);
         try
         {
             gqrs = await _gqrs.PredictAsync(sequence, ct);
@@ -210,7 +214,7 @@ public sealed class PipelineController : ControllerBase
         // Build the topology from the gqrs motif when available; otherwise fall back to a
         // direct G-tract scan of the sequence. A 3D model is always attempted when the
         // sequence can fold into a G4 — only a sequence with fewer than four G-tracts fails.
-        IReadOnlyList<G4TopologyGenerator.GeneratedTopology> candidates = [];
+        G4TopologyGenerator.CandidateSet candidates = G4TopologyGenerator.CandidateSet.Empty;
         string qrs = "";
 
         if (motif is not null)
@@ -238,7 +242,7 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        await RunQuadroCandidatesAndEmitAsync(label, qrs, candidates, rnaStructure, ct);
+        await RunQuadroCandidatesAndEmitAsync(label, qrs, candidates.Topologies, candidates.Determination, rnaStructure, ct);
     }
 
     // Runs Quadro on every predicted topology candidate and streams a single
@@ -248,6 +252,7 @@ public sealed class PipelineController : ControllerBase
     private async Task RunQuadroCandidatesAndEmitAsync(
         string label, string qrs,
         IReadOnlyList<G4TopologyGenerator.GeneratedTopology> candidates,
+        TopologyDetermination? determination,
         string? rnaStructure, CancellationToken ct)
     {
         await SendEventAsync("aligner_quadro_start",
@@ -266,10 +271,21 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        // Run quadro for each candidate (cap at 3 to bound compute time).
+        // The candidate set is already capped by the predictor (top folds + ties at the cutoff).
+        var toRun = candidates.ToList();
+        await SendProgressAsync("topology", $"Building {toRun.Count} topology model(s)", 30, ct);
         var runs = new List<CandidateRun>();
-        foreach (var cand in candidates.Take(3))
+        var k = 0;
+        foreach (var cand in toRun)
+        {
+            k++;
+            // Modeling spans 30%→90% — one increment per model, so the bar advances through the
+            // longest phase instead of sitting at a single value.
+            var pct = 30 + ((k - 1) / (double)toRun.Count) * 60;
+            await SendProgressAsync("modeling",
+                $"Modeling topology {k}/{toRun.Count}: {cand.Label.Split(" (")[0]}", pct, ct, cand.LoopNotation);
             runs.Add(await RunOneCandidateAsync(label, cand, ct));
+        }
 
         object ProjectCandidate(CandidateRun r) => new
         {
@@ -306,6 +322,7 @@ public sealed class PipelineController : ControllerBase
                 inpContent        = first.InpContent,
                 combinedStructure = first.CombinedStructure,
                 candidates        = runs.Select(ProjectCandidate).ToList(),
+                determination,
             }, ct);
             return;
         }
@@ -318,6 +335,7 @@ public sealed class PipelineController : ControllerBase
         string? eltetradoError  = null;
         if (best.StdPdb is { Length: > 0 })
         {
+            await SendProgressAsync("analysis", "Analysing structure with ElTetrado", 95, ct);
             try
             {
                 using var eltCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -353,6 +371,7 @@ public sealed class PipelineController : ControllerBase
             topologyRationale  = best.Rationale,
             loopNotation       = best.LoopNotation,
             candidates         = runs.Select(ProjectCandidate).ToList(),
+            determination,
             eltetradoOutput,
             eltetradoError,
         }, ct);
@@ -389,7 +408,7 @@ public sealed class PipelineController : ControllerBase
             using var jobCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             jobCts.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
 
-            var result = await _jobRunner.RunAsync(jobId, jobDir, items, jobCts.Token);
+            var result = await _jobRunner.RunAsync(jobId, jobDir, items, progress: null, jobCts.Token);
 
             var stdOk = result.Standard.Success    && result.Standard.Pdb    is { Length: > 0 };
             var altOk = result.Alternative.Success && result.Alternative.Pdb is { Length: > 0 };
@@ -514,6 +533,11 @@ public sealed class PipelineController : ControllerBase
     }
 
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+
+    // Home-pipeline progress as an explicit percentage — phases differ a lot in duration, so a
+    // flat index/total bar would sit at one value during modeling. Modeling subdivides per model.
+    private Task SendProgressAsync(string stage, string label, double percent, CancellationToken ct, string? detail = null)
+        => SendEventAsync("progress", new { type = "progress", stage, label, percent, detail }, ct);
 
     private async Task SendEventAsync(string eventType, object data, CancellationToken ct)
     {

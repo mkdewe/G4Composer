@@ -64,10 +64,21 @@ public sealed class OnquadroService : IOnquadroService
         }
     }
 
-    // onquadro's --molecule filters the template database to a single nucleic-acid type.
-    // RNA carries uracil; anything else is treated as DNA (uppercase T is DNA-only).
+    // onquadro's --molecule switch (--molecule DNA | RNA) filters the template database to one
+    // nucleic-acid type. We choose it from the CASE of the sequence, following the app's convention:
+    // UPPERCASE = RNA (C3'-endo, U), lowercase = DNA (C2'-endo, t). This is case-based, NOT mere
+    // uracil presence — a purely-uppercase sequence is RNA even without any U (e.g. GGGAGGGAGGGAGGG),
+    // and a purely-lowercase one is DNA. A mixed-case sequence is a hybrid DNA/RNA G4 that cannot be
+    // filtered to a single type, so we pass NO --molecule and let the aligner search both databases.
     private static string? DetectMolecule(string sequence)
-        => sequence.Contains('U') || sequence.Contains('u') ? "RNA" : "DNA";
+    {
+        bool hasUpper = sequence.Any(char.IsUpper);
+        bool hasLower = sequence.Any(char.IsLower);
+        if (hasUpper && hasLower) return null;   // hybrid → don't restrict the template database
+        if (hasUpper) return "RNA";
+        if (hasLower) return "DNA";
+        return null;                              // no nucleotide letters → let the aligner decide
+    }
 
     // ── g4composer .inp candidate parser ──────────────────────────────────────
 

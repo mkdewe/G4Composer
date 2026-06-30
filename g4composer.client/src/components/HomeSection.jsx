@@ -17,6 +17,8 @@ export default function HomeSection({ onEditInBuild }) {
   const [activeSource, setActiveSource] = useState(null)   // 'aligner' | 'prediction' | null (=default)
   const frameCacheRef = useRef({})
   const abortRef      = useRef(null)
+  const firstShownRef = useRef(false)   // have we shown the first streamed candidate in the viewer yet?
+  const userPickedRef = useRef(false)   // did the user manually pick a candidate tab? (don't override it)
 
   // ── Example sequences (deposited ONQuadro G4 structures) ───────────────────
   // Each example carries its FULL deposited .inp input. Picking one loads the
@@ -104,6 +106,8 @@ export default function HomeSection({ onEditInBuild }) {
     setProgress(null)
     setDisplayedPdbUrl(null)
     setActiveSource(null)   // back to the default tab (aligner if present, else prediction)
+    firstShownRef.current = false   // next run shows its first streamed model fresh
+    userPickedRef.current = false   // and forgets any manual candidate pick
 
     // ── Example path ────────────────────────────────────────────────────────
     // A deposited example is loaded and the field still matches it → compute the
@@ -155,8 +159,44 @@ export default function HomeSection({ onEditInBuild }) {
             break
 
           case 'aligner_quadro_start':
-            setResult({ running: true })
+            setResult({ running: true, determination: event.determination ?? null })
             break
+
+          // A single topology model finished — show it right away instead of waiting for the whole
+          // set. The first successful one is loaded into the viewer; later ones just append as tabs.
+          // The final aligner_quadro_done overrides with the official winner + ElTetrado.
+          case 'aligner_quadro_candidate': {
+            const cand = event.candidate
+            if (!cand) break
+            setResult(prev => {
+              const base = prev ?? { running: true }
+              const existing = base.candidates ?? []
+              const candidates = existing.some(c => c.jobId === cand.jobId)
+                ? existing.map(c => (c.jobId === cand.jobId ? cand : c))
+                : [...existing, cand]
+              return { ...base, candidates }   // keep current running/success; don't revert the viewer
+            })
+            if (cand.success && !firstShownRef.current) {
+              firstShownRef.current = true
+              setSteps({ std: cand.stdBestStep ?? null, alt: cand.altBestStep ?? null })
+              fetchPipelinePdb(cand.jobId).then(pdbUrl => {
+                setResult(prev => prev ? {
+                  ...prev,
+                  running: false, success: true,
+                  jobId: cand.jobId, selectedJobId: cand.jobId,
+                  pdbUrl,
+                  stdEnergy: cand.stdEnergy, altEnergy: cand.altEnergy,
+                  winner: cand.winner, hasAlt: cand.hasAlt,
+                  stdFrames: cand.stdFrames ?? [], altFrames: cand.altFrames ?? [],
+                  stdBestStep: cand.stdBestStep ?? null, altBestStep: cand.altBestStep ?? null,
+                  displayVariant: cand.winner ?? 'standard',
+                  inpContent: cand.inpContent,
+                  loopNotation: cand.loopNotation,
+                } : prev)
+              })
+            }
+            break
+          }
 
           case 'aligner_quadro_done': {
             const { success, jobId, qrs, rnaStructure, stdEnergy, altEnergy, winner,
@@ -166,35 +206,50 @@ export default function HomeSection({ onEditInBuild }) {
                     eltetradoOutput, eltetradoError,
                     candidates, determination, topologyLabel, topologyRationale, loopNotation } = event
             if (success) {
-              setSteps({ std: stdBestStep ?? null, alt: altBestStep ?? null })
-              const fetchBoth = async () => {
-                const pdbUrl    = await fetchPipelinePdb(jobId)
-                const altPdbUrl = hasAlt ? await fetchPipelineAltPdb(jobId) : null
-                return { pdbUrl, altPdbUrl }
-              }
-              fetchBoth().then(({ pdbUrl, altPdbUrl }) => {
-                setResult({
-                  running: false, success: true, jobId, qrs,
-                  stdEnergy, altEnergy, winner, hasAlt,
-                  pdbUrl, altPdbUrl,
-                  stdFrames: stdFramesMeta ?? [],
-                  altFrames: altFramesMeta ?? [],
-                  stdBestStep: stdBestStep ?? null,
-                  altBestStep: altBestStep ?? null,
-                  combinedStructure: combinedStructure ?? null,
-                  displayVariant: winner ?? 'standard',
-                  inpContent, error: null,
-                  rnaStructure: rnaStructure ?? null,
-                  eltetradoOutput: eltetradoOutput ?? null,
-                  eltetradoError: eltetradoError ?? null,
-                  candidates: candidates ?? null,
-                  determination: determination ?? null,
-                  selectedJobId: jobId,
-                  topologyLabel: topologyLabel ?? null,
-                  topologyRationale: topologyRationale ?? null,
-                  loopNotation: loopNotation ?? null,
+              // Finalize: always merge in the full candidate set, determination, ElTetrado and the
+              // official winner's metadata — but DO NOT yank the viewer away from a model the user is
+              // already looking at (streamed first model or a tab they picked). Only auto-load the
+              // winner into the viewer when nothing has been shown, or when the user never picked.
+              setResult(prev => ({
+                ...(prev ?? {}),
+                running: false, success: true, qrs,
+                error: null,
+                rnaStructure: rnaStructure ?? prev?.rnaStructure ?? null,
+                eltetradoOutput: eltetradoOutput ?? null,
+                eltetradoError: eltetradoError ?? null,
+                candidates: candidates ?? prev?.candidates ?? null,
+                determination: determination ?? prev?.determination ?? null,
+                bestJobId: jobId,   // the lowest-energy winner (for reference / 'best' badge)
+              }))
+              if (!userPickedRef.current) {
+                // Show the winner by default (the official answer). This refetches its PDB by jobId
+                // so the viewer + downloads point at exactly this model.
+                firstShownRef.current = true
+                setSteps({ std: stdBestStep ?? null, alt: altBestStep ?? null })
+                setDisplayedPdbUrl(null)
+                const fetchBoth = async () => ({
+                  pdbUrl:    await fetchPipelinePdb(jobId),
+                  altPdbUrl: hasAlt ? await fetchPipelineAltPdb(jobId) : null,
                 })
-              })
+                fetchBoth().then(({ pdbUrl, altPdbUrl }) => {
+                  setResult(prev => prev ? {
+                    ...prev,
+                    jobId, selectedJobId: jobId,
+                    stdEnergy, altEnergy, winner, hasAlt,
+                    pdbUrl, altPdbUrl,
+                    stdFrames: stdFramesMeta ?? [],
+                    altFrames: altFramesMeta ?? [],
+                    stdBestStep: stdBestStep ?? null,
+                    altBestStep: altBestStep ?? null,
+                    combinedStructure: combinedStructure ?? null,
+                    displayVariant: winner ?? 'standard',
+                    inpContent,
+                    topologyLabel: topologyLabel ?? null,
+                    topologyRationale: topologyRationale ?? null,
+                    loopNotation: loopNotation ?? null,
+                  } : prev)
+                })
+              }
             } else {
               setResult({
                 running: false, success: false, qrs, error: error ?? 'Unknown error',
@@ -294,19 +349,32 @@ export default function HomeSection({ onEditInBuild }) {
     : 'idle'
 
   // ── Download handlers ─────────────────────────────────────────────────────
+  // Downloads must match the model CURRENTLY shown in the viewer, not the primary/winner. The shown
+  // model is the selected candidate (by selectedJobId); fall back to the top-level result fields.
+  const shownCand = result?.candidates?.find(c => c.jobId === result.selectedJobId) ?? null
+  // A filesystem-safe slug from the topology label/notation so each model downloads under its own name.
+  const modelSlug = (() => {
+    const name = (shownCand?.label ?? result?.topologyLabel ?? '').split(' (')[0]
+    const tag = name || shownCand?.loopNotation || result?.loopNotation || 'structure'
+    return tag.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'structure'
+  })()
+
   function handleDownloadInp() {
-    if (!result?.inpContent) return
-    downloadInp(result.inpContent, 'structure')
+    const inp = shownCand?.inpContent ?? result?.inpContent
+    if (!inp) return
+    downloadInp(inp, modelSlug)
   }
 
   function handleDownloadPdb() {
+    // activePdbUrl is exactly the blob rendered in Mol*, so it is by definition the shown model
+    // (and the shown frame, if one is selected).
     if (!activePdbUrl) return
     const engine = displayVariant === 'alternative' ? 'alt' : 'std'
     const step   = steps[engine] ?? null
     const suffix = step && frames.length > 1 ? `${engine}_${step}` : engine
     const a = document.createElement('a')
     a.href     = activePdbUrl
-    a.download = `structure_${suffix}.pdb`
+    a.download = `${modelSlug}_${suffix}.pdb`
     a.click()
   }
 
@@ -326,6 +394,7 @@ export default function HomeSection({ onEditInBuild }) {
   // has its own jobId / PDB / frames stored server-side, so we just refetch by jobId.
   const selectCandidate = useCallback(async (c) => {
     if (!c || !c.success || !c.jobId) return
+    userPickedRef.current = true   // user chose this tab — the final 'done' must not override it
     const pdbUrl    = await fetchPipelinePdb(c.jobId)
     const altPdbUrl = c.hasAlt ? await fetchPipelineAltPdb(c.jobId) : null
     frameCacheRef.current = {}
@@ -426,6 +495,25 @@ export default function HomeSection({ onEditInBuild }) {
       {/* ── Results panel ────────────────────────────────────────────────── */}
       {(phase !== 'idle') && (
         <div className={styles.resultsPanel}>
+          {/* Processing indicator — shown only once the first structure is on screen (the viewer is
+              in its 'done' state). Before that the viewer shows its own progress overlay, so gating on
+              an already-displayed model avoids two progress bars at the same time. */}
+          {phase === 'running' && result?.success && activePdbUrl && (
+            <div className={styles.processingStrip}>
+              <span className={styles.procSpinner} />
+              <span className={styles.procLabel}>{progress?.label || 'Processing…'}</span>
+              <span className={styles.procBar}>
+                <span className={styles.procBarFill}
+                      style={{ width: `${Math.round(Math.min(Math.max(progress?.percent ?? 0, 0), 100))}%` }} />
+              </span>
+              {result?.candidates?.length > 0 && (
+                <span className={styles.procCount}>
+                  {result.candidates.filter(c => c.success).length} model(s) ready
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Action bar */}
           {result?.success && (
             <div className={styles.actionBar}>
@@ -860,7 +948,8 @@ function TopologySelection({ determination, candidates = [], selectedJobId }) {
   const head = { ...cell, fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.5 }
   const loops = determination?.loops
   const aRich = determination?.aRichLoops ?? []
-  const builtCount = rows.filter(r => r.built).length
+  // Only the folds actually sent to Quadro are shown — the ruled-out / below-cutoff ones are dropped.
+  const modeledRows = rows.filter(r => r.built)
 
   return (
     <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px' }}>
@@ -888,20 +977,6 @@ function TopologySelection({ determination, candidates = [], selectedJobId }) {
         </div>
       )}
 
-      <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 10px', lineHeight: 1.5 }}>
-        The candidate set is restricted to the <strong>canonical Webba da Silva topologies</strong>
-        (experimentally observed folds) and filtered by loop-length sterics — only folds that can
-        thread all four G-tracts survive. Each is scored as <strong>likelihood × nature</strong>: the
-        loop-length likelihood (per-loop priors, RNA gate, A-track effect) times the
-        <strong>natural-occurrence prior</strong> P(topology) measured from deposited G4 structures
-        (parallel P-P-P ≈ 51%). The <strong>probability</strong> below is that score normalised over the
-        admissible space (a heuristic prior, not a calibrated probability). The top folds — <strong>plus
-        any tied at the cutoff</strong>, so equally-ranked topologies are never dropped — are built with
-        Quadro ({builtCount} here); the model with the <strong>lowest energy</strong> (kcal/mol) is
-        selected. Folds that were ruled out (sterically impossible, forbidden combination, can't thread,
-        or penalised to ≤0) are listed at <strong>0%</strong> with the reason.
-      </p>
-
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--mono)' }}>
           <thead>
@@ -915,7 +990,7 @@ function TopologySelection({ determination, candidates = [], selectedJobId }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => {
+            {modeledRows.map((r, i) => {
               const c        = r.cand
               const excluded = !!r.excludedReason
               const e        = c?.success && c.stdEnergy != null ? Number(c.stdEnergy) : null
@@ -957,46 +1032,6 @@ function TopologySelection({ determination, candidates = [], selectedJobId }) {
           </tbody>
         </table>
       </div>
-
-      {/* How the winner was scored — the explicit probability arithmetic for the selected fold. */}
-      {(() => {
-        const winner = rows.find(r =>
-          r.cand?.success && bestEnergy != null && Number(r.cand.stdEnergy) === bestEnergy)
-        if (!winner) return null
-        return (
-          <div style={{
-            marginTop: 12, padding: '10px 12px', background: 'var(--teal-light)',
-            border: '1px solid var(--teal)', borderRadius: 6, fontSize: 12, lineHeight: 1.6,
-          }}>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>
-              How the winner was scored — {(winner.label || '').split(' (')[0]} ({winner.notation})
-            </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{winner.rationale}</div>
-            <div style={{ marginTop: 4 }}>
-              → normalised over {builtCount} admissible folds = <strong>{winner.probability}%</strong> prior probability.
-              It was then <strong>selected by lowest minimised energy</strong> ({Number(winner.cand.stdEnergy).toFixed(1)} kcal/mol):
-              the loop-prior probability ranks candidates a priori, the computed energy decides the winner.
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* Per-topology rationale: the same loop-prior arithmetic for every admissible fold. */}
-      {rows.some(r => r.rationale) && (
-        <details style={{ marginTop: 10 }}>
-          <summary style={{ fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer' }}>
-            Loop-prior breakdown for every fold
-          </summary>
-          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {rows.filter(r => r.rationale).map((r, i) => (
-              <div key={r.notation || i} style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-                <strong style={{ color: 'var(--text)' }}>{(r.label || '').split(' (')[0]}</strong>
-                {r.notation ? ` (${r.notation})` : ''} — {r.rationale}
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
     </div>
   )
 }

@@ -38,7 +38,7 @@ public sealed class QuadroOptions
     /// które przepuszczamy przez quadro (wg rankingu alignera, od najlepszego). Najniższa
     /// energia wygrywa. Większa wartość = dokładniej, ale wolniej (każdy to osobna minimalizacja).
     /// </summary>
-    public int OnquadroCandidateLimit { get; set; } = 3;
+    public int OnquadroCandidateLimit { get; set; } = 8;
 
     /// <summary>Katalog wewnątrz kontenera, w którym wykonuje się quadroXX.exe.</summary>
     public string ContainerWorkDirectory { get; set; } = "/opt/bin";

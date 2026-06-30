@@ -70,30 +70,40 @@ public sealed class PipelineController : ControllerBase
         Response.Headers["X-Accel-Buffering"] = "no";
         Response.Headers["Connection"]        = "keep-alive";
 
-        var sequence = request?.Sequence?.Trim() ?? string.Empty;
-        if (string.IsNullOrEmpty(sequence))
+        try
         {
-            await SendEventAsync("error", new { type = "error", message = "Sequence is required." }, cancellationToken);
-            return;
-        }
+            var sequence = request?.Sequence?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(sequence))
+            {
+                await SendEventAsync("error", new { type = "error", message = "Sequence is required." }, cancellationToken);
+                return;
+            }
 
-        // Reject ambiguous input (e.g. an uppercase-T sequence) up front so the molecule is
-        // unambiguous: UPPERCASE = RNA (A,C,G,U), lowercase = DNA (a,c,g,t). Without this, an
-        // uppercase-T "RNA" sequence is silently treated as DNA and DNA/RNA runs look identical.
-        var seqErrors = Validation.QuadroInputValidator.ValidateSequenceChars(sequence);
-        if (seqErrors.Count > 0)
+            // Reject ambiguous input (e.g. an uppercase-T sequence) up front so the molecule is
+            // unambiguous: UPPERCASE = RNA (A,C,G,U), lowercase = DNA (a,c,g,t). Without this, an
+            // uppercase-T "RNA" sequence is silently treated as DNA and DNA/RNA runs look identical.
+            var seqErrors = Validation.QuadroInputValidator.ValidateSequenceChars(sequence);
+            if (seqErrors.Count > 0)
+            {
+                await SendEventAsync("error", new { type = "error", message = string.Join(" ", seqErrors) }, cancellationToken);
+                return;
+            }
+
+            await SendEventAsync("start", new { type = "start" }, cancellationToken);
+
+            await SendProgressAsync("rnafold", "Folding RNA secondary structure (ViennaRNA)", 8, cancellationToken);
+            var rnaResult = await RunViennaRnaAsync(sequence, cancellationToken);
+            await RunOnquadroAsync(sequence, rnaResult.Success ? rnaResult.Structure : null, cancellationToken);
+
+            await SendEventAsync("complete", new { type = "complete" }, cancellationToken);
+        }
+        catch (OperationCanceledException)
         {
-            await SendEventAsync("error", new { type = "error", message = string.Join(" ", seqErrors) }, cancellationToken);
-            return;
+            // The client closed the SSE stream (navigated away, hit Stop, or the request was
+            // aborted). This is expected for a streaming endpoint — swallow it so it doesn't surface
+            // as an unhandled TaskCanceledException. Any in-flight Docker job is cancelled via the token.
+            _logger.LogDebug("Pipeline SSE stream cancelled by the client");
         }
-
-        await SendEventAsync("start", new { type = "start" }, cancellationToken);
-
-        await SendProgressAsync("rnafold", "Folding RNA secondary structure (ViennaRNA)", 8, cancellationToken);
-        var rnaResult = await RunViennaRnaAsync(sequence, cancellationToken);
-        await RunOnquadroAsync(sequence, rnaResult.Success ? rnaResult.Structure : null, cancellationToken);
-
-        await SendEventAsync("complete", new { type = "complete" }, cancellationToken);
     }
 
     // ── PDB retrieval ─────────────────────────────────────────────────────────
@@ -331,7 +341,7 @@ public sealed class PipelineController : ControllerBase
         string? rnaStructure, CancellationToken ct)
     {
         await SendEventAsync("aligner_quadro_start",
-            new { type = "aligner_quadro_start", tool = label, qrs }, ct);
+            new { type = "aligner_quadro_start", tool = label, qrs, determination }, ct);
 
         if (candidates.Count == 0)
         {
@@ -359,7 +369,19 @@ public sealed class PipelineController : ControllerBase
             var pct = 30 + ((k - 1) / (double)toRun.Count) * 60;
             await SendProgressAsync("modeling",
                 $"Modeling topology {k}/{toRun.Count}: {cand.Label.Split(" (")[0]}", pct, ct, cand.LoopNotation);
-            runs.Add(await RunOneCandidateAsync(label, cand, source, ct));
+            var run = await RunOneCandidateAsync(label, cand, source, ct);
+            runs.Add(run);
+            // Stream each finished model the moment it is built, so the UI can show it and start the
+            // analysis without waiting for the whole set. The final aligner_quadro_done still arrives
+            // with the winner + ElTetrado; these incremental events just fill the tabs/viewer early.
+            await SendEventAsync("aligner_quadro_candidate", new
+            {
+                type      = "aligner_quadro_candidate",
+                tool      = label,
+                index     = k,
+                total     = toRun.Count,
+                candidate = ProjectCandidate(run),
+            }, ct);
         }
 
         object ProjectCandidate(CandidateRun r) => new

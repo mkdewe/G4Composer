@@ -21,6 +21,32 @@ public sealed class OnquadroService : IOnquadroService
 
     public async Task<OnquadroResult> AlignAsync(string sequence, CancellationToken ct)
     {
+        var molecule = DetectMolecule(sequence);
+        var result = await RunAlignerAsync(sequence, molecule, ct);
+
+        // The --molecule filter restricts the template database to a single nucleic-acid type. Some
+        // folds only have a template of the OTHER type — e.g. 4-tetrad G4s are almost all RNA (the
+        // only DB template is 6k84) — so a strict DNA query legitimately returns nothing even though
+        // a usable cross-type template exists. When a filtered search finds nothing, retry once
+        // WITHOUT --molecule (both databases) so we still surface the closest geometric template;
+        // the energy minimisation adapts the sugar/backbone afterwards.
+        if (molecule is not null && result.Success
+            && result.Matches.Count == 0 && (result.InpCandidates?.Count ?? 0) == 0)
+        {
+            _logger.LogInformation(
+                "onquadro: no {Molecule} template matched '{Seq}'; retrying without --molecule (both DBs)",
+                molecule, sequence);
+            var broadened = await RunAlignerAsync(sequence, null, ct);
+            if (broadened.Success
+                && (broadened.Matches.Count > 0 || (broadened.InpCandidates?.Count ?? 0) > 0))
+                return broadened;
+        }
+        return result;
+    }
+
+    // Runs the aligner once for the given molecule filter (null = no --molecule, search both DBs).
+    private async Task<OnquadroResult> RunAlignerAsync(string sequence, string? molecule, CancellationToken ct)
+    {
         // Mount a host work dir into the container so the aligner can drop its CSV and the
         // ranked g4composer .inp files (--g4composer-output-dir). We still read CSV from stdout
         // as a fallback when the mount is unavailable.
@@ -28,8 +54,7 @@ public sealed class OnquadroService : IOnquadroService
         Directory.CreateDirectory(workDir);
         try
         {
-            var mount    = workDir.Replace('\\', '/');
-            var molecule = DetectMolecule(sequence);
+            var mount = workDir.Replace('\\', '/');
 
             var args = new List<string>
                 { "run", "--rm", "-v", $"{mount}:/work", "onquadro-aligner:latest", sequence };

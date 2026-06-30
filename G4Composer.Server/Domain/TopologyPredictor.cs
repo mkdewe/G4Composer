@@ -39,6 +39,10 @@ public static class TopologyPredictor
     // Bounded so a permissive loop length (many admissible subtypes) does not spawn dozens of runs.
     public const int ModelCap = 10;
 
+    // Folds whose normalised prior rounds to 0% (the UI shows Probability to 0.1%) are not worth a
+    // Quadro run — exclude them from the modelled set. Parallel is exempt (always modelled).
+    private const double MinModelProb = 0.0005;
+
     // ── Empirical loop-type probability grid P(type | position, length) ───────────────
     // Rows = loop length 0..6 (index 6 = tail bin, length ≥6). Columns = {Propeller, Lateral,
     // Diagonal} (LoopType enum order). A 0 entry is sterically forbidden and keeps any fold using
@@ -133,7 +137,11 @@ public static class TopologyPredictor
     // long loops can rank parallel out of the modelled window entirely.
     private static List<ScoredCandidate> ModeledFolds(IReadOnlyList<ScoredCandidate> ranked)
     {
-        var top = ranked.Take(ModelCap).ToList();
+        // Skip folds with a negligible prior (rounds to 0%); they only waste a Quadro run. Parallel
+        // stays eligible regardless so the energy still decides on the canonical baseline.
+        var top = ranked
+            .Where(s => s.Prob >= MinModelProb || s.Candidate.LoopNotation == ParallelNotation)
+            .Take(ModelCap).ToList();
         if (top.Any(s => s.Candidate.LoopNotation == ParallelNotation)) return top;
 
         var parallel = ranked.FirstOrDefault(s => s.Candidate.LoopNotation == ParallelNotation);

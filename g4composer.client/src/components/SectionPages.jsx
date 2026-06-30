@@ -39,7 +39,7 @@ export function DocsSection() {
             <table className={styles.docsTable}>
               <thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
               <tbody>
-                <tr><td><code className={styles.tag}>A B C D</code></td><td>Strand label for tetrad-forming residue</td></tr>
+                <tr><td><code className={styles.tag} style={{ whiteSpace: 'nowrap' }}>A B C D</code></td><td>Strand label for tetrad-forming residue</td></tr>
                 <tr><td><code className={styles.tag}>.</code></td><td>Loop / unpaired residue</td></tr>
                 <tr><td><code className={styles.tag}>( )</code></td><td>Watson–Crick base pair</td></tr>
                 <tr><td><code className={styles.tag}>[ ]</code></td><td>Pseudoknot pair</td></tr>

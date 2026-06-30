@@ -549,8 +549,10 @@ export default function HomeSection({ onEditInBuild }) {
             </div>
           )}
 
-          {/* Topology candidates — two groups: ONQuadro aligner (default) vs sequence prediction */}
-          {result?.success && result.candidates && result.candidates.length > 1 && (() => {
+          {/* Topology candidates — two groups: ONQuadro aligner (default) vs sequence prediction.
+              Shown from the FIRST candidate (>0, not >1) so its button appears the moment it streams
+              in, rather than only once a second model arrives. */}
+          {result?.success && result.candidates && result.candidates.length > 0 && (() => {
             const cands        = result.candidates
             const alignerCands = cands.filter(c => c.source === 'aligner')
             const predCands    = cands.filter(c => c.source !== 'aligner')
@@ -726,19 +728,24 @@ export default function HomeSection({ onEditInBuild }) {
               <summary className={styles.inpSummary}>Analysis</summary>
 
               {/* Topology selection — how the candidate set was determined + why this model won */}
-              {(result.determination || result.candidates?.length > 0) && (
+              {/* Sequence-prediction folds, scored energetically on their OWN. The determination is
+                  the prediction space, so only prediction-source candidates feed its energies — the
+                  aligner group is evaluated separately below. */}
+              {(result.determination || (result.candidates ?? []).some(c => c.source !== 'aligner')) && (
                 <TopologySelection
                   determination={result.determination}
-                  candidates={result.candidates ?? []}
+                  candidates={(result.candidates ?? []).filter(c => c.source !== 'aligner')}
                   selectedJobId={result.selectedJobId}
                 />
               )}
 
-              {/* Experimental templates the ONQuadro aligner matched — real deposited G4 structures
-                  that ground the model. Shown as biological reference examples, without prior
-                  probabilities (those belong to the sequence predictor, not to observed structures). */}
+              {/* ONQuadro aligner templates — deposited PDB folds, evaluated energetically on their
+                  OWN (their own lowest-energy winner), separate from the prediction group above. */}
               {(result.candidates ?? []).some(c => c.source === 'aligner') && (
-                <AlignerExamples candidates={result.candidates.filter(c => c.source === 'aligner')} />
+                <AlignerExamples
+                  candidates={result.candidates.filter(c => c.source === 'aligner')}
+                  selectedJobId={result.selectedJobId}
+                />
               )}
 
               {/* Info strip: QRS + ViennaRNA */}
@@ -852,7 +859,7 @@ function TopoScroller({ children }) {
 // deposited G4 structures — shown as biological reference points for the predicted fold. Deliberately
 // no prior probabilities / percentages here: those are properties of the sequence predictor, whereas
 // these are observed structures the template-geometry models were literally built from.
-function AlignerExamples({ candidates = [] }) {
+function AlignerExamples({ candidates = [], selectedJobId }) {
   if (!candidates.length) return null
   // Template names look like "6w9p-assembly1"; the leading 4 chars are the RCSB PDB id.
   const pdbId = label => (label || '').split(' (')[0].slice(0, 4).toUpperCase()
@@ -865,6 +872,10 @@ function AlignerExamples({ candidates = [] }) {
     tract:  /tract_distance=(-?[\d.]+)/i.exec(r.rationale || '')?.[1] ?? null,
     linker: /linker_score=(-?[\d.]+)/i.exec(r.rationale || '')?.[1] ?? null,
   })
+  // Energetics evaluated WITHIN the aligner group only — its own lowest-energy winner, independent
+  // of the sequence-prediction group.
+  const okEnergies = candidates.filter(c => c.success && c.stdEnergy != null).map(c => Number(c.stdEnergy))
+  const bestEnergy = okEnergies.length ? Math.min(...okEnergies) : null
   const cell = { padding: '6px 9px', borderBottom: '1px solid var(--border)', verticalAlign: 'top', whiteSpace: 'nowrap' }
   const head = { ...cell, fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.5 }
 
@@ -875,9 +886,11 @@ function AlignerExamples({ candidates = [] }) {
       </div>
       <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 10px', lineHeight: 1.5 }}>
         Deposited PDB G-quadruplexes the aligner matched to this sequence — the real folds the
-        template-geometry models were built from. One template per topology is kept (the best match);
+        template-geometry models were built from. One template per topology is kept (the best match).
         <strong> tract dist.</strong> (Å, lower = better G-tract fit) and <strong>linker</strong> score
-        (higher = better) are the aligner's match quality.
+        (higher = better) are the aligner's match quality; <strong>E std</strong> is each model's
+        minimised energy — the <strong>lowest energy wins this group</strong>, evaluated separately
+        from the sequence-prediction folds above.
       </p>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--mono)' }}>
@@ -888,6 +901,8 @@ function AlignerExamples({ candidates = [] }) {
               <th style={{ ...head, textAlign: 'left' }}>Loops</th>
               <th style={{ ...head, textAlign: 'right' }} title="G-tract superposition distance (Å) — lower is a better fit">Tract dist.</th>
               <th style={{ ...head, textAlign: 'right' }} title="Loop/linker compatibility — higher is better">Linker</th>
+              <th style={{ ...head, textAlign: 'right' }}>E std</th>
+              <th style={{ ...head, textAlign: 'right' }}>ΔE vs best</th>
               <th style={{ ...head, textAlign: 'left' }}>Viability</th>
             </tr>
           </thead>
@@ -895,19 +910,31 @@ function AlignerExamples({ candidates = [] }) {
             {candidates.map((c, i) => {
               const id = pdbId(c.label)
               const { loops, viab, tract, linker } = detail(c)
+              const e      = c.success && c.stdEnergy != null ? Number(c.stdEnergy) : null
+              const isBest = e != null && bestEnergy != null && e === bestEnergy
+              const delta  = e != null && bestEnergy != null ? e - bestEnergy : null
+              const isShown = c.jobId && c.jobId === selectedJobId
               return (
-                <tr key={c.jobId || i}>
-                  <td style={cell}>
+                <tr key={c.jobId || i} style={{ background: isBest ? 'var(--teal-light)' : 'transparent' }}>
+                  <td style={{ ...cell, fontWeight: isBest ? 700 : 400 }}>
                     <a href={`https://www.rcsb.org/structure/${id}`} target="_blank" rel="noreferrer"
                        style={{ color: 'var(--teal)', textDecoration: 'none' }}
                        title={`Open ${id} on RCSB PDB`}>
                       {(c.label || '').split(' (')[0]}
                     </a>
+                    {isShown && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--teal-dark)' }}>(shown)</span>}
+                    {isBest && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--teal-dark)', fontWeight: 700 }}>★</span>}
                   </td>
                   <td style={cell}>{c.loopNotation || '—'}</td>
                   <td style={cell}>{loops || '—'}</td>
                   <td style={{ ...cell, textAlign: 'right' }}>{tract ?? '—'}</td>
                   <td style={{ ...cell, textAlign: 'right' }}>{linker ?? '—'}</td>
+                  <td style={{ ...cell, textAlign: 'right' }}>
+                    {e != null ? e.toFixed(1) : (c.success === false ? 'no model' : '—')}
+                  </td>
+                  <td style={{ ...cell, textAlign: 'right' }}>
+                    {delta == null ? '—' : isBest ? '0.0' : `+${delta.toFixed(1)}`}
+                  </td>
                   <td style={{ ...cell, fontFamily: 'var(--sans)' }}>{viab || 'n/a'}</td>
                 </tr>
               )

@@ -104,6 +104,19 @@ public sealed class QuadroInputValidator : IValidator<QuadroInput>
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Validates just the nucleotide sequence (case/character rules) without needing a full
+    /// <see cref="QuadroInput"/>. Used by the pipeline endpoint so an ambiguous input like an
+    /// uppercase-T sequence is rejected with a clear message instead of being silently coerced
+    /// to DNA. Returns the (possibly empty) list of errors.
+    /// </summary>
+    public static IReadOnlyList<string> ValidateSequenceChars(string? sequence)
+    {
+        var errors = new List<string>();
+        ValidateSequence(sequence, errors);
+        return errors;
+    }
+
     private static void ValidateSequence(string? sequence, List<string> errors)
     {
         if (string.IsNullOrWhiteSpace(sequence))

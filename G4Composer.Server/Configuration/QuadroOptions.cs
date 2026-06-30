@@ -33,6 +33,13 @@ public sealed class QuadroOptions
     /// <summary>Limit czasu wykonania pojedynczego joba (sekundy).</summary>
     public int TimeoutSeconds { get; set; } = 300;
 
+    /// <summary>
+    /// Maksymalna liczba gotowych kandydatów .inp z ONQuadro (--g4composer-output-dir),
+    /// które przepuszczamy przez quadro (wg rankingu alignera, od najlepszego). Najniższa
+    /// energia wygrywa. Większa wartość = dokładniej, ale wolniej (każdy to osobna minimalizacja).
+    /// </summary>
+    public int OnquadroCandidateLimit { get; set; } = 3;
+
     /// <summary>Katalog wewnątrz kontenera, w którym wykonuje się quadroXX.exe.</summary>
     public string ContainerWorkDirectory { get; set; } = "/opt/bin";
 

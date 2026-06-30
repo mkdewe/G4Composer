@@ -141,7 +141,7 @@ public static class G4TopologyGenerator
         var chi       = new string('.', sequence.Length);
         var shugar    = BuildShugar(sequence);
 
-        bool isRna = sequence.Any(char.IsUpper);
+        bool isRna = TetradsAreRna(sequence, gTracts, n);
 
         // Antiparallel lateral loops (Lw/Ln) need ≥2 nt to span the groove.
         // For DNA, fall back to parallel propeller when any loop is too short.
@@ -253,7 +253,7 @@ public static class G4TopologyGenerator
             ordered[3].Start - (ordered[2].Start + ordered[2].Length),
         }.Select(l => Math.Max(0, l)).ToArray();
 
-        bool isRna = sequence.Any(char.IsUpper);
+        bool isRna = TetradsAreRna(sequence, gTracts, n);
         var aRich = Enumerable.Range(0, 3)
             .Select(i => IsATrack(sequence, ordered[i].Start + ordered[i].Length, loops[i]))
             .ToArray();
@@ -292,6 +292,26 @@ public static class G4TopologyGenerator
         }
 
         return new CandidateSet(result, determination);
+    }
+
+    // RNA/DNA for the parallel-forcing gate is driven by the sugar pucker of the G-TETRAD
+    // guanines (RNA 2'-OH / C3'-endo → parallel), not by residues in loops/flanks. For hybrid
+    // DNA/RNA quadruplexes the tetrad Gs decide: uppercase G = RNA, lowercase g = DNA. Using the
+    // whole sequence's case would wrongly force a parallel fold whenever any loop residue is RNA.
+    private static bool TetradsAreRna(
+        string sequence, IReadOnlyList<(int Start, int Length)> gTracts, int nTetrads)
+    {
+        int rna = 0, total = 0;
+        foreach (var (start, length) in gTracts)
+            for (int k = 0; k < Math.Min(nTetrads, length); k++)
+            {
+                int pos = start + k;
+                if (pos < 0 || pos >= sequence.Length) continue;
+                if (char.ToLowerInvariant(sequence[pos]) != 'g') continue;
+                total++;
+                if (char.IsUpper(sequence[pos])) rna++;
+            }
+        return total > 0 && rna * 2 >= total;   // tetrad G-core is predominantly RNA
     }
 
     // A loop is "A-rich" (rigid, resists lateral/diagonal folding) when ≥50% of its residues
@@ -464,7 +484,7 @@ public static class G4TopologyGenerator
         var chi    = new string('.', matchedSequence.Length);
         var shugar = BuildShugar(matchedSequence);
 
-        bool isRna = matchedSequence.Any(char.IsUpper);
+        bool isRna = TetradsAreRna(matchedSequence, gTracts, n);
 
         int loopLen1 = runPos[1].Start - (runPos[0].Start + runPos[0].Len);
         int loopLen2 = runPos[2].Start - (runPos[1].Start + runPos[1].Len);

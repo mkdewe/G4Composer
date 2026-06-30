@@ -73,7 +73,17 @@ public sealed class PipelineController : ControllerBase
         var sequence = request?.Sequence?.Trim() ?? string.Empty;
         if (string.IsNullOrEmpty(sequence))
         {
-            await SendEventAsync("error", new { message = "Sequence is required." }, cancellationToken);
+            await SendEventAsync("error", new { type = "error", message = "Sequence is required." }, cancellationToken);
+            return;
+        }
+
+        // Reject ambiguous input (e.g. an uppercase-T sequence) up front so the molecule is
+        // unambiguous: UPPERCASE = RNA (A,C,G,U), lowercase = DNA (a,c,g,t). Without this, an
+        // uppercase-T "RNA" sequence is silently treated as DNA and DNA/RNA runs look identical.
+        var seqErrors = Validation.QuadroInputValidator.ValidateSequenceChars(sequence);
+        if (seqErrors.Count > 0)
+        {
+            await SendEventAsync("error", new { type = "error", message = string.Join(" ", seqErrors) }, cancellationToken);
             return;
         }
 
@@ -106,6 +116,25 @@ public sealed class PipelineController : ControllerBase
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    // Maps an aligner .inp candidate onto the GeneratedTopology shape consumed by the shared
+    // candidate runner, so the existing modelling and UI path is reused unchanged.
+    private static G4TopologyGenerator.GeneratedTopology ToGeneratedTopology(OnquadroInpCandidate c)
+    {
+        // The aligner reports the matched template's topology (e.g. "-p-p-p") and loop lengths.
+        // The UI renders GeneratedTopology.LoopNotation as the topology shown in parentheses, so the
+        // topology — not the loop lengths — must go there; loop lengths are surfaced in the rationale.
+        // Uppercased to match the app's Silva notation convention (-P-P-P, -L-L-L, …).
+        var topology   = string.IsNullOrEmpty(c.Topology) ? "?" : c.Topology.ToUpperInvariant();
+        var viability  = string.IsNullOrEmpty(c.Viability) ? "n/a" : c.Viability;
+        var label      = $"{c.Template} ({topology})";
+        var loops      = string.IsNullOrEmpty(c.LoopLengths) ? "" : $"loops {c.LoopLengths}; ";
+        var rationale  =
+            $"Experimental template {c.Template} (ONQuadro/PDB): {loops}" +
+            $"tract_distance={c.TractDistance:0.##}, linker_score={c.LinkerScore:0.##}, viability={viability}";
+        return new G4TopologyGenerator.GeneratedTopology(
+            c.Input, label, viability, rationale, topology);
+    }
+
     private async Task RunOnquadroAsync(string sequence, string? rnaStructure, CancellationToken ct)
     {
         OnquadroResult? result = null;
@@ -123,6 +152,49 @@ public sealed class PipelineController : ControllerBase
         {
             _logger.LogError(ex, "onquadro-aligner failed");
             failReason = $"onquadro-aligner: {ex.Message}";
+        }
+
+        // Prefer the aligner's ready-made g4composer .inp candidates: they carry the matched
+        // template's real geometry (orient/rise/twist/path), which models far better than
+        // reconstructing a topology from the QRS string. The QRS and gqrs paths below remain
+        // as fallbacks when the aligner produced no .inp output.
+        var inpCandidates = result?.InpCandidates ?? [];
+        if (result is { Success: true } && inpCandidates.Count > 0)
+        {
+            var ranked = inpCandidates.OrderBy(c => c.Rank).ToList();
+
+            // Group 1 (default tab): the aligner's ready-made .inp folds — real PDB-template geometry.
+            // One template per distinct topology: the aligner often returns several PDB matches that
+            // fold the same way (e.g. multiple -P-P-P entries), and modelling duplicates just wastes
+            // Quadro runs and clutters the tab. Keep the best-ranked (lowest tract_distance, since
+            // `ranked` is already sorted by Rank) representative of each topology.
+            // TODO: replace this "one per topology" rule with a tract_distance/linker_score threshold.
+            var byTopology = ranked
+                .GroupBy(c => (c.Topology ?? "").ToUpperInvariant())
+                .Select(g => g.First())
+                .Take(Math.Max(1, _options.OnquadroCandidateLimit))
+                .ToList();
+
+            var toModel = byTopology
+                .Select(c => (Cand: ToGeneratedTopology(c), Source: SourceAligner))
+                .ToList();
+
+            // Group 2 (second tab): ALWAYS also run our sequence-based topology prediction, so the
+            // user can compare the template match against the canonical-Silva predictions even when
+            // the aligner returned a hit. Energy still decides within each group; the aligner group
+            // is the primary one shown.
+            var predicted = G4TopologyGenerator.GenerateCandidates("GQ", sequence, rnaStructure);
+            toModel.AddRange(predicted.Topologies.Select(t => (Cand: t, Source: SourcePrediction)));
+
+            _logger.LogInformation(
+                "Modelling {Total} candidate(s): {Aligner} ONQuadro topolog(ies) deduped from {Found} match(es) (top {Template}) + {Pred} prediction(s)",
+                toModel.Count, byTopology.Count, ranked.Count, ranked[0].Template, predicted.Count);
+
+            // The .inp structure line ('^' = matched tetrad Gs) doubles as the QRS display.
+            var qrsDisplay = toModel[0].Cand.Input.Structure ?? "";
+            await RunQuadroCandidatesAndEmitAsync(
+                "GQ", qrsDisplay, toModel, predicted.Determination, rnaStructure, ct);
+            return;
         }
 
         // Best match: tract_distance = 0, highest linker_score
@@ -170,7 +242,8 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        await RunQuadroCandidatesAndEmitAsync("GQ", best.Qrs, candidates.Topologies, candidates.Determination, matchRnaStructure, ct);
+        var qrsCandidates = candidates.Topologies.Select(t => (Cand: t, Source: SourceAligner)).ToList();
+        await RunQuadroCandidatesAndEmitAsync("GQ", best.Qrs, qrsCandidates, candidates.Determination, matchRnaStructure, ct);
     }
 
     // Fallback when the ONQuadro aligner finds no similar structure in the database:
@@ -242,7 +315,9 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        await RunQuadroCandidatesAndEmitAsync(label, qrs, candidates.Topologies, candidates.Determination, rnaStructure, ct);
+        var predictionCandidates = candidates.Topologies
+            .Select(t => (Cand: t, Source: SourcePrediction)).ToList();
+        await RunQuadroCandidatesAndEmitAsync(label, qrs, predictionCandidates, candidates.Determination, rnaStructure, ct);
     }
 
     // Runs Quadro on every predicted topology candidate and streams a single
@@ -251,7 +326,7 @@ public sealed class PipelineController : ControllerBase
     // Shared by the ONQuadro-aligner path and the gqrs fallback path.
     private async Task RunQuadroCandidatesAndEmitAsync(
         string label, string qrs,
-        IReadOnlyList<G4TopologyGenerator.GeneratedTopology> candidates,
+        IReadOnlyList<(G4TopologyGenerator.GeneratedTopology Cand, string Source)> candidates,
         TopologyDetermination? determination,
         string? rnaStructure, CancellationToken ct)
     {
@@ -276,7 +351,7 @@ public sealed class PipelineController : ControllerBase
         await SendProgressAsync("topology", $"Building {toRun.Count} topology model(s)", 30, ct);
         var runs = new List<CandidateRun>();
         var k = 0;
-        foreach (var cand in toRun)
+        foreach (var (cand, source) in toRun)
         {
             k++;
             // Modeling spans 30%→90% — one increment per model, so the bar advances through the
@@ -284,7 +359,7 @@ public sealed class PipelineController : ControllerBase
             var pct = 30 + ((k - 1) / (double)toRun.Count) * 60;
             await SendProgressAsync("modeling",
                 $"Modeling topology {k}/{toRun.Count}: {cand.Label.Split(" (")[0]}", pct, ct, cand.LoopNotation);
-            runs.Add(await RunOneCandidateAsync(label, cand, ct));
+            runs.Add(await RunOneCandidateAsync(label, cand, source, ct));
         }
 
         object ProjectCandidate(CandidateRun r) => new
@@ -294,6 +369,7 @@ public sealed class PipelineController : ControllerBase
             confidence        = r.Confidence,
             rationale         = r.Rationale,
             loopNotation      = r.LoopNotation,
+            source            = r.Source,
             success           = r.Success,
             error             = r.Error,
             stdEnergy         = r.StdEnergy,
@@ -327,8 +403,12 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        // Best = lowest standard energy (CYANA/Xplor — lower is better).
-        var best = succeeded.OrderBy(r => r.StdEnergy ?? double.PositiveInfinity).First();
+        // The primary (default-shown) model is the lowest-energy ONQuadro-aligner fold when the
+        // aligner produced any — that tab opens first. With no aligner result the prediction tab is
+        // primary. Lower standard energy = better (CYANA/Xplor).
+        var alignerSucceeded = succeeded.Where(r => r.Source == SourceAligner).ToList();
+        var primaryPool = alignerSucceeded.Count > 0 ? alignerSucceeded : succeeded;
+        var best = primaryPool.OrderBy(r => r.StdEnergy ?? double.PositiveInfinity).First();
 
         // ElTetrado on the winning model only (non-fatal).
         string? eltetradoOutput = null;
@@ -382,12 +462,17 @@ public sealed class PipelineController : ControllerBase
         bool Success, string? Error, string InpContent, string CombinedStructure,
         double? StdEnergy, double? AltEnergy, string Winner, bool HasAlt,
         object StdFrames, object AltFrames, int? StdBestStep, int? AltBestStep,
-        byte[]? StdPdb);
+        byte[]? StdPdb, string Source);
+
+    // Candidate provenance — drives the two UI tabs: the ONQuadro template match vs. our
+    // sequence-based topology prediction. "aligner" is shown by default.
+    private const string SourceAligner    = "aligner";
+    private const string SourcePrediction = "prediction";
 
     // Runs quadro for a single topology candidate, stores its PDB/frames under a fresh jobId,
     // and returns the data needed to surface it. Never throws — failures become a failed run.
     private async Task<CandidateRun> RunOneCandidateAsync(
-        string label, G4TopologyGenerator.GeneratedTopology cand, CancellationToken ct)
+        string label, G4TopologyGenerator.GeneratedTopology cand, string source, CancellationToken ct)
     {
         var jobId  = $"aq_{Guid.NewGuid():N}"[..16];
         var jobDir = Path.Combine(Path.GetTempPath(), $"g4_aligner_{jobId}");
@@ -400,7 +485,7 @@ public sealed class PipelineController : ControllerBase
             jobId, cand.Label, cand.Confidence, cand.Rationale, cand.LoopNotation,
             false, error, inpContent, combinedStructure,
             null, null, "standard", false,
-            Array.Empty<object>(), Array.Empty<object>(), null, null, null);
+            Array.Empty<object>(), Array.Empty<object>(), null, null, null, source);
 
         try
         {
@@ -435,7 +520,7 @@ public sealed class PipelineController : ControllerBase
                 result.Standard.Etotal, result.Alternative.Etotal, result.Winner ?? "standard", altOk,
                 stdFramesMeta, altFramesMeta,
                 result.Standard.BestFrame?.Step, result.Alternative.BestFrame?.Step,
-                result.Standard.Pdb);
+                result.Standard.Pdb, source);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {

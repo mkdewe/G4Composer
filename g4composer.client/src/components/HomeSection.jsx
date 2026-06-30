@@ -14,6 +14,7 @@ export default function HomeSection({ onEditInBuild }) {
   const [steps,     setSteps]     = useState({ std: null, alt: null })
   const [progress,  setProgress]  = useState(null)   // { stage, label, percent, detail } — live stage
   const [displayedPdbUrl, setDisplayedPdbUrl] = useState(null)
+  const [activeSource, setActiveSource] = useState(null)   // 'aligner' | 'prediction' | null (=default)
   const frameCacheRef = useRef({})
   const abortRef      = useRef(null)
 
@@ -102,6 +103,7 @@ export default function HomeSection({ onEditInBuild }) {
     setSteps({ std: null, alt: null })
     setProgress(null)
     setDisplayedPdbUrl(null)
+    setActiveSource(null)   // back to the default tab (aligner if present, else prediction)
 
     // ── Example path ────────────────────────────────────────────────────────
     // A deposited example is loaded and the field still matches it → compute the
@@ -459,18 +461,56 @@ export default function HomeSection({ onEditInBuild }) {
             </div>
           )}
 
-          {/* Predicted topology candidates — one tab per model (like Build G4 runs) */}
+          {/* Topology candidates — two groups: ONQuadro aligner (default) vs sequence prediction */}
           {result?.success && result.candidates && result.candidates.length > 1 && (() => {
-            const bestJob = result.candidates
+            const cands        = result.candidates
+            const alignerCands = cands.filter(c => c.source === 'aligner')
+            const predCands    = cands.filter(c => c.source !== 'aligner')
+            const hasAligner   = alignerCands.length > 0
+            const hasPred      = predCands.length > 0
+            const effSource    = activeSource ?? (hasAligner ? 'aligner' : 'prediction')
+            const groupCands   = effSource === 'prediction' ? predCands : alignerCands
+
+            const bestOf = list => list
               .filter(c => c.success)
-              .reduce((a, c) => (a == null || Number(c.stdEnergy) < Number(a.stdEnergy) ? c : a), null)?.jobId
-            const activeCand = result.candidates.find(c => c.jobId === result.selectedJobId)
+              .reduce((a, c) => (a == null || Number(c.stdEnergy) < Number(a.stdEnergy) ? c : a), null)
+            const bestJob    = bestOf(groupCands)?.jobId
+            const activeCand = groupCands.find(c => c.jobId === result.selectedJobId)
+
+            const switchSource = src => {
+              if (src === effSource) return
+              setActiveSource(src)
+              const best = bestOf(src === 'prediction' ? predCands : alignerCands)
+              if (best) selectCandidate(best)
+            }
+
             return (
               <>
+                {/* Source selector — only when both groups exist */}
+                {hasAligner && hasPred && (
+                  <div className={styles.topoTabBar}>
+                    <span className={styles.topoTabBarLabel}>Source</span>
+                    <button type="button" onClick={() => switchSource('aligner')}
+                      className={[styles.topoTab, effSource === 'aligner' && styles.topoTabActive].filter(Boolean).join(' ')}>
+                      <span className={styles.topoTabName}>ONQuadro aligner
+                        <span className={styles.topoTabNotation}>{alignerCands.length} template{alignerCands.length > 1 ? 's' : ''}</span>
+                      </span>
+                    </button>
+                    <button type="button" onClick={() => switchSource('prediction')}
+                      className={[styles.topoTab, effSource === 'prediction' && styles.topoTabActive].filter(Boolean).join(' ')}>
+                      <span className={styles.topoTabName}>Sequence prediction
+                        <span className={styles.topoTabNotation}>{predCands.length} fold{predCands.length > 1 ? 's' : ''}</span>
+                      </span>
+                    </button>
+                  </div>
+                )}
+
                 <div className={styles.topoTabBar}>
-                  <span className={styles.topoTabBarLabel}>Topology ({result.candidates.length})</span>
+                  <span className={styles.topoTabBarLabel}>
+                    {effSource === 'prediction' ? 'Prediction' : 'Template'} ({groupCands.length})
+                  </span>
                   <TopoScroller>
-                    {result.candidates.map((c, i) => {
+                    {groupCands.map((c, i) => {
                       const sel  = c.jobId === result.selectedJobId
                       const name = (c.label || '').split(' (')[0]
                       const e = c.success
@@ -606,6 +646,13 @@ export default function HomeSection({ onEditInBuild }) {
                 />
               )}
 
+              {/* Experimental templates the ONQuadro aligner matched — real deposited G4 structures
+                  that ground the model. Shown as biological reference examples, without prior
+                  probabilities (those belong to the sequence predictor, not to observed structures). */}
+              {(result.candidates ?? []).some(c => c.source === 'aligner') && (
+                <AlignerExamples candidates={result.candidates.filter(c => c.source === 'aligner')} />
+              )}
+
               {/* Info strip: QRS + ViennaRNA */}
               {(result.qrs || result.rnaStructure) && (
                 <div style={{
@@ -713,6 +760,77 @@ function TopoScroller({ children }) {
   )
 }
 
+// The experimental PDB templates the ONQuadro aligner matched against the query. These are real,
+// deposited G4 structures — shown as biological reference points for the predicted fold. Deliberately
+// no prior probabilities / percentages here: those are properties of the sequence predictor, whereas
+// these are observed structures the template-geometry models were literally built from.
+function AlignerExamples({ candidates = [] }) {
+  if (!candidates.length) return null
+  // Template names look like "6w9p-assembly1"; the leading 4 chars are the RCSB PDB id.
+  const pdbId = label => (label || '').split(' (')[0].slice(0, 4).toUpperCase()
+  // Loop lengths, alignment metrics and viability live in the rationale string; pull them out.
+  // tract_distance = G-tract superposition fit (Å, lower = better); linker_score = loop/linker
+  // compatibility (higher = better) — these ARE the aligner's match quality.
+  const detail = r => ({
+    loops:  /loops?\s+([\d-]+)/i.exec(r.rationale || '')?.[1] ?? null,
+    viab:   /viability=([a-z_/]+)/i.exec(r.rationale || '')?.[1] ?? null,
+    tract:  /tract_distance=(-?[\d.]+)/i.exec(r.rationale || '')?.[1] ?? null,
+    linker: /linker_score=(-?[\d.]+)/i.exec(r.rationale || '')?.[1] ?? null,
+  })
+  const cell = { padding: '6px 9px', borderBottom: '1px solid var(--border)', verticalAlign: 'top', whiteSpace: 'nowrap' }
+  const head = { ...cell, fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.5 }
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+        ONQuadro aligner — experimental templates
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 10px', lineHeight: 1.5 }}>
+        Deposited PDB G-quadruplexes the aligner matched to this sequence — the real folds the
+        template-geometry models were built from. One template per topology is kept (the best match);
+        <strong> tract dist.</strong> (Å, lower = better G-tract fit) and <strong>linker</strong> score
+        (higher = better) are the aligner's match quality.
+      </p>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--mono)' }}>
+          <thead>
+            <tr>
+              <th style={{ ...head, textAlign: 'left' }}>Template (PDB)</th>
+              <th style={{ ...head, textAlign: 'left' }}>Topology</th>
+              <th style={{ ...head, textAlign: 'left' }}>Loops</th>
+              <th style={{ ...head, textAlign: 'right' }} title="G-tract superposition distance (Å) — lower is a better fit">Tract dist.</th>
+              <th style={{ ...head, textAlign: 'right' }} title="Loop/linker compatibility — higher is better">Linker</th>
+              <th style={{ ...head, textAlign: 'left' }}>Viability</th>
+            </tr>
+          </thead>
+          <tbody>
+            {candidates.map((c, i) => {
+              const id = pdbId(c.label)
+              const { loops, viab, tract, linker } = detail(c)
+              return (
+                <tr key={c.jobId || i}>
+                  <td style={cell}>
+                    <a href={`https://www.rcsb.org/structure/${id}`} target="_blank" rel="noreferrer"
+                       style={{ color: 'var(--teal)', textDecoration: 'none' }}
+                       title={`Open ${id} on RCSB PDB`}>
+                      {(c.label || '').split(' (')[0]}
+                    </a>
+                  </td>
+                  <td style={cell}>{c.loopNotation || '—'}</td>
+                  <td style={cell}>{loops || '—'}</td>
+                  <td style={{ ...cell, textAlign: 'right' }}>{tract ?? '—'}</td>
+                  <td style={{ ...cell, textAlign: 'right' }}>{linker ?? '—'}</td>
+                  <td style={{ ...cell, fontFamily: 'var(--sans)' }}>{viab || 'n/a'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // Shows HOW the candidate set was determined and WHY one model won. Combines two pieces of
 // data: the determination (full Webba da Silva scored space → which folds were even considered
 // and with what prior probability) and the built candidates (their actual minimised energy).
@@ -771,10 +889,12 @@ function TopologySelection({ determination, candidates = [], selectedJobId }) {
       )}
 
       <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 10px', lineHeight: 1.5 }}>
-        The candidate set is <strong>determined</strong> from N and the three loop lengths by Webba da Silva
-        steric rules (minimum loop length per loop type; no adjacent diagonals) — only folds that can
-        thread all four G-tracts survive. Each is scored by literature priors (loop lengths, RNA gate,
-        A-track effect); the <strong>probability</strong> below is that score normalised over the whole
+        The candidate set is restricted to the <strong>canonical Webba da Silva topologies</strong>
+        (experimentally observed folds) and filtered by loop-length sterics — only folds that can
+        thread all four G-tracts survive. Each is scored as <strong>likelihood × nature</strong>: the
+        loop-length likelihood (per-loop priors, RNA gate, A-track effect) times the
+        <strong>natural-occurrence prior</strong> P(topology) measured from deposited G4 structures
+        (parallel P-P-P ≈ 51%). The <strong>probability</strong> below is that score normalised over the
         admissible space (a heuristic prior, not a calibrated probability). The top folds — <strong>plus
         any tied at the cutoff</strong>, so equally-ranked topologies are never dropped — are built with
         Quadro ({builtCount} here); the model with the <strong>lowest energy</strong> (kcal/mol) is

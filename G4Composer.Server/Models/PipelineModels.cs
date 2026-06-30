@@ -34,11 +34,31 @@ public sealed record OnquadroMatch(
     double TractDistance,
     double LinkerScore,
     string Qrs,
-    string MatchedSequence
+    string MatchedSequence,
+    string Viability = "",
+    string LoopLengths = "",
+    string Topology = ""
+);
+
+/// <summary>
+/// A ready-made g4composer input produced by the aligner's <c>--g4composer-output-dir</c>.
+/// Carries the matched template's real geometry (orient/rise/twist/path) so the pipeline can
+/// model it directly instead of reconstructing a topology from the QRS string.
+/// </summary>
+public sealed record OnquadroInpCandidate(
+    int Rank,
+    string Template,
+    string Viability,
+    string Topology,
+    string LoopLengths,
+    double TractDistance,
+    double LinkerScore,
+    QuadroInput Input
 );
 
 public sealed record OnquadroResult(
     bool Success,
     IReadOnlyList<OnquadroMatch> Matches,
-    string? Error
+    string? Error,
+    IReadOnlyList<OnquadroInpCandidate>? InpCandidates = null
 );

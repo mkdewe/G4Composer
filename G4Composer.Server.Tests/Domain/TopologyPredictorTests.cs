@@ -1,16 +1,25 @@
+using System.Text.RegularExpressions;
 using G4Composer.Server.Domain;
 
 namespace G4Composer.Server.Tests.Domain;
 
 /// <summary>
-/// Tests for <see cref="TopologyPredictor"/> — the empirical loop-type probability model that
-/// ranks canonical (Webba da Silva) topologies from the three loop lengths. The probability grid
-/// is learned from deposited unimolecular G4 structures; predictions are data-driven, so these
-/// tests assert structural invariants (threading, RNA gate, propeller-forcing, A-track) rather
-/// than fixed literature outcomes.
+/// Tests for <see cref="TopologyPredictor"/> — the empirical loop-type probability model that ranks
+/// canonical (Webba da Silva) topologies from the three loop lengths. Candidates are drawn from the
+/// curated <see cref="SilvaCatalog"/> (experimentally-observed folds only) and scored by a grid
+/// learned from deposited unimolecular G4 structures, so these tests assert structural invariants
+/// (canonical membership, threading, RNA gate, propeller-forcing, A-track, both sign variants)
+/// rather than fixed literature outcomes.
 /// </summary>
 public class TopologyPredictorTests
 {
+    // Loop kinds collapsed to P/L/D in order (Lw/Ln → L); index 1 is the central loop.
+    private static char CentralLoopKind(string notation)
+        => Regex.Matches(notation, "Lw|Ln|L|P|D").Select(m => m.Value[0]).ToArray()[1];
+
+    private static readonly HashSet<string> CanonicalNotations =
+        SilvaCatalog.All.Select(s => s.Notation).ToHashSet();
+
     // ── RNA gate ─────────────────────────────────────────────────────────────────
     [Fact]
     public void Rna_IsAlwaysParallel_HighConfidence()
@@ -20,6 +29,30 @@ public class TopologyPredictorTests
         Assert.True(r[0].IsParallel);
         Assert.Equal("-P-P-P", r[0].LoopNotation);
         Assert.Equal("high", r[0].Confidence);
+    }
+
+    // ── Only canonical Silva folds are ever offered (no invented cube topologies) ─
+    [Theory]
+    [InlineData(new[] { 2, 2, 2 })]
+    [InlineData(new[] { 3, 4, 3 })]
+    [InlineData(new[] { 1, 1, 1 })]
+    [InlineData(new[] { 2, 5, 2 })]
+    public void EveryCandidate_IsACanonicalSilvaSubtype(int[] loops)
+    {
+        var r = TopologyPredictor.Predict(3, loops, isRna: false);
+        Assert.NotEmpty(r);
+        Assert.All(r, c => Assert.Contains(c.LoopNotation, CanonicalNotations));
+    }
+
+    // ── Both sign variants of a family are offered (the 6a/6b regression fix) ─────
+    [Fact]
+    public void Dna_AllLateral_OffersBothSignVariants_6a_and_6b()
+    {
+        // Outer 2-nt + central 3-nt loops favour an all-lateral fold; both chair sign variants
+        // must appear — earlier the predictor kept only the first threadable sign and dropped 6b.
+        var r = TopologyPredictor.Predict(2, [2, 3, 2], isRna: false);
+        Assert.Contains(r, c => c.LoopNotation == "-Lw-Ln-Lw");   // 6a
+        Assert.Contains(r, c => c.LoopNotation == "+Ln+Lw+Ln");   // 6b
     }
 
     // ── Parallel is always an offered fold for short loops ───────────────────────
@@ -39,8 +72,7 @@ public class TopologyPredictorTests
     {
         var r = TopologyPredictor.Predict(3, [3, 0, 3], isRna: false);
         Assert.NotEmpty(r);
-        // The central token of "-X-Y-Z" is at index 3; a 0-nt loop admits only a propeller there.
-        Assert.All(r, c => Assert.Equal('P', c.LoopNotation[3]));
+        Assert.All(r, c => Assert.Equal('P', CentralLoopKind(c.LoopNotation)));
     }
 
     // ── Central-loop length drives the antiparallel sub-type (data-derived) ──────
@@ -59,7 +91,7 @@ public class TopologyPredictorTests
         // A 4-nt central loop is mostly diagonal → antiparallel basket on top.
         var r = TopologyPredictor.Predict(2, [2, 4, 2], isRna: false);
         Assert.Contains("basket", r[0].Label);
-        Assert.Equal('D', r[0].LoopNotation[3]);   // central loop is the diagonal
+        Assert.Equal('D', CentralLoopKind(r[0].LoopNotation));   // central loop is the diagonal
     }
 
     // ── Every returned notation must thread all four G-tracts ────────────────────
@@ -81,13 +113,14 @@ public class TopologyPredictorTests
         }
     }
 
-    // ── The full admissible space is returned (no cap) and always includes parallel ─
+    // ── Several folds are offered (parallel included), bounded by the model cap ───
     [Fact]
-    public void ReturnsFullAdmissibleSpace_IncludingParallel()
+    public void ReturnsRankedSpace_IncludingParallel_UpToCap()
     {
         var r = TopologyPredictor.Predict(3, [3, 3, 3], isRna: false);
         Assert.Contains(r, c => c.IsParallel);
-        Assert.True(r.Count >= 3, "all P>0 folds should be returned, not a small fixed cap");
+        Assert.True(r.Count >= 3, "multiple admissible folds should be returned");
+        Assert.True(r.Count <= TopologyPredictor.ModelCap, "modelled set is bounded by the cap");
     }
 
     // ── A-track rigidity pushes an A-rich loop toward propeller, away from diagonal ─
@@ -97,13 +130,13 @@ public class TopologyPredictorTests
         // 4-nt central loop would normally be diagonal (basket); when A-rich it is too rigid,
         // so the top fold's central loop becomes a propeller instead.
         var plain = TopologyPredictor.Predict(3, [3, 4, 3], isRna: false);
-        Assert.Equal('D', plain[0].LoopNotation[3]);          // baseline: diagonal central
+        Assert.Equal('D', CentralLoopKind(plain[0].LoopNotation));    // baseline: diagonal central
 
         var aRich = TopologyPredictor.Predict(3, [3, 4, 3], isRna: false, [false, true, false]);
-        Assert.Equal('P', aRich[0].LoopNotation[3]);          // A-track → propeller central
+        Assert.Equal('P', CentralLoopKind(aRich[0].LoopNotation));    // A-track → propeller central
     }
 
-    // ── Determine exposes the full space: admissible (P>0) + ruled-out (0%) ──────
+    // ── Determine exposes the full canonical space: admissible (P>0) + ruled-out (0%) ─
     [Fact]
     public void Determine_ListsRuledOutFolds_WithReasons_AndAdmissibleSumTo100()
     {
@@ -122,22 +155,26 @@ public class TopologyPredictorTests
         Assert.All(excluded, r => Assert.Equal(0, r.Score));
         Assert.All(excluded, r => Assert.Equal(0, r.Probability));
         Assert.Contains(excluded, r => r.ExcludedReason!.Contains("diagonal"));
-        Assert.All(admissible, r => Assert.True(r.Built));    // every admissible fold is modelled
 
+        // The top folds (up to the cap) are modelled; the rest stay admissible-but-not-built.
+        Assert.Contains(admissible, r => r.Built);
+        Assert.True(admissible.Count(r => r.Built) <= TopologyPredictor.ModelCap);
+
+        // Probabilities are normalised over the whole admissible space (built or not).
         Assert.InRange(admissible.Sum(r => r.Probability), 99.0, 101.0);
+        Assert.All(admissible, r => Assert.Contains(r.LoopNotation, CanonicalNotations));
     }
 
     [Fact]
-    public void Determine_DiagonalLateralDiagonal_ReportsStructuralForbiddance_NotShortLoops()
+    public void Determine_ShortLoops_RuleOutDiagonalSubtype_WithReason()
     {
+        // 11a (-LwD+Ln) has a central diagonal; at a 2-nt central loop it cannot form.
         var d = TopologyPredictor.Determine(4, [2, 2, 2], isRna: false);
-        var dld = d.Ranked.FirstOrDefault(r =>
-            new string([.. r.LoopNotation.Where(char.IsLetter)]) == "DLD");
+        var diag = d.Ranked.FirstOrDefault(r => r.LoopNotation == "-LwD+Ln");
 
-        Assert.NotNull(dld);
-        Assert.NotNull(dld!.ExcludedReason);
-        Assert.Contains("forbidden", dld.ExcludedReason);
-        Assert.DoesNotContain("≥3", dld.ExcludedReason);
+        Assert.NotNull(diag);
+        Assert.NotNull(diag!.ExcludedReason);
+        Assert.Contains("diagonal", diag.ExcludedReason);
     }
 
     [Fact]

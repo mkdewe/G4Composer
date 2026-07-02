@@ -36,6 +36,7 @@ Always write `migrationBuilder.Sql(...)` using **PostgreSQL syntax**. Never use 
   - `viennarna:latest` — built from `docker-biotools/ViennaRNA/Dockerfile`
   - `eltetrado:latest` — built from `docker-biotools/eltetrado/Dockerfile`
   - `dnatco:latest` — built from `docker-biotools/dnatco/Dockerfile` (DNATCO v5.0 offline CLI for NtC/CANA conformational analysis; `run.py` normalises input via gemmi then runs `rednatco.js`, emitting `*_extended.cif` + `summary.csv`/`summary.json`)
+  - `openmm-utils:latest` — built from `docker-biotools/openmmUtils/Dockerfile` (wraps `tzok/openmm-utils`; Amber OL15 DNA / OL3 RNA with electrostatics OFF; reads a PDB on stdin, prints potential energy BEFORE and AFTER minimization + optional minimized PDB). git-clones upstream HEAD → rebuild with `--no-cache`.
 - **docker-biotools** is a git submodule pointing to `https://github.com/mkdewe/docker-quadro`
   - `qgrs-cpp` is a nested submodule inside docker-biotools — requires `git submodule update --init` after pulling
 
@@ -51,10 +52,12 @@ git checkout main && git pull origin main
 git submodule update --init
 docker build -t quadro14l:latest quadro14L/
 docker build -t gqrs:latest gqrsMapper/
-docker build -t onquadro-aligner:latest onquadroAligner/
+# onquadro-aligner and openmm-utils git-clone upstream HEAD — use --no-cache to pick up new versions
+docker build --no-cache -t onquadro-aligner:latest onquadroAligner/
 docker build -t viennarna:latest ViennaRNA/
 docker build -t eltetrado:latest eltetrado/
 docker build -t dnatco:latest dnatco/
+docker build --no-cache -t openmm-utils:latest openmmUtils/
 ```
 
 The server may be in detached HEAD in the submodule — always `git checkout main` before `git pull`.

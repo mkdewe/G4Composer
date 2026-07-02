@@ -95,8 +95,8 @@ export default function MolstarViewer({ pdbUrl, runState, runStatus, structureNa
       disposed = true
       // Viewer.create() returns an object with .plugin or .dispose
       const v = viewerRef.current
-      try { v?.plugin?.dispose?.() } catch {}
-      try { v?.dispose?.() } catch {}
+      try { v?.plugin?.dispose?.() } catch { /* best-effort teardown */ }
+      try { v?.dispose?.() } catch { /* best-effort teardown */ }
       viewerRef.current = null
     }
   }, [])

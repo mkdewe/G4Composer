@@ -588,7 +588,7 @@ export default function HomeSection({ onEditInBuild }) {
                     </button>
                     <button type="button" onClick={() => switchSource('prediction')}
                       className={[styles.topoTab, effSource === 'prediction' && styles.topoTabActive].filter(Boolean).join(' ')}>
-                      <span className={styles.topoTabName}>Sequence prediction
+                      <span className={styles.topoTabName}>Canonical topologies (Silva)
                         <span className={styles.topoTabNotation}>{predCands.length} fold{predCands.length > 1 ? 's' : ''}</span>
                       </span>
                     </button>
@@ -597,7 +597,7 @@ export default function HomeSection({ onEditInBuild }) {
 
                 <div className={styles.topoTabBar}>
                   <span className={styles.topoTabBarLabel}>
-                    {effSource === 'prediction' ? 'Prediction' : 'Template'} ({groupCands.length})
+                    {effSource === 'prediction' ? 'Silva' : 'Template'} ({groupCands.length})
                   </span>
                   <TopoScroller>
                     {groupCands.map((c, i) => {
@@ -864,13 +864,14 @@ function AlignerExamples({ candidates = [], selectedJobId }) {
   // Template names look like "6w9p-assembly1"; the leading 4 chars are the RCSB PDB id.
   const pdbId = label => (label || '').split(' (')[0].slice(0, 4).toUpperCase()
   // Loop lengths, alignment metrics and viability live in the rationale string; pull them out.
-  // tract_distance = G-tract superposition fit (Å, lower = better); linker_score = loop/linker
-  // compatibility (higher = better) — these ARE the aligner's match quality.
+  // tract_distance = G-tract superposition fit (Å, lower = better); linker_distance = loop/linker
+  // edit distance (lower = better) — these ARE the aligner's match quality. Older aligner builds
+  // wrote linker_score instead, so accept both.
   const detail = r => ({
     loops:  /loops?\s+([\d-]+)/i.exec(r.rationale || '')?.[1] ?? null,
     viab:   /viability=([a-z_/]+)/i.exec(r.rationale || '')?.[1] ?? null,
     tract:  /tract_distance=(-?[\d.]+)/i.exec(r.rationale || '')?.[1] ?? null,
-    linker: /linker_score=(-?[\d.]+)/i.exec(r.rationale || '')?.[1] ?? null,
+    linker: /linker_(?:distance|score)=(-?[\d.]+)/i.exec(r.rationale || '')?.[1] ?? null,
   })
   // Energetics evaluated WITHIN the aligner group only — its own lowest-energy winner, independent
   // of the sequence-prediction group.
@@ -886,11 +887,13 @@ function AlignerExamples({ candidates = [], selectedJobId }) {
       </div>
       <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 10px', lineHeight: 1.5 }}>
         Deposited PDB G-quadruplexes the aligner matched to this sequence — the real folds the
-        template-geometry models were built from. One template per topology is kept (the best match).
-        <strong> tract dist.</strong> (Å, lower = better G-tract fit) and <strong>linker</strong> score
-        (higher = better) are the aligner's match quality; <strong>E std</strong> is each model's
+        template-geometry models were built from. Topology is shown in Silva notation (recovered from
+        each template's geometry) so it matches the Canonical topologies (Silva) tab. One template per
+        topology is kept (the best match).
+        <strong> tract dist.</strong> (Å, lower = better G-tract fit) and <strong>linker dist.</strong>
+        (lower = better) are the aligner's match quality; <strong>E std</strong> is each model's
         minimised energy — the <strong>lowest energy wins this group</strong>, evaluated separately
-        from the sequence-prediction folds above.
+        from the canonical-Silva folds above.
       </p>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--mono)' }}>
@@ -900,7 +903,7 @@ function AlignerExamples({ candidates = [], selectedJobId }) {
               <th style={{ ...head, textAlign: 'left' }}>Topology</th>
               <th style={{ ...head, textAlign: 'left' }}>Loops</th>
               <th style={{ ...head, textAlign: 'right' }} title="G-tract superposition distance (Å) — lower is a better fit">Tract dist.</th>
-              <th style={{ ...head, textAlign: 'right' }} title="Loop/linker compatibility — higher is better">Linker</th>
+              <th style={{ ...head, textAlign: 'right' }} title="Loop/linker edit distance — lower is a better fit">Linker dist.</th>
               <th style={{ ...head, textAlign: 'right' }}>E std</th>
               <th style={{ ...head, textAlign: 'right' }}>ΔE vs best</th>
               <th style={{ ...head, textAlign: 'left' }}>Viability</th>

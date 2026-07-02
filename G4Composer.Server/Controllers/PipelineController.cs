@@ -130,17 +130,25 @@ public sealed class PipelineController : ControllerBase
     // candidate runner, so the existing modelling and UI path is reused unchanged.
     private static G4TopologyGenerator.GeneratedTopology ToGeneratedTopology(OnquadroInpCandidate c)
     {
-        // The aligner reports the matched template's topology (e.g. "-p-p-p") and loop lengths.
-        // The UI renders GeneratedTopology.LoopNotation as the topology shown in parentheses, so the
-        // topology — not the loop lengths — must go there; loop lengths are surfaced in the rationale.
-        // Uppercased to match the app's Silva notation convention (-P-P-P, -L-L-L, …).
-        var topology   = string.IsNullOrEmpty(c.Topology) ? "?" : c.Topology.ToUpperInvariant();
+        // The aligner reports the matched template's topology in ONQuadro/ElTetrado notation (e.g.
+        // "-p-p-p"): loop TYPES only, without the wide/narrow lateral distinction (Lw/Ln) that the
+        // Silva-based prediction tab shows. To keep BOTH tabs in one notation, recover the exact
+        // Silva subtype from the template's own threading (the .inp path); fall back to the ONQuadro
+        // topology when the geometry matches no single canonical fold.
+        var onquadro   = string.IsNullOrEmpty(c.Topology) ? "?" : c.Topology.ToUpperInvariant();
+        var tetrads    = c.Input.Path.Select(p => char.ToUpperInvariant(p.Trim()[0])).Distinct().Count();
+        var silva      = SilvaTopologyMatcher.TryMatchNotation(c.Input.Path, tetrads);
+        // The UI renders GeneratedTopology.LoopNotation as the topology shown in parentheses.
+        var topology   = silva ?? onquadro;
         var viability  = string.IsNullOrEmpty(c.Viability) ? "n/a" : c.Viability;
         var label      = $"{c.Template} ({topology})";
         var loops      = string.IsNullOrEmpty(c.LoopLengths) ? "" : $"loops {c.LoopLengths}; ";
+        // Keep the raw ElTetrado notation in the rationale when it was normalised to Silva, so the
+        // template's original annotation is never lost.
+        var eltetrado  = silva is not null && onquadro != "?" ? $"ElTetrado topology {onquadro}; " : "";
         var rationale  =
-            $"Experimental template {c.Template} (ONQuadro/PDB): {loops}" +
-            $"tract_distance={c.TractDistance:0.##}, linker_score={c.LinkerScore:0.##}, viability={viability}";
+            $"Experimental template {c.Template} (ONQuadro/PDB): {loops}{eltetrado}" +
+            $"tract_distance={c.TractDistance:0.##}, linker_distance={c.LinkerDistance:0.##}, viability={viability}";
         return new G4TopologyGenerator.GeneratedTopology(
             c.Input, label, viability, rationale, topology);
     }
@@ -178,7 +186,7 @@ public sealed class PipelineController : ControllerBase
             // fold the same way (e.g. multiple -P-P-P entries), and modelling duplicates just wastes
             // Quadro runs and clutters the tab. Keep the best-ranked (lowest tract_distance, since
             // `ranked` is already sorted by Rank) representative of each topology.
-            // TODO: replace this "one per topology" rule with a tract_distance/linker_score threshold.
+            // TODO: replace this "one per topology" rule with a tract_distance/linker_distance threshold.
             var byTopology = ranked
                 .GroupBy(c => (c.Topology ?? "").ToUpperInvariant())
                 .Select(g => g.First())
@@ -207,11 +215,11 @@ public sealed class PipelineController : ControllerBase
             return;
         }
 
-        // Best match: tract_distance = 0, highest linker_score
+        // Best match: tract_distance = 0, lowest linker_distance (edit-distance; lower = better)
         var best = result is { Success: true }
             ? result.Matches
                 .Where(m => m.TractDistance == 0 && !string.IsNullOrWhiteSpace(m.MatchedSequence))
-                .OrderByDescending(m => m.LinkerScore)
+                .OrderBy(m => m.LinkerDistance)
                 .FirstOrDefault()
             : null;
 

@@ -142,7 +142,7 @@ public sealed class OnquadroService : IOnquadroService
 
             if (line.StartsWith('#'))
             {
-                // # tract_distance=0 linker_score=20 viability=viable loop_lengths=2-2-2 topology=-p-p-p template=6w9p-assembly1
+                // # tract_distance=0 linker_distance=2 viability=viable loop_lengths=2-2-2 topology=-p-p-p template=6w9p-assembly1
                 foreach (var tok in line.TrimStart('#').Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 {
                     var eq = tok.IndexOf('=');
@@ -179,10 +179,15 @@ public sealed class OnquadroService : IOnquadroService
             Path      = pathStr.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
         };
 
-        static double ParseD(Dictionary<string, string> m, string key)
-            => m.TryGetValue(key, out var v) && double.TryParse(v,
-                   System.Globalization.NumberStyles.Float,
-                   System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0;
+        static double ParseD(Dictionary<string, string> m, params string[] keys)
+        {
+            foreach (var key in keys)
+                if (m.TryGetValue(key, out var v) && double.TryParse(v,
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var d))
+                    return d;
+            return 0;
+        }
 
         var rank = 0;
         var dash = fileName.IndexOf('-');
@@ -194,8 +199,10 @@ public sealed class OnquadroService : IOnquadroService
             Viability:     meta.GetValueOrDefault("viability", ""),
             Topology:      meta.GetValueOrDefault("topology", ""),
             LoopLengths:   meta.GetValueOrDefault("loop_lengths", ""),
-            TractDistance: ParseD(meta, "tract_distance"),
-            LinkerScore:   ParseD(meta, "linker_score"),
+            TractDistance:  ParseD(meta, "tract_distance"),
+            // Upstream renamed linker_score → linker_distance (now an edit-distance; lower = better).
+            // Keep linker_score as a fallback so older aligner images still parse.
+            LinkerDistance: ParseD(meta, "linker_distance", "linker_score"),
             Input:         input
         );
     }
@@ -235,7 +242,8 @@ public sealed class OnquadroService : IOnquadroService
         var iTetrad   = Index("Tetrad count");
         var iMolecule = Index("Molecule");
         var iTract    = Index("Tract distance");
-        var iLinker   = Index("Linker score");
+        // Upstream renamed the column "Linker score" → "Linker distance"; accept both.
+        var iLinker   = Index("Linker distance", "Linker score");
         var iViab     = Index("Viability");
         var iLoops    = Index("Loop lengths");
         var iTopo     = Index("Topology");
@@ -251,14 +259,14 @@ public sealed class OnquadroService : IOnquadroService
 
             if (!int.TryParse(Get(cols, iTetrad), out var tetradCount)) continue;
             if (!double.TryParse(Get(cols, iTract),  f, inv, out var tractDist)) continue;
-            if (!double.TryParse(Get(cols, iLinker), f, inv, out var linkerScore)) continue;
+            if (!double.TryParse(Get(cols, iLinker), f, inv, out var linkerDistance)) continue;
 
             matches.Add(new OnquadroMatch(
                 Files:           Get(cols, iFiles),
                 TetradCount:     tetradCount,
                 Molecule:        Get(cols, iMolecule),
                 TractDistance:   tractDist,
-                LinkerScore:     linkerScore,
+                LinkerDistance:  linkerDistance,
                 Qrs:             Get(cols, iQrs),
                 MatchedSequence: Get(cols, iSeq),
                 Viability:       Get(cols, iViab),

@@ -32,7 +32,7 @@ public sealed record OnquadroMatch(
     int TetradCount,
     string Molecule,
     double TractDistance,
-    double LinkerScore,
+    double LinkerDistance,
     string Qrs,
     string MatchedSequence,
     string Viability = "",
@@ -52,7 +52,7 @@ public sealed record OnquadroInpCandidate(
     string Topology,
     string LoopLengths,
     double TractDistance,
-    double LinkerScore,
+    double LinkerDistance,
     QuadroInput Input
 );
 

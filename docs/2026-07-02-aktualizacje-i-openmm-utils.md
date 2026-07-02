@@ -1,10 +1,11 @@
 # G4Composer — raport ze zmian i analiza openmm-utils (2026-07-02)
 
 Raport obejmuje cztery zlecone zmiany. Punkty 1–3 są zaimplementowane i przetestowane
-lokalnie (backend .NET + frontend Vitest). Punkt 4 (openmm-utils) jest przygotowany „pod klucz” —
-obraz + skrypty + integracja w dokumentacji — ale **nie mógł zostać zbudowany ani przetestowany na
-tej maszynie, bo demon Dockera był wyłączony**. Wszystkie komendy do uruchomienia na serwerze są
-niżej.
+lokalnie (backend .NET + frontend Vitest). Punkt 4 (openmm-utils): obraz **zbudowany i pogłębienie
+przetestowany lokalnie** — energie policzone na 10 topologiach jednej sekwencji (jabłka z jabłkami)
+oraz kontrola integralności tetrad ElTetrado przed/po minimalizacji. Wnioski z testu **empirycznie
+potwierdzają obawę przełożonego** i doprecyzowują, jak realnie użyć tego narzędzia (sekcja „Test
+pogłębiony”). Komendy serwerowe niżej.
 
 ---
 
@@ -104,52 +105,89 @@ cat model.pdb | docker run -i --rm openmm-utils:latest        # -> "E_przed E_po
 ./batch-energy.sh /sciezka/do/modeli openmm-energies.csv
 ```
 
-### Analiza mocnych stron i sygnału z energii przed minimalizacją
+### Test pogłębiony „jabłka z jabłkami” (przeprowadzony)
 
-Komentarz przełożonego („może warto skupić się na energii przed minimalizacją, nawet dodatniej”) jest
-**trafny i zgodny z tym, jak to narzędzie liczy energię**:
+Aby uczciwie ocenić sygnał, wygenerowano **jedną sekwencję (`gggttagggttagggttaggg`, ludzki telomer,
+DNA) w 10 kandydackich topologiach** przez prawdziwy `G4TopologyGenerator`, każdą zbudowano przez
+`quadro14L` (683 atomy, ten sam zestaw), po czym policzono energię `openmm-utils` przed i po
+minimalizacji. Zestaw jest w pełni porównywalny (te same atomy, ta sama procedura budowy).
 
-1. **Wyłączona elektrostatyka → energia = miara naprężeń i kolizji sterycznych.** Bez członu
-   elektrostatycznego energia jest zdominowana przez wiązania, kąty, dihedry i van der Waalsa. To nie
-   jest energia swobodna zwijania — to **miara jakości geometrii modelu** (naprężenia i zderzenia
-   atomów powstałe przy przeszczepie geometrii szablonu na sekwencję). Idealnie pasuje do tego, co
-   produkuje pipeline template-geometry G4Composera.
+| topologia | fold | quadro Etotal | openmm PRZED | openmm PO |
+|---|---|--:|--:|--:|
+| -Lw-Ln-Lw | chair 6a | −754 | 2,96×10⁷ | −1694 |
+| -Lw-Ln-P | hybrid3 7a | −773 | 7,1×10⁵ | −1725 |
+| -P-Lw-Ln | hybrid1 9a | −363 | 1,48×10¹⁰ | −1726 |
+| -P-P-Lw | hybrid2 2a | +10093 | 2,8×10⁴ | −138 |
+| -P-P-P | parallel 1a | +153031 | 3,5×10⁶ | −52 |
+| +LnD-Lw | basket2 11b | −716 | 4,99×10⁹ | −1687 |
+| +Ln+Lw+Ln | chair 6b | +103878 | 4,7×10⁶ | −1738 |
+| +Ln+Lw+P | hybrid2 7b | +11462 | 4,4×10⁶ | +4578 |
+| +P+Ln+Lw | hybrid1 9b | −635 | 6,1×10⁷ | −1698 |
+| +P+P+Ln | hybrid3 2b | +8874 | 4,6×10⁵ | +1556 |
 
-2. **Dlaczego energia PRZED minimalizacją jest lepszym sygnałem topologii.** Minimalizacja potrafi
-   ściągnąć energię kiepskiego modelu bardzo nisko, ale — jak zauważył przełożony — kosztem
-   rozerwania tetrad. Zatem **energia PO minimalizacji bywa myląca**: rozprute struktury mogą mieć
-   bardzo niską energię. Energia PRZED minimalizacją odzwierciedla, jak dobrze wyjściowa topologia
-   „siedzi” na sekwencji bez relaksacji — model o poprawnej topologii startuje z mniejszym
-   naprężeniem. To czyni ją **dyskryminatorem poprawności topologii tam, gdzie energia po
-   minimalizacji zawodzi**.
+**Wniosek 1 — surowa energia PRZED minimalizacją NIE jest użytecznym rankingiem (dla tych modeli).**
+Waha się o **6 rzędów wielkości** (2,8×10⁴ … 1,48×10¹⁰) i jest **nieskorelowana** z jakością modelu:
+np. 9a ma najgorszą energię przed (1,48×10¹⁰), a jedną z najlepszych po (−1726); 2a ma najlepszą
+przed (2,8×10⁴), a słabą po (−138). Powód: modele quadro/xplor są **bezwodorowe**, a `pdbfixer`
+dokłada wodory w idealnych pozycjach → katastrofalne kolizje dominują energię przed minimalizacją.
+To bezpośrednio testuje pomysł „patrzmy na energię przed” i pokazuje, że **na obecnych suchych
+modelach on nie działa** bez wcześniejszego oczyszczenia.
 
-3. **Dodatnia energia jest oczekiwana i użyteczna.** Modele „as-built” mają kolizje → dodatnia
-   energia bezwzględna nie jest wadą. Liczy się **porównanie względne** między kandydatami dla tej
-   samej sekwencji (te same atomy → uczciwe porównanie bezwzględne): topologia o najniższej energii
-   przed minimalizacją nawija sekwencję z najmniejszym naprężeniem.
+**Wniosek 2 — energia PO minimalizacji jest MYLĄCA, bo minimalizacja niszczy tetrady.** Sprawdzono to
+wprost: ElTetrado na modelu przed i po minimalizacji (3 reprezentatywne topologie):
 
-**Ograniczenia (żeby nie nadinterpretować):**
-- Energia skaluje się z liczbą atomów — **porównywać tylko w obrębie kandydatów jednej sekwencji**
-  (albo normalizować na resztę/atom przy porównaniach między sekwencjami).
-- Bez elektrostatyki metryka nie nagradza wiązań wodorowych ani stackingu — **nie jest rankingiem
-  stabilności biologicznej**, tylko jakości budowy modelu.
-- Energię PO minimalizacji trzeba parować z **kontrolą integralności tetrad** (np. ElTetrado/DNATCO
-  na `minimized.pdb`): jeśli liczba tetrad spadła, niska energia to artefakt rozerwania — dokładnie
-  przypadek opisany przez przełożonego.
+| topologia | tetrady PRZED | tetrady PO | openmm PO |
+|---|:--:|:--:|--:|
+| +P+Ln+Lw (hybrid1 9b) | 3 | **0** | −1692 |
+| -P-P-P (parallel 1a) | 3 | **0** | −50 |
+| +Ln+Lw+Ln (chair 6b) | 3 | **0** | −1743 |
 
-### Proponowana metodyka testu (do wykonania na serwerze)
+Minimalizacja **rozwaliła kwadrupleks we wszystkich przypadkach (3→0 tetrad)** — także tam, gdzie
+energia po minimalizacji wyglądała znakomicie (−1700). ElTetrado na zminimalizowanym 9b raportuje już
+tylko „single tetrad without stacking” zamiast „3 tetrads”. **Przyczyna: wyłączona elektrostatyka** —
+tetrada G trzyma się głównie wiązaniami Hoogsteena i centralnym kationem (K⁺), a przy wyzerowanych
+ładunkach nic jej nie utrzymuje, więc minimalizacja swobodnie ją rozkłada, obniżając energię. To jest
+**dokładnie mechanizm, przed którym ostrzegał przełożony — potwierdzony eksperymentalnie**: niska
+energia po minimalizacji = rozpad struktury, nie lepszy model.
+
+**Wniosek 3 — najstabilniejszym dostępnym sygnałem jest własna energia `quadro14L` (Etotal).** Zgadza
+się z „po minimalizacji” tam, gdzie oba wskazują zły model (2a, 1a, 7b, 2b mają Etotal > 0), a nie
+jest podatna na artefakt rozpadu. Rozbieżność (6b: Etotal wysoki, ale geometrycznie poprawny) to
+sygnał, że sama liczba to za mało — trzeba kontroli tetrad.
+
+### Co z tego wynika (rekomendacja, wzmacnia kierunek przełożonego)
+
+- **Nie używać energii PO minimalizacji `openmm-utils` do oceny G4** w obecnej konfiguracji
+  (elektrostatyka off) — nagradza rozpad tetrad.
+- Intuicja przełożonego („patrz na model przed destrukcyjną minimalizacją”) jest **słuszna**, ale
+  surowej energii przed nie da się użyć wprost — najpierw potrzebna **relaksacja samych wodorów**
+  (zamrożone atomy ciężkie), żeby energia odzwierciedlała naprężenie topologii ciężkoatomowej, a nie
+  kolizje dołożonych wodorów.
+- Najmocniejsze praktyczne zastosowanie tego narzędzia to **kontrola integralności**: ElTetrado
+  przed/po dowolnej minimalizacji jako **flaga „model traci tetrady”**, plus `quadro14L` Etotal jako
+  główny ranking energetyczny.
+- Do prawdziwego rankingu stabilności biologicznej trzeba by **innej konfiguracji** (elektrostatyka +
+  rozpuszczalnik niejawny + centralny K⁺) — to poza zakresem tego obrazu.
+
+Skrypty testu w repo: `docker-biotools/openmmUtils/batch-energy.sh` (energie wsadowo) oraz — jako
+załącznik do tego raportu — protokół generowania modeli (test `ModelInpDumpUtility`, bramkowany
+`INP_DUMP_DIR`) + `quadro14L` + ElTetrado przed/po.
+
+### Metodyka (wykonana lokalnie — do powtórzenia na serwerze)
 1. Zbuduj obraz (`--no-cache`).
-2. Weź kilka sekwencji o **znanej** topologii eksperymentalnej; wygeneruj pipeline’em wszystkie
-   modele-kandydatów (poprawne i błędne topologie).
-3. `batch-energy.sh` → CSV energii przed/po dla każdego kandydata.
-4. Sprawdź hipotezy: (a) czy poprawna topologia ma najniższą energię **przed** minimalizacją;
-   (b) czy energia **po** minimalizacji sama wprowadza w błąd (błędna topologia schodzi najniżej).
-5. Uruchom ElTetrado na `minimized.pdb` i policz tetrady — potwierdź obserwację „minimalizacja
-   rozwala tetrady”.
+2. Weź sekwencję o znanej topologii; wygeneruj pipeline’em wszystkie modele-kandydatów (poprawne i
+   błędne topologie) — użyto testu `ModelInpDumpUtility` (bramkowany `INP_DUMP_DIR`/`INP_DUMP_SEQ`).
+3. Zbuduj każdy model przez `quadro14L`; policz energię `openmm-utils` przed/po.
+4. Sprawdź hipotezy: (a) czy energia **przed** minimalizacją rankuje topologie; (b) czy energia
+   **po** minimalizacji wprowadza w błąd.
+5. Uruchom ElTetrado na modelu przed i po minimalizacji — policz tetrady (weryfikacja „minimalizacja
+   rozwala tetrady”).
 
-### Wyniki testu (zbudowane i uruchomione lokalnie)
+Wyniki i wnioski z wykonania tej metodyki są w sekcji „Test pogłębiony” powyżej.
 
-Obraz zbudowany (`openmm-utils:latest`, 3,94 GB) i przetestowany na deponowanych strukturach G4
+### Test wstępny: struktury deponowane (kontekst)
+
+Obraz zbudowany (`openmm-utils:latest`, 3,94 GB) i przetestowany też na deponowanych strukturach G4
 (oba tryby wrappera — stdin oraz montowany `/work` — działają, zwracają energie + zminimalizowany
 PDB). Energie (kcal/mol; pierwszy model dla zespołów NMR):
 

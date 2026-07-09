@@ -33,7 +33,7 @@ export function serializeInp(input) {
   const rmLevel   = input.rmLevel ?? input.RM_Level ?? 5
   const steps     = Array.isArray(input.iterationSteps) && input.iterationSteps.length > 0
     ? input.iterationSteps
-    : [20, 40, 60, 80, 100]
+    : [30, 50, 70, 100, 150, 300]
   const iterationSteps = steps.join(',')
 
   // Match pz74 reference format — field name left-padded with spaces

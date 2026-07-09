@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import styles from './SimpleSection.module.css'
 import MolstarViewer from './MolstarViewer.jsx'
 import { parseFile } from '../utils/batchParser.js'
-import { runQuadro11Stream, fetchSilvaGroups } from '../services/apiService.js'
+import { runQuadro11Stream, fetchSilvaGroups, fetchFrame } from '../services/apiService.js'
 
 /**
  * BatchSection — upload multiple .inp / .txt files, run them sequentially,
@@ -128,13 +128,24 @@ export default function BatchSection() {
         i.id === item.id ? { ...i, status: 'running', error: null, progress: null } : i
       ))
       try {
-        const { blob, altBlob, stdEnergy, altEnergy, winner } = await runQuadro11Stream(
+        const {
+          blob, altBlob, stdEnergy, altEnergy, winner,
+          jobId, stdFrames, altFrames, stdBestStep, altBestStep,
+        } = await runQuadro11Stream(
           [item.input],
           { onProgress: (p) => setItems(prev => prev.map(i =>
               i.id === item.id ? { ...i, progress: p } : i)) }
         )
         setItems(prev => prev.map(i =>
-          i.id === item.id ? { ...i, status: 'done', progress: null, pdbBlob: blob, altBlob: altBlob || null, stdEnergy: stdEnergy || null, altEnergy: altEnergy || null, winner: winner || 'standard' } : i
+          i.id === item.id ? {
+            ...i, status: 'done', progress: null,
+            pdbBlob: blob, altBlob: altBlob || null,
+            stdEnergy: stdEnergy || null, altEnergy: altEnergy || null,
+            winner: winner || 'standard',
+            jobId: jobId || null,
+            stdFrames: stdFrames || [], altFrames: altFrames || [],
+            stdBestStep: stdBestStep ?? null, altBestStep: altBestStep ?? null,
+          } : i
         ))
       } catch (err) {
         setItems(prev => prev.map(i =>
@@ -150,14 +161,25 @@ export default function BatchSection() {
   }
 
   // ── Downloads ──────────────────────────────────────────────────────────
-  const downloadOne = (item, variant = 'std') => {
+  // Single iteration → download that one .pdb. More than one iteration in the input
+  // → bundle every iteration's .pdb into a ZIP so the whole minimization trajectory
+  // is available, not just the best-energy frame.
+  const downloadOne = async (item, variant = 'std') => {
+    const frames = variant === 'alt' ? item.altFrames : item.stdFrames
+    const name   = sanitiseName(item.name)
+
+    if (item.jobId && Array.isArray(frames) && frames.length > 1) {
+      const { default: JSZip } = await import('jszip')
+      const zip = new JSZip()
+      await addIterationsToZip(zip, item, variant, name)
+      const blob = await zip.generateAsync({ type: 'blob' })
+      triggerDownload(blob, `${name}_${variant}_iterations.zip`)
+      return
+    }
+
     const blob = variant === 'alt' ? item.altBlob : item.pdbBlob
     if (!blob) return
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `${sanitiseName(item.name)}_${variant}.pdb`
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+    triggerDownload(blob, `${name}_${variant}.pdb`)
   }
 
   const downloadAll = async () => {
@@ -168,20 +190,36 @@ export default function BatchSection() {
     const { default: JSZip } = await import('jszip')
     const zip = new JSZip()
     for (const item of successful) {
-      const stdText = await item.pdbBlob.text()
-      const name    = sanitiseName(item.name)
-      zip.file(`${name}_std.pdb`, stdText)
-      if (item.altBlob) {
-        const altText = await item.altBlob.text()
-        zip.file(`${name}_alt.pdb`, altText)
+      const name = sanitiseName(item.name)
+      // Multi-iteration items: fold every iteration into a per-structure folder so the
+      // bundle mirrors what the single-item download produces. Otherwise the best frame only.
+      if (item.jobId && Array.isArray(item.stdFrames) && item.stdFrames.length > 1) {
+        const folder = zip.folder(name)
+        await addIterationsToZip(folder, item, 'std', name)
+        if (Array.isArray(item.altFrames) && item.altFrames.length > 1)
+          await addIterationsToZip(folder, item, 'alt', name)
+        continue
       }
+      zip.file(`${name}_std.pdb`, await item.pdbBlob.text())
+      if (item.altBlob) zip.file(`${name}_alt.pdb`, await item.altBlob.text())
     }
     const blob = await zip.generateAsync({ type: 'blob' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `g4composer_batch_${new Date().toISOString().slice(0, 10)}.zip`
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+    triggerDownload(blob, `g4composer_batch_${new Date().toISOString().slice(0, 10)}.zip`)
+  }
+
+  // Fetch every iteration frame for one engine variant and add each as a .pdb entry,
+  // tagging the best-energy iteration in the filename.
+  const addIterationsToZip = async (zip, item, variant, name) => {
+    const engine    = variant === 'alt' ? 'alt' : 'std'
+    const frames    = variant === 'alt' ? item.altFrames : item.stdFrames
+    const bestStep  = variant === 'alt' ? item.altBestStep : item.stdBestStep
+    for (const f of frames) {
+      const res = await fetchFrame(item.jobId, engine, f.step)
+      if (!res?.blob) continue
+      const tag = f.step === bestStep ? '_best' : ''
+      zip.file(`${name}_${variant}_iter${f.step}${tag}.pdb`, await res.blob.text())
+      if (res.url) URL.revokeObjectURL(res.url)
+    }
   }
 
   // ── Derived state ──────────────────────────────────────────────────────
@@ -296,6 +334,9 @@ export default function BatchSection() {
                       <span style={{ color: it.winner === 'standard' ? 'var(--teal-dark)' : 'var(--text)', fontWeight: it.winner === 'standard' ? 700 : 400 }}>
                         {it.stdEnergy.toFixed(1)}{it.winner === 'standard' ? ' ★' : ''}
                       </span>
+                      {it.stdBestStep != null && (it.stdFrames?.length ?? 0) > 1 && (
+                        <span style={{ color: 'var(--text-dim)', marginLeft: 4 }} title="Best iteration">@{it.stdBestStep}</span>
+                      )}
                     </span>
                   )}
                   {it.altEnergy != null && (
@@ -304,6 +345,9 @@ export default function BatchSection() {
                       <span style={{ color: it.winner === 'alternative' ? 'var(--teal-dark)' : 'var(--text)', fontWeight: it.winner === 'alternative' ? 700 : 400 }}>
                         {it.altEnergy.toFixed(1)}{it.winner === 'alternative' ? ' ★' : ''}
                       </span>
+                      {it.altBestStep != null && (it.altFrames?.length ?? 0) > 1 && (
+                        <span style={{ color: 'var(--text-dim)', marginLeft: 4 }} title="Best iteration">@{it.altBestStep}</span>
+                      )}
                     </span>
                   )}
                 </span>
@@ -321,8 +365,8 @@ export default function BatchSection() {
                       <button
                         onClick={() => downloadOne(it, 'std')}
                         className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
-                        title="Download standard .pdb"
-                        aria-label="Download standard .pdb"
+                        title={(it.stdFrames?.length ?? 0) > 1 ? 'Download standard — all iterations (.zip)' : 'Download standard .pdb'}
+                        aria-label="Download standard structure"
                       >
                         <DownloadIcon />
                       </button>
@@ -330,8 +374,8 @@ export default function BatchSection() {
                         <button
                           onClick={() => downloadOne(it, 'alt')}
                           className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
-                          title="Download alternative .pdb"
-                          aria-label="Download alternative .pdb"
+                          title={(it.altFrames?.length ?? 0) > 1 ? 'Download alternative — all iterations (.zip)' : 'Download alternative .pdb'}
+                          aria-label="Download alternative structure"
                           style={{ opacity: 0.7 }}
                         >
                           <DownloadIcon />
@@ -442,23 +486,55 @@ export default function BatchSection() {
 
 // ── Mol* preview modal ───────────────────────────────────────────────────────
 function BatchViewerModal({ item, onClose }) {
-  const [variant, setVariant] = useState('std')
-  const [urls, setUrls] = useState({ std: null, alt: null })
+  const [variant, setVariant] = useState(item.winner === 'alternative' ? 'alt' : 'std')
+  const [step,    setStep]    = useState(null)   // current iteration step being previewed
+  const [pdbUrl,  setPdbUrl]  = useState(null)
   const hasAlt = !!item.altBlob
 
-  // Build object URLs INSIDE the effect (not useMemo) so React StrictMode's
-  // double-invoke creates fresh URLs each setup — otherwise the cleanup revokes
-  // a memoised URL that is still handed to Mol*, leaving the viewer blank.
+  const frames   = (variant === 'alt' ? item.altFrames : item.stdFrames) || []
+  const bestStep = variant === 'alt' ? item.altBestStep : item.stdBestStep
+  const baseBlob = variant === 'alt' ? item.altBlob : item.pdbBlob
+
+  // Object-URL cache keyed by `${engine}_${step}` (frames) or `${engine}_base`
+  // (single-iteration best blob). Everything is revoked together on unmount so
+  // no URL handed to Mol* is freed while still in use.
+  const cacheRef = useRef({})
+  useEffect(() => () => {
+    for (const url of Object.values(cacheRef.current)) URL.revokeObjectURL(url)
+    cacheRef.current = {}
+  }, [])
+
+  // Reset to the best-energy iteration whenever the engine variant changes.
   useEffect(() => {
-    const std = item.pdbBlob ? URL.createObjectURL(item.pdbBlob) : null
-    const alt = item.altBlob ? URL.createObjectURL(item.altBlob) : null
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing external blob URLs into render state, with cleanup
-    setUrls({ std, alt })
-    return () => {
-      if (std) URL.revokeObjectURL(std)
-      if (alt) URL.revokeObjectURL(alt)
+    setStep(bestStep ?? frames[frames.length - 1]?.step ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- frames/bestStep derive from (item, variant); avoid array-identity re-fires
+  }, [variant, item])
+
+  // Resolve the PDB URL for the current (variant, step): fetch the iteration frame
+  // when the input carried multiple iterations, otherwise show the single best blob.
+  useEffect(() => {
+    let cancelled = false
+    const engine    = variant === 'alt' ? 'alt' : 'std'
+    const useFrames = !!item.jobId && frames.length > 1 && step != null
+    const key       = useFrames ? `${engine}_${step}` : `${engine}_base`
+
+    if (cacheRef.current[key]) {
+      setPdbUrl(cacheRef.current[key])
+      return
     }
-  }, [item])
+    ;(async () => {
+      let url = null
+      if (useFrames) {
+        const res = await fetchFrame(item.jobId, engine, step)
+        url = res?.url ?? null
+      } else if (baseBlob) {
+        url = URL.createObjectURL(baseBlob)
+      }
+      if (url) cacheRef.current[key] = url
+      if (!cancelled) setPdbUrl(url)
+    })()
+    return () => { cancelled = true }
+  }, [variant, step, item, frames.length, baseBlob])
 
   // Close on Escape.
   useEffect(() => {
@@ -467,8 +543,9 @@ function BatchViewerModal({ item, onClose }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const pdbUrl = variant === 'alt' ? urls.alt : urls.std
-  const energy = variant === 'alt' ? item.altEnergy : item.stdEnergy
+  const frameEnergy = frames.find(f => f.step === step)?.energy
+  const energy = frameEnergy ?? (variant === 'alt' ? item.altEnergy : item.stdEnergy)
+  const sliderIdx = Math.max(0, frames.findIndex(f => f.step === step))
 
   return (
     <div
@@ -517,6 +594,11 @@ function BatchViewerModal({ item, onClose }) {
               ))}
             </div>
           )}
+          {frames.length > 1 && step != null && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-dim)' }}>
+              iter {step}{step === bestStep ? ' ★' : ''}
+            </span>
+          )}
           {energy != null && (
             <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-dim)' }}>
               Energy {energy.toFixed(1)}
@@ -533,6 +615,32 @@ function BatchViewerModal({ item, onClose }) {
             }}
           >×</button>
         </div>
+
+        {/* Iteration slider — only when the input carried more than one CYANA iteration.
+            Lets the user scrub every checkpoint frame; ★ marks the best-energy one. */}
+        {frames.length > 1 && step != null && (
+          <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)', flexShrink: 0 }}>
+            <input
+              type="range"
+              min={0}
+              max={frames.length - 1}
+              step={1}
+              value={sliderIdx}
+              onChange={e => setStep(frames[+e.target.value].step)}
+              style={{ width: '100%', accentColor: 'var(--teal)' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+              {frames.map(f => (
+                <span key={f.step} style={{
+                  color: f.step === step ? 'var(--teal-dark)' : (f.step === bestStep ? 'var(--text)' : 'var(--text-dim)'),
+                  fontWeight: f.step === step ? 700 : 400,
+                }}>
+                  {f.step}{f.step === bestStep ? '★' : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Viewer — explicit height so Mol* initialises with a real canvas size
             (a flex-derived height can resolve to 0 at init → blank viewer). */}
@@ -635,4 +743,12 @@ function StatusBadge({ status }) {
 
 function sanitiseName(name) {
   return name.replace(/[^a-z0-9._-]/gi, '_').slice(0, 80)
+}
+
+function triggerDownload(blob, filename) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000)
 }

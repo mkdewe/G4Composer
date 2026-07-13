@@ -22,7 +22,9 @@ describe('parseText — minimal (5-line) format', () => {
     expect(item.input.sequence).toBe('agggttagggttagggttaggg')
     expect(Array.isArray(item.input.path)).toBe(true)
     expect(item.input.orient).toBeTruthy()
-    expect(item.input.iterationSteps).toEqual([100])
+    // Minimal format carries no iteration → standard 30→300 sweep so the best
+    // checkpoint is discovered automatically.
+    expect(item.input.iterationSteps).toEqual([30, 50, 70, 100, 150, 300])
   })
 
   it('rejects an unknown topology code', () => {
@@ -87,6 +89,30 @@ describe('parseText — key/value .inp format', () => {
     const text = 'name x\nstructure ((((....))))'
     const [item] = parseText(text, 'x.inp', silvaData)
     expect(item.error).toMatch(/sequence/)
+  })
+
+  it('runs the standard 30→300 sweep when the .inp omits iteration', () => {
+    const text = [
+      'name        5cmx-assembly1',
+      'sequence    tgacgtaggttggtgtggttggggcgtca',
+      'structure   ((((((.^^..^^...^^..^^.))))))',
+      'orient      A+;B-',
+      'path        A1;B1;B2;A2;A3;B3;B4;A4',
+    ].join('\n')
+    const [item] = parseText(text, '5cmx-assembly1.inp', silvaData)
+    expect(item.error).toBeUndefined()
+    expect(item.input.iterationSteps).toEqual([30, 50, 70, 100, 150, 300])
+  })
+
+  it('honours an explicit iteration_steps field over the sweep default', () => {
+    const text = [
+      'name        x',
+      'sequence    ggggttttgggg',
+      'structure   ((((....))))',
+      'iteration_steps 50,100',
+    ].join('\n')
+    const [item] = parseText(text, 'x.inp', silvaData)
+    expect(item.input.iterationSteps).toEqual([50, 100])
   })
 })
 

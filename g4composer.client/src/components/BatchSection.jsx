@@ -545,7 +545,6 @@ function BatchViewerModal({ item, onClose }) {
 
   const frameEnergy = frames.find(f => f.step === step)?.energy
   const energy = frameEnergy ?? (variant === 'alt' ? item.altEnergy : item.stdEnergy)
-  const sliderIdx = Math.max(0, frames.findIndex(f => f.step === step))
 
   return (
     <div
@@ -617,28 +616,11 @@ function BatchViewerModal({ item, onClose }) {
         </div>
 
         {/* Iteration slider — only when the input carried more than one CYANA iteration.
-            Lets the user scrub every checkpoint frame; ★ marks the best-energy one. */}
+            Lets the user scrub every checkpoint frame; ★ marks the best-energy one.
+            Same markup/styling as Build G4 & Home so the scrubber looks identical. */}
         {frames.length > 1 && step != null && (
-          <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)', flexShrink: 0 }}>
-            <input
-              type="range"
-              min={0}
-              max={frames.length - 1}
-              step={1}
-              value={sliderIdx}
-              onChange={e => setStep(frames[+e.target.value].step)}
-              style={{ width: '100%', accentColor: 'var(--teal)' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-              {frames.map(f => (
-                <span key={f.step} style={{
-                  color: f.step === step ? 'var(--teal-dark)' : (f.step === bestStep ? 'var(--text)' : 'var(--text-dim)'),
-                  fontWeight: f.step === step ? 700 : 400,
-                }}>
-                  {f.step}{f.step === bestStep ? '★' : ''}
-                </span>
-              ))}
-            </div>
+          <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface2)', flexShrink: 0 }}>
+            <IterationSlider frames={frames} activeStep={step} bestStep={bestStep} onStep={setStep} />
           </div>
         )}
 
@@ -653,6 +635,47 @@ function BatchViewerModal({ item, onClose }) {
             representation="cartoon"
           />
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Iteration scrubber — identical markup/styling to Build G4 & Home (styles.iterSlider
+// track/thumb, tick labels absolutely positioned under the thumb, ★ marks the best).
+function IterationSlider({ frames, activeStep, bestStep, onStep }) {
+  if (!frames?.length) return null
+  const idx    = Math.max(0, frames.findIndex(f => f.step === activeStep))
+  const thumbW = 16
+  return (
+    <div style={{ padding: '4px 16px 10px' }}>
+      <input
+        type="range"
+        min={0}
+        max={frames.length - 1}
+        step={1}
+        value={idx}
+        onChange={e => onStep(frames[+e.target.value].step)}
+        className={styles.iterSlider}
+      />
+      <div style={{ position: 'relative', height: 16, marginTop: 6, fontFamily: 'var(--mono)', fontSize: 10 }}>
+        {frames.map((f, i) => {
+          const pct      = frames.length > 1 ? i / (frames.length - 1) * 100 : 50
+          const offsetPx = thumbW * (0.5 - pct / 100)
+          const isCurrent = f.step === activeStep
+          const isBest    = f.step === bestStep
+          return (
+            <span key={f.step} style={{
+              position: 'absolute',
+              left: `calc(${pct}% + ${offsetPx}px)`,
+              transform: 'translateX(-50%)',
+              color: isCurrent ? 'var(--teal-dark)' : 'var(--text-dim)',
+              fontWeight: isCurrent ? 700 : 400,
+              whiteSpace: 'nowrap',
+            }}>
+              {f.step}{isBest ? '★' : ''}
+            </span>
+          )
+        })}
       </div>
     </div>
   )

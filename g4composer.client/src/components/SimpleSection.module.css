@@ -261,3 +261,34 @@
   color: white;
   border-color: var(--teal-dark);
 }
+
+/* Iteration slider — mirrors Build G4 / Home so the batch preview scrubber
+   looks identical (flat teal track, round teal thumb) instead of the browser default. */
+.iterSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  display: block;
+  height: 4px;
+  background: var(--border-med);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.iterSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #1D9E75;
+  cursor: pointer;
+}
+.iterSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #1D9E75;
+  cursor: pointer;
+  border: none;
+}

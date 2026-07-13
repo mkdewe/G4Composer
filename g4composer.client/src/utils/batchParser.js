@@ -47,6 +47,10 @@ import { buildPath, buildDefaultTwist, scaleOrientToTetrads } from './silvaTopol
 
 const MINIMAL_LINES_COUNT = 5
 const FULL_LINES_COUNT    = 11
+// Standard CYANA iteration sweep used when an input carries no explicit iteration.
+// Matches the backend QuadroInput default so "bez iteracji" batch inputs run the
+// full 30→300 trajectory and expose which checkpoint had the best energy.
+const DEFAULT_ITERATION_STEPS = [30, 50, 70, 100, 150, 300]
 // UPPERCASE=RNA(A,C,G,U), lowercase=DNA(a,c,g,t), mixed allowed. Invalid: uppercase T, lowercase u.
 // Quadro14L explicitly rejects lowercase 'u' (ERROR 2) — use uppercase 'U' for RNA uridine.
 const ALLOWED_SEQ_CHARS = /^[ACGUacgt]+$/
@@ -166,9 +170,9 @@ function parseMinimal(lines, silvaData) {
     path:        path ? path.split(';') : null,
     isTest:      false,
     rmLevel:     5,  // minimal format carries no rm_level → quadro/reference default 5
-    // Batch mode computes a single CYANA iteration (no slider range) to keep
-    // computation time low. Minimal format carries no iteration value → use 100.
-    iterationSteps: [100],
+    // Minimal format carries no iteration value → run the standard 30→300 sweep so the
+    // best-energy checkpoint is discovered (and the viewer exposes the full trajectory).
+    iterationSteps: [...DEFAULT_ITERATION_STEPS],
     sugarPucker: /[U]/.test(sequenceRaw) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
 }
@@ -197,7 +201,7 @@ function parseFull(lines) {
     isTest:      false,
     rmLevel:     parseRmLevel(rmLevelRaw),
     // Iteration steps come directly from the input file's line 11 — single ("100")
-    // or comma-separated ("10,20,…,100"). Falls back to a single 100-step run.
+    // or comma-separated ("10,20,…,100"). Falls back to the standard 30→300 sweep.
     iterationSteps: parseIterationSteps(iterRaw),
     sugarPucker: /[U]/.test(sequenceRaw) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
@@ -248,7 +252,8 @@ function parseKeyValue(raw) {
     rmLevel:     parseRmLevel(fields.rm_level),
     // Iteration steps from the .inp: prefer the comma-separated 'iteration_steps' field
     // ("100" or "10,20,…,100"), then the legacy single 'iteration'. Batch honours both
-    // single- and multi-iteration files; falls back to a single 100-step run.
+    // single- and multi-iteration files; an .inp with neither field falls back to the
+    // standard 30→300 sweep so the best checkpoint is found automatically.
     iterationSteps: parseIterationSteps(fields.iteration_steps ?? fields.iteration),
     sugarPucker: /[U]/.test(fields.sequence) ? 'N' : 'S',  // U (uppercase) = RNA = N pucker
   }
@@ -258,8 +263,9 @@ function parseKeyValue(raw) {
 // Parse a CYANA iteration spec into a list of positive integers. Accepts a single
 // value ("100" → [100]) or a comma-separated list ("10,20,…,100" → [10,…,100]),
 // so batch mode honours both single-iteration and multi-iteration .inp files.
-// Returns the fallback (default a single 100-step run) when nothing usable is given.
-function parseIterationSteps(raw, fallback = [100]) {
+// Returns the fallback (the standard 30→300 sweep) when nothing usable is given —
+// so an .inp without an iteration field runs the full trajectory, not a lone step.
+function parseIterationSteps(raw, fallback = DEFAULT_ITERATION_STEPS) {
   const steps = String(raw ?? '')
     .split(',')
     .map(s => parseInt(s.trim(), 10))

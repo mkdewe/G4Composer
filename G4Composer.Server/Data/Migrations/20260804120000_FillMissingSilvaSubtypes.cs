@@ -177,14 +177,11 @@ namespace G4Composer.Server.Data.Migrations
                   'ggtgtgtgtgtgtgtgtggtggtggtg','^^.^.^.^.^.^.^.^.^^.^^.^^.^',
                   '...........................','A+;B+;C-;D-',
                   '3.4;4;3.4','-30.6;-18.1;-27.7','A1;B1;A2;B2;A3;B3;A4;B4;C4;D3;C3;D2;C2;D1;C1;D4',
-                  false,5,90,s.""Id""
+                  false,5,40,s.""Id""
                 FROM ""SilvaSubtypes"" s WHERE s.""Code""='1b'
                 ON CONFLICT (""PdbId"") DO NOTHING;
             ");
 
-            // NOTE (dev-only, not user-facing): out-quadro/manifest.csv records E=+3402.9 @step50
-            // for this structure — positive, unlike the other four 1b examples. Kept in pending
-            // Joanna/Tomek's confirmation that their parameters give a negative Etotal.
             migrationBuilder.Sql(@"
                 INSERT INTO ""StructureExamples""
                   (""PdbId"",""Note"",""Tetrads"",""IsTheoretical"",""InpName"",
@@ -195,7 +192,7 @@ namespace G4Composer.Server.Data.Migrations
                   'ggtgtgtggtggtgtggtggtggtgtt','^^.^.^.^^.^^.^.^^.^^.^^.^..',
                   '...........................','A+;B+;C-;D-',
                   '3.3;3.3;3.3','-29.2;-10.5;-25.9','A1;B1;A2;B2;A3;B3;A4;B4;C4;D3;C3;D2;C2;D1;C1;D4',
-                  false,5,50,s.""Id""
+                  false,5,100,s.""Id""
                 FROM ""SilvaSubtypes"" s WHERE s.""Code""='1b'
                 ON CONFLICT (""PdbId"") DO NOTHING;
             ");
@@ -210,7 +207,7 @@ namespace G4Composer.Server.Data.Migrations
                   'tggtggtggtggttgtggtggtggtgtt','.^^.^^.^^.^^..^.^^.^^.^^.^..',
                   '.S..........S...............','A+;B+;C-;D-',
                   '3.3;3.3;3.3','-28.2;-10.8;-25.8','A1;B1;A2;B2;A3;B3;A4;B4;C4;D3;C3;D2;C2;D1;C1;D4',
-                  false,5,20,s.""Id""
+                  false,5,100,s.""Id""
                 FROM ""SilvaSubtypes"" s WHERE s.""Code""='1b'
                 ON CONFLICT (""PdbId"") DO NOTHING;
             ");
@@ -225,7 +222,7 @@ namespace G4Composer.Server.Data.Migrations
                   'tggtggtggtggttgtggtggtggtgtt','.^^.^^.^^.^^..^.^^.^^.^^.^..',
                   '.S................S..S......','A+;B+;C-;D-',
                   '3.5;3.4;3.5','-35.3;-11.1;-26.9','A1;B1;A2;B2;A3;B3;A4;B4;C4;D3;C3;D2;C2;D1;C1;D4',
-                  false,5,100,s.""Id""
+                  false,5,80,s.""Id""
                 FROM ""SilvaSubtypes"" s WHERE s.""Code""='1b'
                 ON CONFLICT (""PdbId"") DO NOTHING;
             ");

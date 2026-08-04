@@ -49,7 +49,7 @@ public abstract class QuadroEngineBase : IQuadroEngine
         var chi       = string.IsNullOrWhiteSpace(input.Chi)    ? BuildDefaultChi(sequence)    : input.Chi;
         // Sugar: per-residue sugar pucker (N=North/RNA, S=South/DNA, .=default).
         // Auto-generated from sequence case when empty: UPPERCASE→N, lowercase→S.
-        var shugar    = string.IsNullOrWhiteSpace(input.Sugar) ? BuildDefaultShugar(sequence) : input.Sugar;
+        var sugar     = string.IsNullOrWhiteSpace(input.Sugar) ? BuildDefaultSugar(sequence) : input.Sugar;
         var orient    = string.IsNullOrWhiteSpace(input.Orient)    ? "A+;B+"                           : input.Orient;
         // Rise can be multi-step (e.g. "3.4;3.4") — write as-is; quadro14L.exe parses semicolons.
         var rise  = string.IsNullOrWhiteSpace(input.Rise) ? "3.4" : input.Rise.Trim();
@@ -73,7 +73,7 @@ public abstract class QuadroEngineBase : IQuadroEngine
         sb.Append("sequence    ").Append(sequence).Append('\n');
         sb.Append("structure    ").Append(structure).Append('\n');
         sb.Append("chi        ").Append(chi).Append('\n');
-        sb.Append("shugar     ").Append(shugar).Append('\n');
+        sb.Append("sugar      ").Append(sugar).Append('\n');
         sb.Append("orient        ").Append(orient).Append('\n');
         sb.Append("rise                ").Append(rise).Append('\n');
         sb.Append("twist        ").Append(twist).Append('\n');
@@ -108,10 +108,10 @@ public abstract class QuadroEngineBase : IQuadroEngine
         => new string('.', sequence.Length);
 
     /// <summary>
-    /// Default shugar: derived from sequence case — uppercase residue → N (North/RNA),
+    /// Default sugar: derived from sequence case — uppercase residue → N (North/RNA),
     /// lowercase residue → S (South/DNA). Mixed sequences get per-residue assignment.
     /// </summary>
-    protected static string BuildDefaultShugar(string sequence)
+    protected static string BuildDefaultSugar(string sequence)
     {
         var sb = new StringBuilder(sequence.Length);
         foreach (var c in sequence)

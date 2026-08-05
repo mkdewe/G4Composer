@@ -133,7 +133,7 @@ public sealed class QuadroController : ControllerBase
         if (inputs.Count == 1)
         {
             cacheHash = _cacheService.ComputeHash(inputs[0], engine);
-            var cached = await _cacheService.TryGetAsync(cacheHash, inputs[0].IterationSteps, cancellationToken);
+            var cached = await TryLookupCacheAsync(cacheHash, inputs[0].IterationSteps, cancellationToken);
             if (cached is not null)
             {
                 _logger.LogInformation("Cache hit (entry {EntryId}): skipping Docker run.", cached.EntryId);
@@ -184,7 +184,7 @@ public sealed class QuadroController : ControllerBase
                 _altPdbStore.Store(jobId, result.Alternative.Pdb);
 
             if (cacheHash is not null)
-                await _cacheService.SaveAsync(inputs[0], engine, cacheHash, result.Standard, cancellationToken);
+                await TrySaveToCacheAsync(cacheHash, inputs[0], engine, result.Standard, jobId, cancellationToken);
 
             var ic = System.Globalization.CultureInfo.InvariantCulture;
             var stdEnergy    = result.Standard.Etotal?.ToString("F3", ic) ?? "";
@@ -230,7 +230,7 @@ public sealed class QuadroController : ControllerBase
         {
             _logger.LogError(ex, "Job {JobId}: unexpected error", jobId);
             return StatusCode(StatusCodes.Status500InternalServerError,
-                new ErrorDto($"Internal error: {ex.Message}"));
+                new ErrorDto($"Internal error: {DescribeError(ex)}"));
         }
         finally
         {
@@ -278,7 +278,7 @@ public sealed class QuadroController : ControllerBase
         if (inputs.Count == 1)
         {
             cacheHash = _cacheService.ComputeHash(inputs[0], engine);
-            var cached = await _cacheService.TryGetAsync(cacheHash, inputs[0].IterationSteps, cancellationToken);
+            var cached = await TryLookupCacheAsync(cacheHash, inputs[0].IterationSteps, cancellationToken);
             if (cached is not null)
             {
                 _logger.LogInformation("Cache hit (entry {EntryId}): skipping Docker run (stream).", cached.EntryId);
@@ -341,7 +341,7 @@ public sealed class QuadroController : ControllerBase
                 _altPdbStore.Store(jobId, result.Alternative.Pdb);
 
             if (cacheHash is not null)
-                await _cacheService.SaveAsync(inputs[0], engine, cacheHash, result.Standard, cancellationToken);
+                await TrySaveToCacheAsync(cacheHash, inputs[0], engine, result.Standard, jobId, cancellationToken);
 
             await SendEventAsync("done", new
             {
@@ -375,7 +375,7 @@ public sealed class QuadroController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Job {JobId}: unexpected stream error", jobId);
-            await SendEventAsync("error", new { type = "error", message = $"Internal error: {ex.Message}" }, CancellationToken.None);
+            await SendEventAsync("error", new { type = "error", message = $"Internal error: {DescribeError(ex)}" }, CancellationToken.None);
         }
         finally
         {
@@ -478,6 +478,41 @@ public sealed class QuadroController : ControllerBase
         entry.CreatedAtUtc, entry.LastAccessedAtUtc,
         entry.Frames.OrderBy(f => f.Step).Select(f => new PdbCacheFrameDto(f.Step, f.Etotal)).ToList());
 
+    /// <summary>
+    /// A broken cache lookup should degrade to "run it fresh," never fail the request outright.
+    /// </summary>
+    private async Task<CachedRun?> TryLookupCacheAsync(string hash, IReadOnlyList<int> requestedSteps, CancellationToken ct)
+    {
+        try
+        {
+            return await _cacheService.TryGetAsync(hash, requestedSteps, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Cache lookup failed (non-fatal, running fresh): {Msg}", DescribeError(ex));
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Caching a result is a nice-to-have, never a reason to fail a request whose Docker
+    /// computation already succeeded — log and swallow any DB error instead of propagating it.
+    /// </summary>
+    private async Task TrySaveToCacheAsync(
+        string cacheHash, QuadroInput input, IQuadroEngine engine, SingleRunResult result,
+        string jobId, CancellationToken ct)
+    {
+        try
+        {
+            await _cacheService.SaveAsync(input, engine, cacheHash, result, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Job {JobId}: failed to save result to PDB cache (non-fatal): {Msg}",
+                jobId, DescribeError(ex));
+        }
+    }
+
     // ── Cache helpers ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -577,6 +612,14 @@ public sealed class QuadroController : ControllerBase
             l.StartsWith("ATOM",   StringComparison.Ordinal) ||
             l.StartsWith("HETATM", StringComparison.Ordinal));
     }
+
+    /// <summary>
+    /// EF Core wraps DB failures in DbUpdateException, whose own .Message is a generic
+    /// "See the inner exception for details." — surface the real (innermost) driver error
+    /// too, so a failure is diagnosable from the UI/SSE response alone.
+    /// </summary>
+    private static string DescribeError(Exception ex) =>
+        ex.InnerException is null ? ex.Message : $"{ex.Message} — {ex.GetBaseException().Message}";
 
     private void CleanupJobDir(string dir)
     {

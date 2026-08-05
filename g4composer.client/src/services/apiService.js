@@ -436,3 +436,55 @@ export async function fetchExampleDetail(pdbId) {
     return null
   }
 }
+
+/**
+ * Retrieve — fetch a cached result's metadata by its numeric cache id.
+ * @param {number} id
+ * @returns {Promise<object|null>} PdbCacheEntryDto (id, pdbId, isExample, engineVersion, createdAtUtc, frames[])
+ */
+export async function fetchCacheEntry(id) {
+  try {
+    const response = await fetch(`/api/quadro11/cache/${encodeURIComponent(id)}`, {
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Retrieve — fetch a cached result's metadata by PDB ID (only set for cached Examples).
+ * @param {string} pdbId
+ * @returns {Promise<object|null>}
+ */
+export async function fetchCacheEntryByPdbId(pdbId) {
+  try {
+    const response = await fetch(`/api/quadro11/cache/by-pdbid/${encodeURIComponent(pdbId)}`, {
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Retrieve — fetch the PDB for one specific cached iteration checkpoint.
+ * @param {number} entryId
+ * @param {number} step
+ * @returns {Promise<{blob: Blob, url: string}|null>}
+ */
+export async function fetchCacheFrame(entryId, step) {
+  try {
+    const res = await fetch(`/api/quadro11/cache/${entryId}/frame/${step}`)
+    if (!res.ok) return null
+    const raw  = await res.blob()
+    const blob = raw.type === 'chemical/x-pdb' ? raw : new Blob([raw], { type: 'chemical/x-pdb' })
+    return { blob, url: URL.createObjectURL(blob) }
+  } catch {
+    return null
+  }
+}

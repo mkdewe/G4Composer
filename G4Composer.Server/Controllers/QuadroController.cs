@@ -42,6 +42,7 @@ public sealed class QuadroController : ControllerBase
     private readonly IJobLogStore _logStore;
     private readonly IAltPdbStore _altPdbStore;
     private readonly IFrameStore _frameStore;
+    private readonly IPdbCacheService _cacheService;
 
     public QuadroController(
         ILogger<QuadroController> logger,
@@ -52,7 +53,8 @@ public sealed class QuadroController : ControllerBase
         IOptions<QuadroOptions> options,
         IJobLogStore logStore,
         IAltPdbStore altPdbStore,
-        IFrameStore frameStore)
+        IFrameStore frameStore,
+        IPdbCacheService cacheService)
     {
         _logger = logger;
         _engineSelector = engineSelector;
@@ -63,6 +65,7 @@ public sealed class QuadroController : ControllerBase
         _logStore = logStore;
         _altPdbStore = altPdbStore;
         _frameStore = frameStore;
+        _cacheService = cacheService;
     }
 
     // ── Health ───────────────────────────────────────────────────────────────
@@ -123,6 +126,21 @@ public sealed class QuadroController : ControllerBase
             return BadRequest(new ValidationErrorDto("Validation failed.", validationErrors));
 
         var engine = _engineSelector.Active;
+
+        // Cache: only single-structure runs have a well-defined dedup key (batch runs are a
+        // sequential sweep over many distinct inputs — not a good caching candidate).
+        string? cacheHash = null;
+        if (inputs.Count == 1)
+        {
+            cacheHash = _cacheService.ComputeHash(inputs[0], engine);
+            var cached = await _cacheService.TryGetAsync(cacheHash, inputs[0].IterationSteps, cancellationToken);
+            if (cached is not null)
+            {
+                _logger.LogInformation("Cache hit (entry {EntryId}): skipping Docker run.", cached.EntryId);
+                return ServeCachedResult(cached);
+            }
+        }
+
         var jobId  = Guid.NewGuid().ToString("N")[..12];
         var jobDir = Path.Combine(Path.GetTempPath(), $"g4composer_{jobId}");
         Directory.CreateDirectory(jobDir);
@@ -164,6 +182,9 @@ public sealed class QuadroController : ControllerBase
             // Store alt best-frame PDB for legacy GET /alt-pdb/{jobId}
             if (result.Alternative.Success && result.Alternative.Pdb is not null)
                 _altPdbStore.Store(jobId, result.Alternative.Pdb);
+
+            if (cacheHash is not null)
+                await _cacheService.SaveAsync(inputs[0], engine, cacheHash, result.Standard, cancellationToken);
 
             var ic = System.Globalization.CultureInfo.InvariantCulture;
             var stdEnergy    = result.Standard.Etotal?.ToString("F3", ic) ?? "";
@@ -252,6 +273,20 @@ public sealed class QuadroController : ControllerBase
         }
 
         var engine = _engineSelector.Active;
+
+        string? cacheHash = null;
+        if (inputs.Count == 1)
+        {
+            cacheHash = _cacheService.ComputeHash(inputs[0], engine);
+            var cached = await _cacheService.TryGetAsync(cacheHash, inputs[0].IterationSteps, cancellationToken);
+            if (cached is not null)
+            {
+                _logger.LogInformation("Cache hit (entry {EntryId}): skipping Docker run (stream).", cached.EntryId);
+                await SendCachedDoneEventAsync(cached, cancellationToken);
+                return;
+            }
+        }
+
         var jobId  = Guid.NewGuid().ToString("N")[..12];
         var jobDir = Path.Combine(Path.GetTempPath(), $"g4composer_{jobId}");
         Directory.CreateDirectory(jobDir);
@@ -304,6 +339,9 @@ public sealed class QuadroController : ControllerBase
                     _frameStore.Store(jobId, "alt", frame.Step, frame.Pdb);
             if (result.Alternative.Success && result.Alternative.Pdb is not null)
                 _altPdbStore.Store(jobId, result.Alternative.Pdb);
+
+            if (cacheHash is not null)
+                await _cacheService.SaveAsync(inputs[0], engine, cacheHash, result.Standard, cancellationToken);
 
             await SendEventAsync("done", new
             {
@@ -389,6 +427,124 @@ public sealed class QuadroController : ControllerBase
 
         return Content(log, "text/plain");
     }
+
+    // ── Cache retrieve ───────────────────────────────────────────────────────
+
+    /// <summary>Look up a cached result by its numeric id (the "Retrieve" identifier — not name).</summary>
+    [HttpGet("cache/{id:int}")]
+    [SwaggerOperation(Summary = "Get cached result metadata by id", Tags = [SwaggerTag])]
+    [ProducesResponseType(typeof(PdbCacheEntryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PdbCacheEntryDto>> GetCacheEntry(int id, CancellationToken cancellationToken)
+    {
+        var entry = await _cacheService.GetByIdAsync(id, cancellationToken);
+        if (entry is null)
+            return NotFound(new ErrorDto($"Cached result '{id}' not found."));
+
+        return Ok(ToDto(entry));
+    }
+
+    /// <summary>Look up a cached result by PDB id (only set for entries matching a curated Example).</summary>
+    [HttpGet("cache/by-pdbid/{pdbId}")]
+    [SwaggerOperation(Summary = "Get cached result metadata by PDB id", Tags = [SwaggerTag])]
+    [ProducesResponseType(typeof(PdbCacheEntryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PdbCacheEntryDto>> GetCacheEntryByPdbId(string pdbId, CancellationToken cancellationToken)
+    {
+        var entry = await _cacheService.GetByPdbIdAsync(pdbId, cancellationToken);
+        if (entry is null)
+            return NotFound(new ErrorDto($"Cached result for PDB id '{pdbId}' not found."));
+
+        return Ok(ToDto(entry));
+    }
+
+    /// <summary>PDB bytes for one specific iteration of a cached entry (preview of a chosen checkpoint).</summary>
+    [HttpGet("cache/{id:int}/frame/{step:int}")]
+    [SwaggerOperation(Summary = "Get PDB for a specific cached iteration", Tags = [SwaggerTag])]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "chemical/x-pdb")]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> GetCacheFrame(int id, int step, CancellationToken cancellationToken)
+    {
+        var entry = await _cacheService.GetByIdAsync(id, cancellationToken);
+        var frame = entry?.Frames.FirstOrDefault(f => f.Step == step);
+        if (frame is null)
+            return NotFound(new ErrorDto($"Cached frame {id}/{step} not found."));
+
+        return File(Encoding.UTF8.GetBytes(frame.Pdb), "chemical/x-pdb", $"g4_cache_{id}_{step}.pdb");
+    }
+
+    private static PdbCacheEntryDto ToDto(G4Composer.Server.Data.Entities.PdbCacheEntry entry) => new(
+        entry.Id, entry.PdbId, entry.IsExample, entry.EngineVersion,
+        entry.CreatedAtUtc, entry.LastAccessedAtUtc,
+        entry.Frames.OrderBy(f => f.Step).Select(f => new PdbCacheFrameDto(f.Step, f.Etotal)).ToList());
+
+    // ── Cache helpers ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds the exact same response shape as a fresh <see cref="Run"/> call from a cache hit —
+    /// same headers, same file — so the frontend cannot tell the difference except for timing
+    /// and the added X-Cache-Hit header. Frames are re-published into the (short-lived)
+    /// in-memory FrameStore under a synthetic job id so the per-step GET /frame endpoint keeps
+    /// working when the user switches iterations in the UI.
+    /// </summary>
+    private IActionResult ServeCachedResult(CachedRun cached)
+    {
+        var jobId = $"cache-{cached.EntryId}-{Guid.NewGuid():N}"[..24];
+        foreach (var frame in cached.Frames)
+            _frameStore.Store(jobId, "std", frame.Step, frame.Pdb);
+
+        var best = PickBest(cached.Frames);
+        var ic   = System.Globalization.CultureInfo.InvariantCulture;
+        var steps    = string.Join(",", cached.Frames.Select(f => f.Step));
+        var energies = string.Join(",", cached.Frames.Select(f => f.Etotal?.ToString("F3", ic) ?? ""));
+
+        Response.Headers["X-Job-Id"]        = jobId;
+        Response.Headers["X-Cache-Hit"]     = "1";
+        Response.Headers["X-Cache-Entry-Id"] = cached.EntryId.ToString();
+        Response.Headers["X-Atom-Count"]    = CountPdbAtoms(best.Pdb).ToString();
+        Response.Headers["X-Std-Energy"]    = best.Etotal?.ToString("F3", ic) ?? "";
+        Response.Headers["X-Alt-Energy"]    = "";
+        Response.Headers["X-Has-Alt"]       = "0";
+        Response.Headers["X-Winner"]        = "standard";
+        Response.Headers["X-Std-Steps"]     = steps;
+        Response.Headers["X-Alt-Steps"]     = "";
+        Response.Headers["X-Std-Energies"]  = energies;
+        Response.Headers["X-Alt-Energies"]  = "";
+        Response.Headers["X-Std-Best-Step"] = best.Step.ToString();
+        Response.Headers["X-Alt-Best-Step"] = "";
+        Response.Headers["Access-Control-Expose-Headers"] =
+            "X-Job-Id, X-Cache-Hit, X-Cache-Entry-Id, X-Atom-Count, X-Std-Energy, X-Alt-Energy, X-Has-Alt, X-Winner, " +
+            "X-Std-Steps, X-Alt-Steps, X-Std-Energies, X-Alt-Energies, X-Std-Best-Step, X-Alt-Best-Step";
+
+        return File(best.Pdb, "chemical/x-pdb", $"g4_{jobId}.pdb");
+    }
+
+    private async Task SendCachedDoneEventAsync(CachedRun cached, CancellationToken ct)
+    {
+        var jobId = $"cache-{cached.EntryId}-{Guid.NewGuid():N}"[..24];
+        foreach (var frame in cached.Frames)
+            _frameStore.Store(jobId, "std", frame.Step, frame.Pdb);
+
+        var best = PickBest(cached.Frames);
+
+        await SendEventAsync("done", new
+        {
+            type        = "done",
+            jobId,
+            atoms       = CountPdbAtoms(best.Pdb),
+            stdEnergy   = best.Etotal,
+            altEnergy   = (double?)null,
+            hasAlt      = false,
+            winner      = "standard",
+            stdFrames   = cached.Frames.Select(f => new { step = f.Step, energy = f.Etotal }).ToList(),
+            altFrames   = Array.Empty<object>(),
+            stdBestStep = best.Step,
+            altBestStep = (int?)null,
+        }, ct);
+    }
+
+    private static IterationFrame PickBest(IReadOnlyList<IterationFrame> frames) =>
+        frames.Where(f => f.Etotal.HasValue).MinBy(f => f.Etotal!.Value) ?? frames[0];
 
     // ── SSE helper ─────────────────────────────────────────────────────────────
 

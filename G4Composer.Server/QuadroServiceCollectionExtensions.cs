@@ -36,6 +36,9 @@ public static class QuadroServiceCollectionExtensions
         services.AddSingleton<IFrameStore, InMemoryFrameStore>();
         services.AddSingleton<IQuadroJobRunner, QuadroJobRunner>();
 
+        // Scoped — depends on AppDbContext (scoped).
+        services.AddScoped<IPdbCacheService, PdbCacheService>();
+
         return services;
     }
 }

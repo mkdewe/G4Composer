@@ -112,3 +112,57 @@ public sealed class StructureExample
     public int? SilvaSubtypeId { get; set; }
     public SilvaSubtype? Subtype { get; set; }
 }
+
+/// <summary>
+/// A cached quadro run: one row per distinct physical input (identical
+/// sequence/structure/chi/orient/rise/twist/sugar/path resolved through the engine's own
+/// defaulting logic). <see cref="Hash"/> is the dedup key — see PdbCacheService.ComputeHash.
+/// Serving a hit skips the Docker run entirely.
+/// </summary>
+public sealed class PdbCacheEntry
+{
+    public int Id { get; set; }
+
+    /// <summary>SHA-256 hex of the canonical (defaulted) .inp fields + engine version.</summary>
+    public required string Hash { get; set; }
+
+    /// <summary>Set when this entry matches a curated StructureExample; null for ad-hoc runs.</summary>
+    public int? StructureExampleId { get; set; }
+    public StructureExample? StructureExample { get; set; }
+
+    /// <summary>Denormalized copy of StructureExample.PdbId, for lookup-by-PdbId without a join.</summary>
+    public string? PdbId { get; set; }
+
+    /// <summary>True when StructureExampleId is set — kept as its own column for cheap filtering.</summary>
+    public bool IsExample { get; set; }
+
+    /// <summary>Engine version that produced these frames (IQuadroEngine.Version), e.g. "14L".</summary>
+    public required string EngineVersion { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    /// <summary>Bumped on every cache hit — drives LRU eviction of ad-hoc entries.</summary>
+    public DateTime LastAccessedAtUtc { get; set; }
+
+    public ICollection<PdbCacheFrame> Frames { get; set; } = [];
+}
+
+/// <summary>
+/// One stored iteration checkpoint's PDB content for a <see cref="PdbCacheEntry"/>.
+/// Examples get one row per displayed checkpoint; ad-hoc entries get exactly one (the best).
+/// </summary>
+public sealed class PdbCacheFrame
+{
+    public int Id { get; set; }
+
+    public int PdbCacheEntryId { get; set; }
+    public PdbCacheEntry Entry { get; set; } = null!;
+
+    /// <summary>Cumulative iteration-step count this checkpoint was minimized to.</summary>
+    public int Step { get; set; }
+
+    public double? Etotal { get; set; }
+
+    /// <summary>Raw PDB file content.</summary>
+    public required string Pdb { get; set; }
+}

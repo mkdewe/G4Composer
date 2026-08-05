@@ -53,6 +53,13 @@ public sealed class QuadroOptions
     /// </summary>
     public string? AlternativeExecutable { get; set; } = null;
 
+    /// <summary>
+    /// Maximum number of ad-hoc (non-Example) entries kept in the PDB cache. When a new
+    /// ad-hoc entry would exceed this, the least-recently-accessed ad-hoc entries are evicted
+    /// first. Curated Example entries are never evicted by this limit.
+    /// </summary>
+    public int PdbCacheMaxAdHocEntries { get; set; } = 300;
+
     /// <summary>Słownik konfiguracji per-wersja silnika.</summary>
     public Dictionary<string, EngineConfig> Engines { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {

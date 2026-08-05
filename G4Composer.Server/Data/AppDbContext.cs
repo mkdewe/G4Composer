@@ -10,6 +10,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<SilvaGroup>      SilvaGroups      => Set<SilvaGroup>();
     public DbSet<SilvaSubtype>    SilvaSubtypes    => Set<SilvaSubtype>();
     public DbSet<StructureExample> StructureExamples => Set<StructureExample>();
+    public DbSet<PdbCacheEntry>   PdbCacheEntries  => Set<PdbCacheEntry>();
+    public DbSet<PdbCacheFrame>   PdbCacheFrames   => Set<PdbCacheFrame>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -59,6 +61,34 @@ public sealed class AppDbContext : DbContext
             e.HasOne(x => x.Subtype)
              .WithMany(s => s.Examples)
              .HasForeignKey(x => x.SilvaSubtypeId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── PdbCacheEntry ─────────────────────────────────────────────────
+        model.Entity<PdbCacheEntry>(e =>
+        {
+            e.HasIndex(c => c.Hash).IsUnique();
+            e.HasIndex(c => c.PdbId);
+            e.HasIndex(c => c.LastAccessedAtUtc);
+
+            e.Property(c => c.Hash).HasMaxLength(64);
+            e.Property(c => c.PdbId).HasMaxLength(32);
+            e.Property(c => c.EngineVersion).HasMaxLength(16);
+
+            e.HasOne(c => c.StructureExample)
+             .WithMany()
+             .HasForeignKey(c => c.StructureExampleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── PdbCacheFrame ─────────────────────────────────────────────────
+        model.Entity<PdbCacheFrame>(e =>
+        {
+            e.HasIndex(f => new { f.PdbCacheEntryId, f.Step }).IsUnique();
+
+            e.HasOne(f => f.Entry)
+             .WithMany(c => c.Frames)
+             .HasForeignKey(f => f.PdbCacheEntryId)
              .OnDelete(DeleteBehavior.Cascade);
         });
     }

@@ -1,24 +1,4 @@
-// ─── RetrieveSection ───────────────────────────────────────────────────────
 import styles from './SimpleSection.module.css'
-
-export function RetrieveSection() {
-  return (
-    <div>
-      <h2 className={styles.heading}>Retrieve a previous job</h2>
-      <p className={styles.sub}>
-        Enter a job identifier to download a previously generated model.
-        Results older than 30 days are automatically deleted from the server.
-      </p>
-      <div className={styles.card} style={{ maxWidth: 580, margin: '0 auto' }}>
-        <div className={styles.cardTitle}>Job / Molecule ID</div>
-        <div className={styles.retrieveRow}>
-          <input type="text" placeholder="e.g. a3f2-91cc-4d8e-b712" />
-          <button className={styles.retrieveBtn}>Retrieve</button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── DocsSection ───────────────────────────────────────────────────────────
 export function DocsSection() {

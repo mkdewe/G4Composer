@@ -77,7 +77,8 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader()
             .AllowAnyMethod()
             .WithExposedHeaders("X-Job-Id", "X-Atom-Count", "Content-Disposition",
-                "X-Std-Energy", "X-Alt-Energy", "X-Has-Alt", "X-Winner");
+                "X-Std-Energy", "X-Alt-Energy", "X-Has-Alt", "X-Winner",
+                "X-Cache-Hit", "X-Cache-Entry-Id");
     });
 });
 

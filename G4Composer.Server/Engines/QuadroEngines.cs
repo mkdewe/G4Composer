@@ -9,20 +9,7 @@ public sealed class Quadro14GEngine : QuadroEngineBase
 {
     public const string VersionId = "14G";
 
-    private readonly QuadroOptions.EngineConfig _config;
-
-    public Quadro14GEngine(IOptions<QuadroOptions> options)
-    {
-        if (!options.Value.Engines.TryGetValue(VersionId, out var cfg))
-            throw new InvalidOperationException(
-                $"Missing configuration for engine version '{VersionId}' " +
-                $"in section '{QuadroOptions.SectionName}.Engines'.");
-        _config = cfg;
-    }
-
-    public override string Version    => VersionId;
-    public override string Image      => _config.Image;
-    public override string Executable => _config.Executable;
+    public Quadro14GEngine(IOptions<QuadroOptions> options) : base(options, VersionId) { }
 }
 
 /// <summary>
@@ -35,20 +22,7 @@ public sealed class Quadro14LEngine : QuadroEngineBase
 {
     public const string VersionId = "14L";
 
-    private readonly QuadroOptions.EngineConfig _config;
-
-    public Quadro14LEngine(IOptions<QuadroOptions> options)
-    {
-        if (!options.Value.Engines.TryGetValue(VersionId, out var cfg))
-            throw new InvalidOperationException(
-                $"Missing configuration for engine version '{VersionId}' " +
-                $"in section '{QuadroOptions.SectionName}.Engines'.");
-        _config = cfg;
-    }
-
-    public override string Version    => VersionId;
-    public override string Image      => _config.Image;
-    public override string Executable => _config.Executable;
+    public Quadro14LEngine(IOptions<QuadroOptions> options) : base(options, VersionId) { }
 
     // public override string SerializeInput(QuadroInput input)
     // {
@@ -82,20 +56,7 @@ public sealed class Quadro14NEngine : QuadroEngineBase
 {
     public const string VersionId = "14N";
 
-    private readonly QuadroOptions.EngineConfig _config;
-
-    public Quadro14NEngine(IOptions<QuadroOptions> options)
-    {
-        if (!options.Value.Engines.TryGetValue(VersionId, out var cfg))
-            throw new InvalidOperationException(
-                $"Missing configuration for engine version '{VersionId}' " +
-                $"in section '{QuadroOptions.SectionName}.Engines'.");
-        _config = cfg;
-    }
-
-    public override string Version    => VersionId;
-    public override string Image      => _config.Image;
-    public override string Executable => _config.Executable;
+    public Quadro14NEngine(IOptions<QuadroOptions> options) : base(options, VersionId) { }
 
     /// <summary>
     /// Kanoniczna postać .inp — używana do hasha cache'a i do podglądu w UI, nie do

@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text;
+using Microsoft.Extensions.Options;
+using G4Composer.Server.Configuration;
 using G4Composer.Server.Models;
 
 namespace G4Composer.Server.Engines;
@@ -20,6 +22,13 @@ public interface IQuadroEngine
 
     /// <summary>Nazwa pliku wykonywalnego w kontenerze (np. "quadro14L.exe").</summary>
     string Executable { get; }
+
+    /// <summary>
+    /// Binarka alternatywnego przelotu uruchamiana równolegle w <see cref="Image"/>.
+    /// <c>null</c> = ta wersja nie ma alternatywy. Trzymana przy silniku, bo dzieli z nim
+    /// obraz — globalna wartość rozjeżdżała się z <c>Version</c> przy zmianie wersji.
+    /// </summary>
+    string? AlternativeExecutable { get; }
 
     /// <summary>Generuje zawartość pliku .inp w formacie wymaganym przez wersję silnika.</summary>
     string SerializeInput(QuadroInput input);
@@ -62,9 +71,37 @@ public sealed record QuadroPass(int Step, string FileName, string Content, int E
 /// </summary>
 public abstract class QuadroEngineBase : IQuadroEngine
 {
-    public abstract string Version { get; }
-    public abstract string Image { get; }
-    public abstract string Executable { get; }
+    private readonly QuadroOptions.EngineConfig _config;
+    private readonly string? _globalAlternative;
+
+    /// <param name="versionId">
+    /// Klucz w <c>Quadro.Engines</c>. Podawany jawnie, bo <see cref="Version"/> nie jest jeszcze
+    /// dostępne w konstruktorze klasy bazowej.
+    /// </param>
+    protected QuadroEngineBase(IOptions<QuadroOptions> options, string versionId)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var opts = options.Value;
+        if (!opts.Engines.TryGetValue(versionId, out var cfg))
+            throw new InvalidOperationException(
+                $"Missing configuration for engine version '{versionId}' " +
+                $"in section '{QuadroOptions.SectionName}.Engines'.");
+
+        _config            = cfg;
+        _globalAlternative = opts.AlternativeExecutable;
+        Version            = versionId;
+    }
+
+    public string Version { get; }
+    public string Image => _config.Image;
+    public string Executable => _config.Executable;
+
+    /// <summary>
+    /// Per-silnik, z globalnym ustawieniem jako fallback dla starych configów. Kolejność jest
+    /// istotna: wpis przy silniku musi wygrać, bo to on jedzie w parze z <see cref="Image"/>.
+    /// </summary>
+    public string? AlternativeExecutable => _config.AlternativeExecutable ?? _globalAlternative;
 
     public virtual string SerializeInput(QuadroInput input)
         => BuildInp(input, ResolveName(input), IterationLine(input));

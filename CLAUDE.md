@@ -73,6 +73,25 @@ monotonically better; measured on the 70 deposited examples, raising 14L's build
   line 859, so the shell parses the trailing 24 lines as shell code and chokes. Harmless only
   because the runner calls it via `ExecIgnore`. 14N exits 0.
 
+## Configuration: what lives where
+
+`deploy.sh` is committed at the repo root and is what the server runs (`/home/G4Composer/deploy.sh`).
+Frontend and Docker images are rebuilt by it — do **not** commit `G4Composer.Server/wwwroot/`,
+it is gitignored build output.
+
+⚠️ **`/var/www/g4composer/appsettings.Production.json` exists only on the server.**
+`dotnet publish` never overwrites it (it is not part of the project), so it silently outranks
+everything in `appsettings.json`. On 2026-08-25 it pinned `Quadro:Version` to `14L` for a week
+after the repo had moved to 14N — the standard run kept working while the alternative one died
+in the wrong image, so the UI showed only one model and nothing logged an error. **Keep that
+file down to server-only settings** (connection string, log levels); anything about the engine
+belongs in `appsettings.json`.
+
+`AlternativeExecutable` is configured **per engine**, inside `Quadro:Engines:<ver>`, because the
+alternative binary runs in that engine's own image. `QuadroReadinessCheck` verifies at startup
+that the active image really contains both binaries and reports it in `/health`
+(`status: "degraded"` + `configProblem`).
+
 ## Deploy flow (server)
 
 ```bash

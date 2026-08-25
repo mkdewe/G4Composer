@@ -37,6 +37,11 @@ public static class QuadroServiceCollectionExtensions
         services.AddSingleton<IFrameStore, InMemoryFrameStore>();
         services.AddSingleton<IQuadroJobRunner, QuadroJobRunner>();
 
+        // Jednorazowa weryfikacja na starcie: czy obraz aktywnej wersji naprawdę zawiera
+        // binarki, które config każe w nim uruchamiać. Wynik czyta /health.
+        services.AddSingleton<QuadroReadiness>();
+        services.AddHostedService<QuadroReadinessCheck>();
+
         // Scoped — depends on AppDbContext (scoped).
         services.AddScoped<IPdbCacheService, PdbCacheService>();
 

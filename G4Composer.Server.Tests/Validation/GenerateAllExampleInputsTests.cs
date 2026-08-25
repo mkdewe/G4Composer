@@ -1,4 +1,5 @@
 using System.Text;
+using G4Composer.Server.Configuration;
 using G4Composer.Server.Data;
 using G4Composer.Server.Data.Entities;
 using G4Composer.Server.Engines;
@@ -24,12 +25,14 @@ public class GenerateAllExampleInputsTests
     private readonly ITestOutputHelper _out;
     public GenerateAllExampleInputsTests(ITestOutputHelper output) => _out = output;
 
-    // Minimal concrete engine so we can call the real SerializeInput without DI/config.
+    // Minimal concrete engine so we can call the real SerializeInput without DI.
+    // Version/Image/Executable pochodzą teraz z QuadroOptions (klasa bazowa je czyta w
+    // konstruktorze), więc podajemy domyślne opcje — wpis "14L" jest w nich zaszyty.
     private sealed class ReportEngine : QuadroEngineBase
     {
-        public override string Version    => "14L";
-        public override string Image      => "quadro14l:latest";
-        public override string Executable => "quadro14L.exe";
+        public ReportEngine()
+            : base(Microsoft.Extensions.Options.Options.Create(new QuadroOptions()),
+                   Quadro14LEngine.VersionId) { }
     }
 
     [Fact]

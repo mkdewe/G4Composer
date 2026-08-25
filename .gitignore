@@ -33,3 +33,8 @@ run_quadro_all.sh
 run_quadro_smoke.sh
 export-example-pdbs.ps1
 example-inputs.generated.txt
+# Zbudowany frontend. Generowany przez `npm run build` (vite: emptyOutDir), a na serwerze
+# przez krok [3/6] deploy.sh — commitowanie go tylko rozjeżdżało repo z produkcją i
+# blokowało `git pull` konfliktem na wygenerowanych plikach.
+G4Composer.Server/wwwroot/assets/
+G4Composer.Server/wwwroot/index.html

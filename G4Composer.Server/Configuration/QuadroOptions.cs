@@ -10,12 +10,14 @@ namespace G4Composer.Server.Configuration;
 /// appsettings.json:
 /// <code>
 /// "Quadro": {
-///   "Version": "14L",
-///   "ContainerNamePrefix": "q14l",
-///   "TimeoutSeconds": 300,
+///   "Version": "14N",
+///   "ContainerNamePrefix": "q14n",
+///   "TimeoutSeconds": 900,
 ///   "Engines": {
-///     "14G": { "Image": "quadro14g:latest", "Executable": "quadro14G.exe" },
-///     "14L": { "Image": "quadro14l:latest", "Executable": "quadro14L.exe" }
+///     "14L": { "Image": "quadro14l:latest", "Executable": "quadro14L.exe",
+///              "AlternativeExecutable": "alternatywa14L.exe" },
+///     "14N": { "Image": "quadro14n:latest", "Executable": "quadro14N.exe",
+///              "AlternativeExecutable": "alternatywa14N.exe" }
 ///   }
 /// }
 /// </code>
@@ -47,9 +49,16 @@ public sealed class QuadroOptions
     public string ContainerDataDirectory { get; set; } = "/data";
 
     /// <summary>
-    /// Executable name of the alternative engine run in parallel alongside the standard one.
-    /// Set to null to disable dual-run mode. Example: "alternatywa14L.exe".
-    /// The alternative engine uses the same Docker image as the active engine.
+    /// Fallback dla <see cref="EngineConfig.AlternativeExecutable"/>, używany tylko wtedy,
+    /// gdy aktywny silnik nie definiuje własnej alternatywy. Zostawione dla zgodności ze
+    /// starymi plikami konfiguracyjnymi — nowe wpisy podawaj per-silnik.
+    /// <para>
+    /// UWAGA: alternatywa startuje w <b>obrazie aktywnego silnika</b>. Globalna wartość jest
+    /// więc pułapką przy zmianie wersji: 2026-08-25 produkcja miała <c>Version=14L</c> i
+    /// globalne <c>alternatywa14N.exe</c>, którego w obrazie 14L nie ma — przelot alternatywny
+    /// wywalał się po cichu (niefatalnie), a UI od tygodnia pokazywało wyłącznie standard.
+    /// Dlatego wartość należy trzymać obok obrazu, w <see cref="EngineConfig"/>.
+    /// </para>
     /// </summary>
     public string? AlternativeExecutable { get; set; } = null;
 
@@ -64,8 +73,10 @@ public sealed class QuadroOptions
     public Dictionary<string, EngineConfig> Engines { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {
         ["14G"] = new EngineConfig { Image = "quadro14g:latest", Executable = "quadro14G.exe" },
-        ["14L"] = new EngineConfig { Image = "quadro14l:latest", Executable = "quadro14L.exe" },
-        ["14N"] = new EngineConfig { Image = "quadro14n:latest", Executable = "quadro14N.exe" },
+        ["14L"] = new EngineConfig { Image = "quadro14l:latest", Executable = "quadro14L.exe",
+                                     AlternativeExecutable = "alternatywa14L.exe" },
+        ["14N"] = new EngineConfig { Image = "quadro14n:latest", Executable = "quadro14N.exe",
+                                     AlternativeExecutable = "alternatywa14N.exe" },
     };
 
     public sealed class EngineConfig
@@ -75,5 +86,14 @@ public sealed class QuadroOptions
 
         /// <summary>Nazwa pliku wykonywalnego w obrazie, np. "quadro14L.exe".</summary>
         public required string Executable { get; set; }
+
+        /// <summary>
+        /// Nazwa binarki alternatywnego przelotu, uruchamianej równolegle w <b>tym samym
+        /// obrazie</b> co <see cref="Executable"/> — dlatego musi tu być, a nie globalnie:
+        /// obraz i jego alternatywa nie mogą się rozjechać przy zmianie
+        /// <see cref="QuadroOptions.Version"/>. <c>null</c> = brak alternatywy dla tej wersji
+        /// (wtedy używany jest globalny <see cref="QuadroOptions.AlternativeExecutable"/>).
+        /// </summary>
+        public string? AlternativeExecutable { get; set; }
     }
 }

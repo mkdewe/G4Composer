@@ -44,6 +44,7 @@ public sealed class QuadroController : ControllerBase
     private readonly IAltPdbStore _altPdbStore;
     private readonly IFrameStore _frameStore;
     private readonly IPdbCacheService _cacheService;
+    private readonly QuadroReadiness _readiness;
 
     public QuadroController(
         ILogger<QuadroController> logger,
@@ -55,7 +56,8 @@ public sealed class QuadroController : ControllerBase
         IJobLogStore logStore,
         IAltPdbStore altPdbStore,
         IFrameStore frameStore,
-        IPdbCacheService cacheService)
+        IPdbCacheService cacheService,
+        QuadroReadiness readiness)
     {
         _logger = logger;
         _engineSelector = engineSelector;
@@ -67,6 +69,7 @@ public sealed class QuadroController : ControllerBase
         _altPdbStore = altPdbStore;
         _frameStore = frameStore;
         _cacheService = cacheService;
+        _readiness = readiness;
     }
 
     // ── Health ───────────────────────────────────────────────────────────────
@@ -81,13 +84,23 @@ public sealed class QuadroController : ControllerBase
         var imageExists = dockerAvailable
             && await _healthService.ImageExistsAsync(engine.Image, cancellationToken);
 
+        // Brakująca binarka alternatywy to też degradacja — przelot standardowy chodzi, ale
+        // użytkownik dostaje jeden model zamiast dwóch i nigdzie tego nie widać. Wynik
+        // pochodzi ze startowego QuadroReadinessCheck, żeby nie odpalać kontenera per request.
+        var altBroken = _readiness.Completed
+            && _readiness.AlternativeExecutable is not null
+            && !_readiness.AlternativeAvailable;
+
         return Ok(new HealthDto
         {
-            Status          = imageExists ? "ready" : "degraded",
-            EngineVersion   = engine.Version,
-            DockerAvailable = dockerAvailable,
-            ImageExists     = imageExists,
-            ImageName       = engine.Image,
+            Status                = imageExists && !altBroken ? "ready" : "degraded",
+            EngineVersion         = engine.Version,
+            DockerAvailable       = dockerAvailable,
+            ImageExists           = imageExists,
+            ImageName             = engine.Image,
+            AlternativeExecutable = engine.AlternativeExecutable,
+            AlternativeAvailable  = _readiness.Completed ? _readiness.AlternativeAvailable : null,
+            ConfigProblem         = _readiness.Problem,
         });
     }
 

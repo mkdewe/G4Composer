@@ -94,7 +94,9 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
                     pass.Content, cancellationToken);
 
         var engine = _engineSelector.Active;
-        var altExe = _options.AlternativeExecutable;
+        // Per-silnik, nie globalne: alternatywa jedzie w engine.Image, więc musi pochodzić
+        // z tego samego wpisu konfiguracji co obraz (patrz QuadroOptions.EngineConfig).
+        var altExe = engine.AlternativeExecutable;
 
         if (items.Count > 1)
         {

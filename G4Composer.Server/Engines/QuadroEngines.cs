@@ -115,6 +115,7 @@ public sealed class Quadro14NEngine : QuadroEngineBase
             .Select(step => new QuadroPass(
                 step,
                 $"{baseFileName}_{step}.inp",
-                BuildInp(input, $"{name}_{step}", $"iteration          {step}\n")))];
+                BuildInp(input, $"{name}_{step}", $"iteration          {step}\n"),
+                EstimateCyanaStages(input)))];
     }
 }

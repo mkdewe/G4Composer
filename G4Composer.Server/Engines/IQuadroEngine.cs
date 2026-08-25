@@ -46,7 +46,15 @@ public interface IQuadroEngine
 /// <paramref name="Step"/> służy tylko do logowania i raportowania postępu — numery kroków
 /// przypisane klatkom biorą się z nazw plików PDB znalezionych po przebiegu.
 /// </summary>
-public sealed record QuadroPass(int Step, string FileName, string Content);
+/// <param name="ExpectedCyanaStages">
+/// Szacowana liczba etapów budowy CYANA, do raportowania postępu. Silnik dobudowuje strukturę
+/// resztę po reszcie w kolejności z <c>path</c> i przy każdym etapie wypisuje
+/// <c>N angle constraints added.</c> — ale zależnie od struktury etapów bywa o jeden więcej niż
+/// pozycji w <c>path</c> (sprawdzone na 70 przykładach: 24 razy +1, reszta dokładnie), więc to
+/// tylko punkt startowy. Runner kalibruje się dokładną liczbą po pierwszym przelocie.
+/// 0 = brak szacunku.
+/// </param>
+public sealed record QuadroPass(int Step, string FileName, string Content, int ExpectedCyanaStages = 0);
 
 /// <summary>
 /// Bazowa implementacja zawierająca wspólny formatter pliku .inp (identyczny dla 14G/14L
@@ -66,7 +74,14 @@ public abstract class QuadroEngineBase : IQuadroEngine
     /// w drabinkę checkpointów. 14N nadpisuje to N przelotami.
     /// </summary>
     public virtual IReadOnlyList<QuadroPass> SerializePasses(QuadroInput input, string baseFileName)
-        => [new QuadroPass(ResolveSteps(input).Max(), $"{baseFileName}.inp", SerializeInput(input))];
+        => [new QuadroPass(ResolveSteps(input).Max(), $"{baseFileName}.inp", SerializeInput(input),
+                           EstimateCyanaStages(input))];
+
+    /// <summary>
+    /// Punkt startowy dla paska postępu: ile etapów budowy CYANA się spodziewamy.
+    /// Jeden na pozycję w <c>path</c>; runner koryguje to obserwacją.
+    /// </summary>
+    protected static int EstimateCyanaStages(QuadroInput input) => input.Path?.Count ?? 0;
 
     /// <summary>
     /// Linia .inp sterująca głębokością minimalizacji. 14G/14L: drabinka checkpointów

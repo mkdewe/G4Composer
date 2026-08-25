@@ -43,6 +43,9 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
     private const int PollIntervalMs  = 150;
     private const int PollMaxAttempts = 40;
 
+    /// <summary>How often to re-read the engine log while a pass is running.</summary>
+    private const int StagePollIntervalMs = 400;
+
     // Matches "Etotal = -605.7" in xplor output / energy files
     private static readonly Regex EtotalRegex =
         new(@"Etotal\s*=\s*([-+]?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)",
@@ -196,23 +199,50 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
             // <name>_<K>.pdb / <name>_<K>_energy.txt, so nothing overwrites anything.
             // Stdout of the last pass feeds the Etotal fallback in CollectFrames.
             DockerResult quadro = default;
+            var lastStdout = string.Empty;
+
+            // Expected CYANA build-up stages. The engine emits one "angle constraints added."
+            // per stage; the count is ~path.Count but varies by one per structure, so it can't
+            // be derived up front. The first pass runs on the engine's estimate, then every
+            // later pass uses the exact count observed — self-calibrating.
+            var expectedStages = passes[0].ExpectedCyanaStages;
+
             for (var p = 0; p < passes.Count; p++)
             {
                 var pass = passes[p];
                 await ExecChecked(jobId, cname, ct, "cp", $"{dataDir}/{pass.FileName}", $"{workDir}/{pass.FileName}");
 
-                progress?.Report(new("minimizing",
-                    passes.Count > 1
-                        ? $"Running energy minimization (pass {p + 1}/{passes.Count}, iteration {pass.Step})"
-                        : "Running energy minimization",
-                    p + 1, passes.Count,
-                    Percent: 12 + (78.0 * (p + 1) / passes.Count)));
+                // Engine output goes to a file on the shared volume rather than being buffered
+                // until `docker exec` returns — that is what makes live stage tracking possible.
+                var logName  = Path.GetFileNameWithoutExtension(pass.FileName) + ".runlog";
+                var hostLog  = Path.Combine(jobDir, logName);
+                var passBase = (double)p / passes.Count;
+                var passSpan = 1.0 / passes.Count;
 
-                quadro = await ExecIgnore(jobId, cname, ct,
-                    "/bin/sh", "-c", $"cd {workDir} && ./{executable} {pass.FileName}");
+                using var watchCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var watcher = WatchStagesAsync(hostLog, expectedStages, progress,
+                    passBase, passSpan, p + 1, passes.Count, pass.Step, watchCts.Token);
+
+                try
+                {
+                    quadro = await ExecIgnore(jobId, cname, ct,
+                        "/bin/sh", "-c", $"cd {workDir} && ./{executable} {pass.FileName} > {dataDir}/{logName} 2>&1");
+                }
+                finally
+                {
+                    await watchCts.CancelAsync();
+                    try { await watcher; } catch (OperationCanceledException) { /* expected */ }
+                }
+
+                // docker exec captured nothing (output was redirected) — read it back so
+                // CollectFrames' Etotal fallback and the failure diagnostics still work.
+                lastStdout = await ReadLogSafeAsync(hostLog, ct);
+
+                var observed = QuadroStageTracker.Parse(lastStdout, expectedStages).CyanaStages;
+                if (observed > 0) expectedStages = observed;
             }
 
-            progress?.Report(new("collecting", "Collecting structures", passes.Count, passes.Count, Percent: 90));
+            progress?.Report(new("collecting", "Collecting structures", passes.Count, passes.Count, Percent: 97));
 
             await ExecDebug  (jobId, cname, ct, "ls", "-lh", $"{workDir}/");
             await ExecChecked(jobId, cname, ct, "/bin/sh", "-c",
@@ -221,19 +251,76 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
                 $"cp {workDir}/*_energy.txt {dataDir}/ 2>/dev/null || true");
             await ExecDebug  (jobId, cname, ct, "ls", "-lh", $"{dataDir}/");
 
-            var frames = CollectFrames(jobDir, quadro.Stdout, preferAlt: prefix == "alt");
+            var frames = CollectFrames(jobDir, lastStdout, preferAlt: prefix == "alt");
 
             if (frames.Count == 0)
             {
                 var files = string.Join(", ", Directory.GetFiles(jobDir).Select(Path.GetFileName));
                 throw new DockerException(
                     $"[{cname}] {executable} produced no PDB (exit {quadro.ExitCode})",
-                    BuildDiag(quadro, files));
+                    BuildDiag(quadro with { Stdout = lastStdout }, files));
             }
 
             return new SingleRunResult(frames, true);
         }
         finally { await RemoveAsync(jobId, cname); }
+    }
+
+    // ── Live stage tracking ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Polls the engine's log on the shared volume and reports the stage it has reached.
+    /// Runs until cancelled (i.e. until the pass returns).
+    /// </summary>
+    private async Task WatchStagesAsync(
+        string hostLog, int expectedStages, IProgress<JobProgress>? progress,
+        double passBase, double passSpan, int passNo, int passCount, int iteration,
+        CancellationToken ct)
+    {
+        if (progress is null) return;
+
+        var lastStage = string.Empty;
+        var lastPercent = -1.0;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try { await Task.Delay(StagePollIntervalMs, ct); }
+            catch (OperationCanceledException) { return; }
+
+            var text = await ReadLogSafeAsync(hostLog, CancellationToken.None);
+            if (text.Length == 0) continue;
+
+            var stage = QuadroStageTracker.Parse(text, expectedStages);
+
+            // Overall percent: 12% reserved for container start, 3% for collection at the end.
+            var percent = 12 + 85 * (passBase + passSpan * stage.Fraction);
+
+            // Only report real movement — the UI redraws on every event.
+            if (stage.Stage == lastStage && percent - lastPercent < 1.0) continue;
+            lastStage = stage.Stage;
+            lastPercent = percent;
+
+            var label = passCount > 1
+                ? $"{stage.Label} · pass {passNo}/{passCount} (iteration {iteration})"
+                : stage.Label;
+
+            progress.Report(new(stage.Stage, label, passNo, passCount, Detail: null, Percent: percent));
+        }
+    }
+
+    private static async Task<string> ReadLogSafeAsync(string path, CancellationToken ct)
+    {
+        try
+        {
+            if (!File.Exists(path)) return string.Empty;
+            // The container writes while we read — share everything and tolerate races.
+            await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using var sr = new StreamReader(fs);
+            return await sr.ReadToEndAsync(ct);
+        }
+        catch (IOException)             { return string.Empty; }
+        catch (UnauthorizedAccessException) { return string.Empty; }
     }
 
     // ── Frame collector ──────────────────────────────────────────────────────

@@ -92,6 +92,25 @@ alternative binary runs in that engine's own image. `QuadroReadinessCheck` verif
 that the active image really contains both binaries and reports it in `/health`
 (`status: "degraded"` + `configProblem`).
 
+## Curated examples (`StructureExamples.IsCurated`)
+
+`tools/curate-examples.sh` picks one representative per **(Silva subtype × tetrad count)** bucket
+— lowest `Etotal` across all frames of both variants wins — and flags it. Non-canonical examples
+(`SilvaSubtypeId IS NULL`) are all flagged: they have no topology to represent. Nothing is
+deleted, so re-running with new energies simply moves the flag.
+
+```bash
+cd /home/G4Composer
+./tools/curate-examples.sh --dry-run   # policz brakujące, pokaż wybór, nie zapisuj
+./tools/curate-examples.sh             # policz + zapisz flagę
+./tools/curate-examples.sh --select    # tylko przelicz wybór z tego, co już w cache'u
+```
+
+Step 1 POSTs each example **individually** to `/api/quadro11/run` — that is the only path that
+produces both variants (a multi-input batch runs the standard engine only) and the only one that
+links the result to its `StructureExample`. It is idempotent: examples already cached with alt
+frames are skipped, so an interrupted run resumes.
+
 ## Deploy flow (server)
 
 ```bash

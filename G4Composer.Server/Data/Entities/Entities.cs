@@ -106,6 +106,18 @@ public sealed class StructureExample
     public int Iterations { get; set; } = 70;
 
     /// <summary>
+    /// Wybrany reprezentant swojego kubełka (podtyp Silva × liczba tetrad) — ten o najniższej
+    /// energii. Struktury non-canonical (<see cref="SilvaSubtypeId"/> = null) są oznaczone
+    /// wszystkie, bo nie mają topologii, której miałyby być reprezentantem.
+    /// <para>
+    /// Nadawane przez <c>tools/curate-examples.sh</c> na podstawie policzonych energii, nie
+    /// ręcznie. Flaga, a nie usunięcie: odrzucone przykłady zostają w bazie i wystarczy
+    /// przeliczyć na nowo, żeby zmienić wybór.
+    /// </para>
+    /// </summary>
+    public bool IsCurated { get; set; } = false;
+
+    /// <summary>
     /// FK to SilvaSubtype. Nullable — non-canonical structures that don't fit
     /// any Silva topology classification have this set to null.
     /// </summary>

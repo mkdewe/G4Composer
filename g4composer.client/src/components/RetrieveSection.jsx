@@ -30,17 +30,22 @@ export function RetrieveSection() {
     setFrameLoading(false)
   }, [])
 
-  // Downloads exactly the iteration currently on screen — each one is its own model
-  // under 14N (its own build-up depth), not a snapshot of a shared trajectory.
-  const downloadActiveFrame = useCallback(() => {
-    if (!pdbBlob || !entry || activeStep == null) return
+  // Downloads one iteration of one variant — under 14N each is its own model (its own
+  // build-up depth), not a snapshot of a shared trajectory. If nothing is selected in that
+  // row yet, falls back to that variant's lowest-energy frame so the button is never a dead end.
+  const downloadFrame = useCallback(async (variant, step) => {
+    if (!entry || step == null) return
+    const reuse = pdbBlob && variant === activeVariant && step === activeStep
+    const blob = reuse ? pdbBlob : (await fetchCacheFrame(entry.id, step, variant))?.blob
+    if (!blob) return
+
     const base = (entry.pdbId || `result-${entry.id}`).replace(/[^a-z0-9._-]/gi, '_').slice(0, 80)
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(pdbBlob)
-    a.download = `${base}_${activeVariant}_${activeStep}it.pdb`
+    a.href = URL.createObjectURL(blob)
+    a.download = `${base}_${variant}_${step}it.pdb`
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 5000)
-  }, [pdbBlob, entry, activeStep, activeVariant])
+  }, [entry, pdbBlob, activeVariant, activeStep])
 
   const handleRetrieve = useCallback(async () => {
     const trimmed = query.trim()
@@ -126,6 +131,11 @@ export function RetrieveSection() {
             if (frames.length === 0) return null
 
             const isActiveGroup = activeVariant === variant
+            const label = variant === 'alt' ? 'alternative' : 'standard'
+            // Cel pobierania: wybrana klatka tego rzedu, inaczej najlepsza energetycznie.
+            const bestFrame = frames.reduce((a, b) =>
+              b.etotal != null && (a.etotal == null || b.etotal < a.etotal) ? b : a)
+            const targetStep = isActiveGroup && activeStep != null ? activeStep : bestFrame.step
 
             return (
               <div key={variant} style={{
@@ -135,7 +145,7 @@ export function RetrieveSection() {
                   fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)',
                   minWidth: 76, textTransform: 'uppercase', letterSpacing: '.04em',
                 }}>
-                  {variant === 'alt' ? 'alternative' : 'standard'}
+                  {label}
                 </span>
 
                 {frames.map(f => {
@@ -145,7 +155,7 @@ export function RetrieveSection() {
                       key={`${variant}-${f.step}`}
                       onClick={() => loadFrame(entry.id, f.step, variant)}
                       disabled={frameLoading}
-                      title={`Show the ${variant === 'alt' ? 'alternative' : 'standard'} model built with iteration ${f.step}`}
+                      title={`Show the ${label} model built with iteration ${f.step}`}
                       style={{
                         padding: '6px 12px', borderRadius: 8, fontSize: 12, fontFamily: 'var(--mono)',
                         cursor: frameLoading ? 'wait' : 'pointer',
@@ -161,13 +171,11 @@ export function RetrieveSection() {
                 })}
 
                 <button
-                  onClick={downloadActiveFrame}
-                  disabled={!pdbBlob || frameLoading || !isActiveGroup || activeStep == null}
+                  onClick={() => downloadFrame(variant, targetStep)}
+                  disabled={frameLoading || targetStep == null}
                   className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
-                  title={isActiveGroup && activeStep != null
-                    ? `Download ${variant === 'alt' ? 'alternative' : 'standard'} iteration ${activeStep} (.pdb)`
-                    : 'Select an iteration in this row first'}
-                  aria-label={`Download ${variant === 'alt' ? 'alternative' : 'standard'} structure`}
+                  title={`Download ${label} iteration ${targetStep} (.pdb)`}
+                  aria-label={`Download ${label} iteration ${targetStep}`}
                   style={{ marginLeft: 'auto' }}
                 >
                   <DownloadIcon />

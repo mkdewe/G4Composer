@@ -84,7 +84,9 @@ public sealed class AppDbContext : DbContext
         // ── PdbCacheFrame ─────────────────────────────────────────────────
         model.Entity<PdbCacheFrame>(e =>
         {
-            e.HasIndex(f => new { f.PdbCacheEntryId, f.Step }).IsUnique();
+            // Variant is part of the key: std and alt share the same iteration numbers.
+            e.HasIndex(f => new { f.PdbCacheEntryId, f.Variant, f.Step }).IsUnique();
+            e.Property(f => f.Variant).HasMaxLength(8).HasDefaultValue(FrameVariants.Standard);
 
             e.HasOne(f => f.Entry)
              .WithMany(c => c.Frames)

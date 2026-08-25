@@ -12,6 +12,7 @@ export function RetrieveSection() {
   const [error,   setError]   = useState('')
   const [entry,   setEntry]   = useState(null)   // PdbCacheEntryDto
   const [activeStep, setActiveStep] = useState(null)
+  const [activeVariant, setActiveVariant] = useState('std')
   const [pdbUrl,     setPdbUrl]     = useState(null)
   const [pdbBlob,    setPdbBlob]    = useState(null)
   const [frameLoading, setFrameLoading] = useState(false)
@@ -19,12 +20,13 @@ export function RetrieveSection() {
   // Revoke the previous object URL whenever it's replaced, and on unmount.
   useEffect(() => () => { if (pdbUrl) URL.revokeObjectURL(pdbUrl) }, [pdbUrl])
 
-  const loadFrame = useCallback(async (entryId, step) => {
+  const loadFrame = useCallback(async (entryId, step, variant = 'std') => {
     setFrameLoading(true)
-    const res = await fetchCacheFrame(entryId, step)
+    const res = await fetchCacheFrame(entryId, step, variant)
     setPdbUrl(res?.url ?? null)
     setPdbBlob(res?.blob ?? null)
     setActiveStep(step)
+    setActiveVariant(variant)
     setFrameLoading(false)
   }, [])
 
@@ -35,10 +37,10 @@ export function RetrieveSection() {
     const base = (entry.pdbId || `result-${entry.id}`).replace(/[^a-z0-9._-]/gi, '_').slice(0, 80)
     const a = document.createElement('a')
     a.href = URL.createObjectURL(pdbBlob)
-    a.download = `${base}_${activeStep}it.pdb`
+    a.download = `${base}_${activeVariant}_${activeStep}it.pdb`
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 5000)
-  }, [pdbBlob, entry, activeStep])
+  }, [pdbBlob, entry, activeStep, activeVariant])
 
   const handleRetrieve = useCallback(async () => {
     const trimmed = query.trim()
@@ -48,6 +50,7 @@ export function RetrieveSection() {
     setError('')
     setEntry(null)
     setActiveStep(null)
+    setActiveVariant('std')
     setPdbUrl(null)
     setPdbBlob(null)
 
@@ -63,10 +66,11 @@ export function RetrieveSection() {
     }
 
     setEntry(result)
-    if (result.frames.length > 0) {
-      const best = result.frames.reduce((a, b) =>
+    const std = result.frames.filter(f => f.variant !== 'alt')
+    if (std.length > 0) {
+      const best = std.reduce((a, b) =>
         b.etotal != null && (a.etotal == null || b.etotal < a.etotal) ? b : a)
-      await loadFrame(result.id, best.step)
+      await loadFrame(result.id, best.step, 'std')
     }
   }, [query, loading, loadFrame])
 
@@ -75,8 +79,9 @@ export function RetrieveSection() {
       <h2 className={styles.heading}>Retrieve a previous result</h2>
       <p className={styles.sub}>
         Look up a cached model by its result ID or by PDB ID — not by name, which isn't a
-        reliable key. Curated examples keep every iteration checkpoint; ad-hoc runs keep only
-        their best result.
+        reliable key. Both engines are kept: <strong>standard</strong> and{' '}
+        <strong>alternative</strong>. Curated examples keep every iteration of each; ad-hoc runs
+        keep only the best of each.
       </p>
 
       <div className={styles.card} style={{ maxWidth: 580, margin: '0 auto' }}>
@@ -115,46 +120,69 @@ export function RetrieveSection() {
             engine {entry.engineVersion} · cached {new Date(entry.createdAtUtc).toLocaleString()}
           </p>
 
-          <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14, alignItems: 'center',
-          }}>
-            {entry.frames.map(f => (
-              <button
-                key={f.step}
-                onClick={() => loadFrame(entry.id, f.step)}
-                disabled={frameLoading}
-                title={`Show the model built with iteration ${f.step}`}
-                style={{
-                  padding: '6px 12px', borderRadius: 8, fontSize: 12, fontFamily: 'var(--mono)',
-                  cursor: frameLoading ? 'wait' : 'pointer',
-                  border: f.step === activeStep ? '1px solid var(--teal)' : '1px solid var(--border)',
-                  background: f.step === activeStep ? 'var(--teal-light)' : 'var(--surface2)',
-                  color: f.step === activeStep ? '#085041' : 'var(--text-sub)',
-                }}
-              >
-                {f.step} it · {f.etotal != null ? f.etotal.toFixed(1) : '—'}
-              </button>
-            ))}
+          {['std', 'alt'].map(variant => {
+            const frames = entry.frames.filter(f =>
+              variant === 'alt' ? f.variant === 'alt' : f.variant !== 'alt')
+            if (frames.length === 0) return null
 
-            <button
-              className={styles.btnGhost}
-              onClick={downloadActiveFrame}
-              disabled={!pdbBlob || frameLoading || activeStep == null}
-              title={activeStep == null
-                ? 'Pick an iteration first'
-                : `Download the model for iteration ${activeStep} as .pdb`}
-              style={{ marginLeft: 'auto' }}
-            >
-              <DownloadIcon />
-              {activeStep == null ? 'Download .pdb' : `Download ${activeStep} it`}
-            </button>
-          </div>
+            const isActiveGroup = activeVariant === variant
+
+            return (
+              <div key={variant} style={{
+                display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10, alignItems: 'center',
+              }}>
+                <span style={{
+                  fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)',
+                  minWidth: 76, textTransform: 'uppercase', letterSpacing: '.04em',
+                }}>
+                  {variant === 'alt' ? 'alternative' : 'standard'}
+                </span>
+
+                {frames.map(f => {
+                  const isActive = isActiveGroup && f.step === activeStep
+                  return (
+                    <button
+                      key={`${variant}-${f.step}`}
+                      onClick={() => loadFrame(entry.id, f.step, variant)}
+                      disabled={frameLoading}
+                      title={`Show the ${variant === 'alt' ? 'alternative' : 'standard'} model built with iteration ${f.step}`}
+                      style={{
+                        padding: '6px 12px', borderRadius: 8, fontSize: 12, fontFamily: 'var(--mono)',
+                        cursor: frameLoading ? 'wait' : 'pointer',
+                        border: isActive ? '1px solid var(--teal)' : '1px solid var(--border)',
+                        background: isActive ? 'var(--teal-light)' : 'var(--surface2)',
+                        color: isActive ? '#085041' : 'var(--text-sub)',
+                        opacity: variant === 'alt' && !isActive ? 0.85 : 1,
+                      }}
+                    >
+                      {f.step} it · {f.etotal != null ? f.etotal.toFixed(1) : '—'}
+                    </button>
+                  )
+                })}
+
+                <button
+                  onClick={downloadActiveFrame}
+                  disabled={!pdbBlob || frameLoading || !isActiveGroup || activeStep == null}
+                  className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
+                  title={isActiveGroup && activeStep != null
+                    ? `Download ${variant === 'alt' ? 'alternative' : 'standard'} iteration ${activeStep} (.pdb)`
+                    : 'Select an iteration in this row first'}
+                  aria-label={`Download ${variant === 'alt' ? 'alternative' : 'standard'} structure`}
+                  style={{ marginLeft: 'auto' }}
+                >
+                  <DownloadIcon />
+                </button>
+              </div>
+            )
+          })}
 
           <div style={{ height: 440, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
             <MolstarViewer
               pdbUrl={pdbUrl}
               runState={pdbUrl ? 'done' : 'running'}
-              runStatus={frameLoading ? 'Loading iteration…' : 'Cached result'}
+              runStatus={frameLoading
+                ? 'Loading iteration…'
+                : `${activeVariant === 'alt' ? 'Alternative' : 'Standard'} · ${activeStep ?? '—'} it`}
               structureName={entry.pdbId || `result-${entry.id}`}
               representation="cartoon"
               progress={null}
@@ -166,11 +194,13 @@ export function RetrieveSection() {
   )
 }
 
-const DownloadIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path d="M8 2v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    <path d="M4.5 7.5 8 11l3.5-3.5" stroke="currentColor" strokeWidth="1.5"
-          strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M3 13h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-  </svg>
-)
+function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"
+         strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 1.5v9.5" />
+      <path d="M4.5 7.5L8 11l3.5-3.5" />
+      <path d="M2.5 13.5h11" />
+    </svg>
+  )
+}

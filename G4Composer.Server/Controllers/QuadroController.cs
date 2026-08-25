@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.Annotations;
 using Swashbuckle.AspNetCore.Filters;
 using G4Composer.Server.Configuration;
+using G4Composer.Server.Data.Entities;
 using G4Composer.Server.Engines;
 using G4Composer.Server.Examples;
 using G4Composer.Server.Models;
@@ -181,7 +182,7 @@ public sealed class QuadroController : ControllerBase
                 _altPdbStore.Store(jobId, result.Alternative.Pdb);
 
             if (cacheHash is not null)
-                await TrySaveToCacheAsync(cacheHash, inputs[0], engine, result.Standard, jobId, cancellationToken);
+                await TrySaveToCacheAsync(cacheHash, inputs[0], engine, result, jobId, cancellationToken);
 
             var ic = System.Globalization.CultureInfo.InvariantCulture;
             var stdEnergy    = result.Standard.Etotal?.ToString("F3", ic) ?? "";
@@ -338,7 +339,7 @@ public sealed class QuadroController : ControllerBase
                 _altPdbStore.Store(jobId, result.Alternative.Pdb);
 
             if (cacheHash is not null)
-                await TrySaveToCacheAsync(cacheHash, inputs[0], engine, result.Standard, jobId, cancellationToken);
+                await TrySaveToCacheAsync(cacheHash, inputs[0], engine, result, jobId, cancellationToken);
 
             await SendEventAsync("done", new
             {
@@ -455,15 +456,22 @@ public sealed class QuadroController : ControllerBase
         return Ok(ToDto(entry));
     }
 
-    /// <summary>PDB bytes for one specific iteration of a cached entry.</summary>
+    /// <summary>
+    /// PDB bytes for one specific iteration of a cached entry.
+    /// <paramref name="variant"/> selects the engine: "std" (default) or "alt".
+    /// </summary>
     [HttpGet("cache/{id:int}/frame/{step:int}")]
     [SwaggerOperation(Summary = "Get PDB for a specific cached iteration", Tags = [SwaggerTag])]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "chemical/x-pdb")]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult> GetCacheFrame(int id, int step, CancellationToken cancellationToken)
+    public async Task<ActionResult> GetCacheFrame(
+        int id, int step, CancellationToken cancellationToken,
+        [FromQuery] string variant = FrameVariants.Standard)
     {
         var entry = await _cacheService.GetByIdAsync(id, cancellationToken);
-        var frame = entry?.Frames.FirstOrDefault(f => f.Step == step);
+        var frame = entry?.Frames.FirstOrDefault(
+            f => f.Step == step &&
+                 string.Equals(f.Variant, variant, StringComparison.OrdinalIgnoreCase));
         if (frame is null)
             return NotFound(new ErrorDto($"Cached frame {id}/{step} not found."));
 
@@ -473,7 +481,10 @@ public sealed class QuadroController : ControllerBase
     private static PdbCacheEntryDto ToDto(G4Composer.Server.Data.Entities.PdbCacheEntry entry) => new(
         entry.Id, entry.PdbId, entry.IsExample, entry.EngineVersion,
         entry.CreatedAtUtc, entry.LastAccessedAtUtc,
-        entry.Frames.OrderBy(f => f.Step).Select(f => new PdbCacheFrameDto(f.Step, f.Etotal)).ToList());
+        entry.Frames
+             .OrderBy(f => f.Variant).ThenBy(f => f.Step)
+             .Select(f => new PdbCacheFrameDto(f.Step, f.Etotal, f.Variant))
+             .ToList());
 
     /// <summary>
     /// A broken cache lookup should degrade to "run it fresh," never fail the request outright.
@@ -496,7 +507,7 @@ public sealed class QuadroController : ControllerBase
     /// computation already succeeded — log and swallow any DB error instead of propagating it.
     /// </summary>
     private async Task TrySaveToCacheAsync(
-        string cacheHash, QuadroInput input, IQuadroEngine engine, SingleRunResult result,
+        string cacheHash, QuadroInput input, IQuadroEngine engine, DualRunResult result,
         string jobId, CancellationToken ct)
     {
         try
@@ -524,26 +535,35 @@ public sealed class QuadroController : ControllerBase
         var jobId = $"cache-{cached.EntryId}-{Guid.NewGuid():N}"[..24];
         foreach (var frame in cached.Frames)
             _frameStore.Store(jobId, "std", frame.Step, frame.Pdb);
+        foreach (var frame in cached.AltFrames)
+            _frameStore.Store(jobId, "alt", frame.Step, frame.Pdb);
 
-        var best = PickBest(cached.Frames);
-        var ic   = System.Globalization.CultureInfo.InvariantCulture;
-        var steps    = string.Join(",", cached.Frames.Select(f => f.Step));
-        var energies = string.Join(",", cached.Frames.Select(f => f.Etotal?.ToString("F3", ic) ?? ""));
+        var best    = PickBest(cached.Frames);
+        var hasAlt  = cached.AltFrames.Count > 0;
+        var altBest = hasAlt ? PickBest(cached.AltFrames) : null;
+        var ic      = System.Globalization.CultureInfo.InvariantCulture;
+
+        string Steps(IReadOnlyList<IterationFrame> f)    => string.Join(",", f.Select(x => x.Step));
+        string Energies(IReadOnlyList<IterationFrame> f) =>
+            string.Join(",", f.Select(x => x.Etotal?.ToString("F3", ic) ?? ""));
+
+        if (hasAlt && altBest is not null) _altPdbStore.Store(jobId, altBest.Pdb);
 
         Response.Headers["X-Job-Id"]        = jobId;
         Response.Headers["X-Cache-Hit"]     = "1";
         Response.Headers["X-Cache-Entry-Id"] = cached.EntryId.ToString();
         Response.Headers["X-Atom-Count"]    = CountPdbAtoms(best.Pdb).ToString();
         Response.Headers["X-Std-Energy"]    = best.Etotal?.ToString("F3", ic) ?? "";
-        Response.Headers["X-Alt-Energy"]    = "";
-        Response.Headers["X-Has-Alt"]       = "0";
-        Response.Headers["X-Winner"]        = "standard";
-        Response.Headers["X-Std-Steps"]     = steps;
-        Response.Headers["X-Alt-Steps"]     = "";
-        Response.Headers["X-Std-Energies"]  = energies;
-        Response.Headers["X-Alt-Energies"]  = "";
+        Response.Headers["X-Alt-Energy"]    = altBest?.Etotal?.ToString("F3", ic) ?? "";
+        Response.Headers["X-Has-Alt"]       = hasAlt ? "1" : "0";
+        Response.Headers["X-Winner"]        =
+            altBest?.Etotal is { } ae && best.Etotal is { } se && ae < se ? "alternative" : "standard";
+        Response.Headers["X-Std-Steps"]     = Steps(cached.Frames);
+        Response.Headers["X-Alt-Steps"]     = hasAlt ? Steps(cached.AltFrames) : "";
+        Response.Headers["X-Std-Energies"]  = Energies(cached.Frames);
+        Response.Headers["X-Alt-Energies"]  = hasAlt ? Energies(cached.AltFrames) : "";
         Response.Headers["X-Std-Best-Step"] = best.Step.ToString();
-        Response.Headers["X-Alt-Best-Step"] = "";
+        Response.Headers["X-Alt-Best-Step"] = altBest?.Step.ToString() ?? "";
         Response.Headers["Access-Control-Expose-Headers"] =
             "X-Job-Id, X-Cache-Hit, X-Cache-Entry-Id, X-Atom-Count, X-Std-Energy, X-Alt-Energy, X-Has-Alt, X-Winner, " +
             "X-Std-Steps, X-Alt-Steps, X-Std-Energies, X-Alt-Energies, X-Std-Best-Step, X-Alt-Best-Step";
@@ -556,8 +576,14 @@ public sealed class QuadroController : ControllerBase
         var jobId = $"cache-{cached.EntryId}-{Guid.NewGuid():N}"[..24];
         foreach (var frame in cached.Frames)
             _frameStore.Store(jobId, "std", frame.Step, frame.Pdb);
+        foreach (var frame in cached.AltFrames)
+            _frameStore.Store(jobId, "alt", frame.Step, frame.Pdb);
 
-        var best = PickBest(cached.Frames);
+        var best    = PickBest(cached.Frames);
+        var hasAlt  = cached.AltFrames.Count > 0;
+        var altBest = hasAlt ? PickBest(cached.AltFrames) : null;
+
+        if (hasAlt && altBest is not null) _altPdbStore.Store(jobId, altBest.Pdb);
 
         await SendEventAsync("done", new
         {
@@ -565,13 +591,14 @@ public sealed class QuadroController : ControllerBase
             jobId,
             atoms       = CountPdbAtoms(best.Pdb),
             stdEnergy   = best.Etotal,
-            altEnergy   = (double?)null,
-            hasAlt      = false,
-            winner      = "standard",
+            altEnergy   = altBest?.Etotal,
+            hasAlt,
+            winner      = altBest?.Etotal is { } ae && best.Etotal is { } se && ae < se
+                              ? "alternative" : "standard",
             stdFrames   = cached.Frames.Select(f => new { step = f.Step, energy = f.Etotal }).ToList(),
-            altFrames   = Array.Empty<object>(),
+            altFrames   = cached.AltFrames.Select(f => new { step = f.Step, energy = f.Etotal }).ToList(),
             stdBestStep = best.Step,
-            altBestStep = (int?)null,
+            altBestStep = altBest?.Step,
         }, ct);
     }
 

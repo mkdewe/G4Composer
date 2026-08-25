@@ -477,9 +477,10 @@ export async function fetchCacheEntryByPdbId(pdbId) {
  * @param {number} step
  * @returns {Promise<{blob: Blob, url: string}|null>}
  */
-export async function fetchCacheFrame(entryId, step) {
+export async function fetchCacheFrame(entryId, step, variant = 'std') {
   try {
-    const res = await fetch(`/api/quadro11/cache/${entryId}/frame/${step}`)
+    const res = await fetch(
+      `/api/quadro11/cache/${entryId}/frame/${step}?variant=${encodeURIComponent(variant)}`)
     if (!res.ok) return null
     const raw  = await res.blob()
     const blob = raw.type === 'chemical/x-pdb' ? raw : new Blob([raw], { type: 'chemical/x-pdb' })

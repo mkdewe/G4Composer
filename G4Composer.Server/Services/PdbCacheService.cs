@@ -15,7 +15,8 @@ public sealed record CachedRun(
     int EntryId,
     string? PdbId,
     bool IsExample,
-    IReadOnlyList<IterationFrame> Frames);
+    IReadOnlyList<IterationFrame> Frames,
+    IReadOnlyList<IterationFrame> AltFrames);
 
 public interface IPdbCacheService
 {
@@ -37,13 +38,14 @@ public interface IPdbCacheService
     Task<CachedRun?> TryGetAsync(string hash, IReadOnlyList<int> requestedSteps, CancellationToken ct);
 
     /// <summary>
-    /// Persists a fresh run's standard-engine frames. If the input matches a curated
-    /// StructureExample (by Sequence + Structure + Path — the same fields the hash is built
-    /// from), all frames are stored and the entry is linked to that example. Otherwise only
-    /// the best (lowest-energy) frame is kept, and the ad-hoc cache is trimmed to
+    /// Persists a fresh run — both the standard and the alternative engine's structures.
+    /// If the input matches a curated StructureExample (by Sequence + Structure + Path — the
+    /// same fields the hash is built from), every frame of both variants is stored and the
+    /// entry is linked to that example. Otherwise only the best (lowest-energy) frame of each
+    /// variant is kept, and the ad-hoc cache is trimmed to
     /// <see cref="QuadroOptions.PdbCacheMaxAdHocEntries"/> by evicting the least-recently-used.
     /// </summary>
-    Task SaveAsync(QuadroInput input, IQuadroEngine engine, string hash, SingleRunResult result, CancellationToken ct);
+    Task SaveAsync(QuadroInput input, IQuadroEngine engine, string hash, DualRunResult result, CancellationToken ct);
 
     Task<PdbCacheEntry?> GetByIdAsync(int id, CancellationToken ct);
 
@@ -104,24 +106,32 @@ public sealed class PdbCacheService : IPdbCacheService
 
         if (entry is null) return null;
 
-        var storedSteps = entry.Frames.Select(f => f.Step).ToHashSet();
+        // Coverage is judged on the standard variant only — that is what a fresh run is
+        // guaranteed to produce. The alternative engine is allowed to fail (the runner treats
+        // it as non-fatal), so demanding alt coverage would turn cacheable results into misses.
+        var storedSteps = entry.Frames
+            .Where(f => f.Variant == FrameVariants.Standard)
+            .Select(f => f.Step)
+            .ToHashSet();
         if (!requestedSteps.All(storedSteps.Contains))
             return null; // partial match — let the caller run Docker for the full set
 
         entry.LastAccessedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
-        var frames = entry.Frames
+        List<IterationFrame> Frames(string variant) => entry.Frames
+            .Where(f => f.Variant == variant)
             .OrderBy(f => f.Step)
             .Select(f => new IterationFrame(f.Step, Encoding.UTF8.GetBytes(f.Pdb), f.Etotal))
             .ToList();
 
-        return new CachedRun(entry.Id, entry.PdbId, entry.IsExample, frames);
+        return new CachedRun(entry.Id, entry.PdbId, entry.IsExample,
+            Frames(FrameVariants.Standard), Frames(FrameVariants.Alternative));
     }
 
-    public async Task SaveAsync(QuadroInput input, IQuadroEngine engine, string hash, SingleRunResult result, CancellationToken ct)
+    public async Task SaveAsync(QuadroInput input, IQuadroEngine engine, string hash, DualRunResult result, CancellationToken ct)
     {
-        if (!result.Success || result.Frames.Count == 0) return;
+        if (!result.Standard.Success || result.Standard.Frames.Count == 0) return;
 
         // Someone else may have raced us to save the same hash — nothing to do.
         if (await _db.PdbCacheEntries.AnyAsync(e => e.Hash == hash, ct)) return;
@@ -147,19 +157,30 @@ public sealed class PdbCacheService : IPdbCacheService
             LastAccessedAtUtc   = now,
         };
 
-        IReadOnlyList<IterationFrame> framesToStore = match is not null
-            ? result.Frames                        // Examples: keep every displayed checkpoint
-            : new[] { result.BestFrame! };          // Ad-hoc: keep only the best result
-
-        foreach (var frame in framesToStore)
+        // Examples keep every iteration of both variants; ad-hoc runs keep only the best of
+        // each, so the ad-hoc cache stays bounded.
+        void Store(SingleRunResult run, string variant)
         {
-            entry.Frames.Add(new PdbCacheFrame
+            if (!run.Success || run.Frames.Count == 0) return;
+
+            IReadOnlyList<IterationFrame> frames = match is not null
+                ? run.Frames
+                : [run.BestFrame!];
+
+            foreach (var frame in frames)
             {
-                Step   = frame.Step,
-                Etotal = frame.Etotal,
-                Pdb    = Encoding.UTF8.GetString(frame.Pdb),
-            });
+                entry.Frames.Add(new PdbCacheFrame
+                {
+                    Variant = variant,
+                    Step    = frame.Step,
+                    Etotal  = frame.Etotal,
+                    Pdb     = Encoding.UTF8.GetString(frame.Pdb),
+                });
+            }
         }
+
+        Store(result.Standard,    FrameVariants.Standard);
+        Store(result.Alternative, FrameVariants.Alternative);
 
         _db.PdbCacheEntries.Add(entry);
         await _db.SaveChangesAsync(ct);

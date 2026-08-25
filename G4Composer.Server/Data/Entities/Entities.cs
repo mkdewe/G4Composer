@@ -147,9 +147,19 @@ public sealed class PdbCacheEntry
     public ICollection<PdbCacheFrame> Frames { get; set; } = [];
 }
 
+/// <summary>Which engine produced a cached structure.</summary>
+public static class FrameVariants
+{
+    /// <summary>quadro14*.exe — the standard topology from the .inp.</summary>
+    public const string Standard = "std";
+
+    /// <summary>alternatywa14*.exe — the mirrored topology (orient/rise/twist/path flipped).</summary>
+    public const string Alternative = "alt";
+}
+
 /// <summary>
-/// One stored structure for a <see cref="PdbCacheEntry"/>, keyed by its iteration count.
-/// Examples get one row per iteration value; ad-hoc entries get exactly one (the best).
+/// One stored structure for a <see cref="PdbCacheEntry"/>, keyed by (variant, iteration count).
+/// Examples get one row per iteration value per variant; ad-hoc entries get the best of each.
 /// </summary>
 public sealed class PdbCacheFrame
 {
@@ -157,6 +167,14 @@ public sealed class PdbCacheFrame
 
     public int PdbCacheEntryId { get; set; }
     public PdbCacheEntry Entry { get; set; } = null!;
+
+    /// <summary>
+    /// <see cref="FrameVariants.Standard"/> or <see cref="FrameVariants.Alternative"/>.
+    /// Both engines run on every job and produce genuinely different topologies, so both are
+    /// worth keeping — before this column existed only the standard result was ever cached
+    /// and the alternative was recomputed (or lost) on every lookup.
+    /// </summary>
+    public string Variant { get; set; } = FrameVariants.Standard;
 
     /// <summary>
     /// The iteration count this structure was produced with. Under 14N that is the

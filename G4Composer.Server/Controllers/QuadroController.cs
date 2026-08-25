@@ -157,10 +157,7 @@ public sealed class QuadroController : ControllerBase
         {
             // Build .inp items — engine decyduje o formacie pliku.
             var items = inputs
-                .Select((inp, i) => new QuadroJobItem(
-                    Index: i,
-                    InpFileName: $"struct_{i:D3}.inp",
-                    InpContent: engine.SerializeInput(inp)))
+                .Select((inp, i) => QuadroJobItem.For(engine, inp, i))
                 .ToList();
 
             var result = await _jobRunner.RunAsync(jobId, jobDir, items, progress: null, jobCts.Token);
@@ -303,7 +300,7 @@ public sealed class QuadroController : ControllerBase
         var progress = new ChannelProgress(channel.Writer);
 
         var items = inputs
-            .Select((inp, i) => new QuadroJobItem(i, $"struct_{i:D3}.inp", engine.SerializeInput(inp)))
+            .Select((inp, i) => QuadroJobItem.For(engine, inp, i))
             .ToList();
 
         var runTask = Task.Run(async () =>
@@ -458,7 +455,7 @@ public sealed class QuadroController : ControllerBase
         return Ok(ToDto(entry));
     }
 
-    /// <summary>PDB bytes for one specific iteration of a cached entry (preview of a chosen checkpoint).</summary>
+    /// <summary>PDB bytes for one specific iteration of a cached entry.</summary>
     [HttpGet("cache/{id:int}/frame/{step:int}")]
     [SwaggerOperation(Summary = "Get PDB for a specific cached iteration", Tags = [SwaggerTag])]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "chemical/x-pdb")]

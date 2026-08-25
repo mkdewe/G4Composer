@@ -65,6 +65,7 @@ public sealed class QuadroOptions
     {
         ["14G"] = new EngineConfig { Image = "quadro14g:latest", Executable = "quadro14G.exe" },
         ["14L"] = new EngineConfig { Image = "quadro14l:latest", Executable = "quadro14L.exe" },
+        ["14N"] = new EngineConfig { Image = "quadro14n:latest", Executable = "quadro14N.exe" },
     };
 
     public sealed class EngineConfig

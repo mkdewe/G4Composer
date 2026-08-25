@@ -23,6 +23,7 @@ public static class QuadroServiceCollectionExtensions
         // ── Engines (każda nowa wersja = jedna linijka) ─────────────────────
         services.AddSingleton<IQuadroEngine, Quadro14GEngine>();
         services.AddSingleton<IQuadroEngine, Quadro14LEngine>();
+        services.AddSingleton<IQuadroEngine, Quadro14NEngine>();
         services.AddSingleton<IQuadroEngineSelector, QuadroEngineSelector>();
 
         // ── Walidacja ───────────────────────────────────────────────────────

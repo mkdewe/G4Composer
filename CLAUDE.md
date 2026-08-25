@@ -29,15 +29,49 @@ Always write `migrationBuilder.Sql(...)` using **PostgreSQL syntax**. Never use 
 - **Frontend**: React + Vite (`g4composer.client/`), built with `npm run build` → output to `G4Composer.Server/wwwroot/`
 - **Backend**: ASP.NET Core 10, deployed as systemd service `g4composer` on port 5238
 - **Docker images** (used by the backend to run bioinformatics tools):
-  - `quadro14l:latest` — built from `docker-biotools/quadro14L/Dockerfile`
+  - `quadro14n:latest` — built from `docker-biotools/quadro14N/Dockerfile`; **currently the active engine** (`Quadro:Version` = `14N`)
+  - `quadro14l:latest` — built from `docker-biotools/quadro14L/Dockerfile`; kept for rollback
   - `quadro14g:latest` — separate image for the 14G engine
+  - ⚠️ **quadro14L and quadro14N must be built with the repo root as build context** (`-f quadro14N/Dockerfile .`) — CYANA (`cyana-2.1/`) and Xplor-NIH (`xplor-nih-2.39/`) live at the root of docker-quadro and are shared by every quadro version, instead of being duplicated in each `quadro14*/bin/`.
   - `gqrs:latest` — built from `docker-biotools/gqrsMapper/Dockerfile` (compiles qgrs-cpp)
   - `onquadro-aligner:latest` — built from `docker-biotools/onquadroAligner/Dockerfile`
   - `viennarna:latest` — built from `docker-biotools/ViennaRNA/Dockerfile`
   - `eltetrado:latest` — built from `docker-biotools/eltetrado/Dockerfile`
+  - `x3dna-dssr:latest` — built from `docker-biotools/x3dna-dssr/Dockerfile`; wraps **DSSR-Basic** (native G-tetrad/G4 detection). Licensed (not open source): the Dockerfile `COPY`s a `x3dna-dssr` binary you obtain once from Columbia Technology Ventures (free for academics, NIH grant R24GM153869) and drop into the build dir — it is `.gitignore`d and never committed. See that dir's README.md.
   - `dnatco:latest` — built from `docker-biotools/dnatco/Dockerfile` (DNATCO v5.0 offline CLI for NtC/CANA conformational analysis; `run.py` normalises input via gemmi then runs `rednatco.js`, emitting `*_extended.cif` + `summary.csv`/`summary.json`)
 - **docker-biotools** is a git submodule pointing to `https://github.com/mkdewe/docker-quadro`
   - `qgrs-cpp` is a nested submodule inside docker-biotools — requires `git submodule update --init` after pulling
+
+## Quadro engine: what `iteration` actually controls
+
+`quadro14*.exe` is an awk script that computes nothing itself — it generates inputs for two
+different minimizers and runs them:
+
+| stage | program | space | steps | driven by `iteration`? |
+|---|---|---|---|---|
+| build-up, one per residue added in `path` order | CYANA | torsion angles | `iteration` each | **yes** |
+| final CYANA pass | CYANA | torsion angles | 100, hard-wired in 14N | no |
+| xplor pass 1 — tetrad core frozen | Xplor-NIH | Cartesian | `nstep=1000` | no |
+| xplor pass 2 — everything released, planar+dihedral+NOE restraints | Xplor-NIH | Cartesian | `nstep=1000` | no |
+
+So `iteration` decides **how good a starting structure Xplor receives**, not how good the
+answer is — 2000 hard-wired Xplor steps follow regardless. More iterations is therefore *not*
+monotonically better; measured on the 70 deposited examples, raising 14L's build-up from 50 to
+300 moved convergence 43→45 (12 structures fixed, 10 broken).
+
+### 14N vs 14L
+
+- **14N does not know `iteration_steps`** — that was a local patch on top of 14L. It splits only
+  the *final* CYANA pass into checkpoints, so all 14L frames shared one identical build-up
+  (hard-wired at 50, because the backend only ever sent `iteration_steps`, never `iteration`).
+- **14N runs N independent passes instead**, one per `IterationSteps` value, each with its own
+  build-up depth → genuinely different models, and the best is picked. See `Quadro14NEngine`.
+- 14N widens the alphabet: uppercase `T` = ribothymidine (`RT`), lowercase `u` = deoxyuridine
+  (`DU`). 14L rejects both with `ERROR 2`. `QuadroInputValidator.AllowedChars` must be narrowed
+  again if the engine is ever rolled back.
+- 14L exits **2 on every run** — three apostrophes in `quadro14L.exe` close the awk program at
+  line 859, so the shell parses the trailing 24 lines as shell code and chokes. Harmless only
+  because the runner calls it via `ExecIgnore`. 14N exits 0.
 
 ## Deploy flow (server)
 
@@ -49,12 +83,17 @@ cd /home/G4Composer && ./deploy.sh
 cd /home/G4Composer/docker-biotools
 git checkout main && git pull origin main
 git submodule update --init
-docker build -t quadro14l:latest quadro14L/
+# quadro14N / quadro14L: build context = repo root (shared cyana-2.1/ + xplor-nih-2.39/)
+docker build -f quadro14N/Dockerfile -t quadro14n:latest .
+docker build -f quadro14L/Dockerfile -t quadro14l:latest .
+# pozostałe narzędzia: kontekst = własny podkatalog
 docker build -t gqrs:latest gqrsMapper/
 docker build -t onquadro-aligner:latest onquadroAligner/
 docker build -t viennarna:latest ViennaRNA/
 docker build -t eltetrado:latest eltetrado/
 docker build -t dnatco:latest dnatco/
+# x3dna-dssr needs the licensed `x3dna-dssr` binary dropped into x3dna-dssr/ first (see that dir's README.md)
+docker build -t x3dna-dssr:latest x3dna-dssr/
 ```
 
 The server may be in detached HEAD in the submodule — always `git checkout main` before `git pull`.

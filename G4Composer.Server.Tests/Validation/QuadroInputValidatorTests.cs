@@ -50,22 +50,35 @@ public class QuadroInputValidatorTests
         Assert.Contains(result.Errors, e => e.Contains("Sequence is required"));
     }
 
+    // quadro14N widened the alphabet: uppercase 'T' = ribothymidine (RT), lowercase 'u' =
+    // deoxyuridine (DU). Both have library residues in other_residues.lib and atom templates
+    // in cyana2xplor.exe. quadro14L rejected them with ERROR 2 — these two tests asserted
+    // that old behaviour and were inverted when the active engine moved to 14N.
     [Fact]
-    public void Validate_UppercaseT_IsRejected()
+    public void Validate_UppercaseT_IsAccepted_Ribothymidine()
     {
         var result = _sut.Validate(Valid(i => i.Sequence = "ggggTtttgggg"));
 
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("uppercase 'T'"));
+        Assert.True(result.IsValid, string.Join(" | ", result.Errors));
     }
 
     [Fact]
-    public void Validate_LowercaseU_IsRejected()
+    public void Validate_LowercaseU_IsAccepted_Deoxyuridine()
     {
         var result = _sut.Validate(Valid(i => i.Sequence = "gggguuuugggg"));
 
+        Assert.True(result.IsValid, string.Join(" | ", result.Errors));
+    }
+
+    [Fact]
+    public void Validate_IterationStepBelowTen_IsRejected()
+    {
+        // The engine itself dies with "ERROR 25 Za mala iteracja" below 10, and under 14N
+        // each step is a full pass — so a bad value wastes an entire run.
+        var result = _sut.Validate(Valid(i => i.IterationSteps = [5, 50]));
+
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("lowercase 'u'"));
+        Assert.Contains(result.Errors, e => e.Contains("Iteration steps must be >= 10"));
     }
 
     [Fact]

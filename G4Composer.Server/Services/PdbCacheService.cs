@@ -52,14 +52,24 @@ public interface IPdbCacheService
 
 public sealed class PdbCacheService : IPdbCacheService
 {
-    // Bump this whenever the quadro14L/14G engine script (docker-biotools submodule) changes
+    // Bump this whenever the quadro engine script (docker-biotools submodule) changes
     // behavior WITHOUT the engine's own Version string changing — e.g. the 2026-08-04
     // shugar/sugar + missing-read-ang fix. Otherwise stale pre-fix PDBs would be served
     // forever after a silent engine content change, since IQuadroEngine.Version alone
     // wouldn't invalidate them.
-    private const string EngineContentVersion = "2026-08-04-sugar-fix";
+    private const string EngineContentVersion = "2026-08-25-14N-multipass";
 
-    private static readonly string[] HashIgnoredFieldNames = ["name", "rm_level", "iteration_steps"];
+    // Fields deliberately excluded from the dedup hash — they must not split one physical
+    // model across several cache entries:
+    //   name      — irrelevant per spec
+    //   rm_level  — only controls cleanup of intermediate files, provably no effect on geometry
+    //   iteration_steps / iteration — these select HOW DEEP we minimize, and each depth is
+    //     stored as its own frame under the same entry. Coverage is enforced by TryGetAsync,
+    //     which demands a frame for every requested step and treats a partial match as a miss.
+    //     Under 14N each step is a genuinely different model (its own build-up phase), not a
+    //     snapshot along one trajectory — but the per-frame storage represents that correctly.
+    private static readonly string[] HashIgnoredFieldNames =
+        ["name", "rm_level", "iteration_steps", "iteration"];
 
     private readonly AppDbContext _db;
     private readonly QuadroOptions _options;

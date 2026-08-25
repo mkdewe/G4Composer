@@ -48,9 +48,18 @@ public class QuadroInput
     /// Tryb testowy generatora (mapowany na pole <c>test</c> w .inp jako "y"/"n").
     /// </summary>
     /// <summary>
-    /// Iteration checkpoints for the final CYANA minimization stage.
-    /// Each value generates a complete Xplor-refined structure at that cumulative step count.
-    /// The last (highest) value is the full run — identical to the single <c>iteration</c> field.
+    /// How deep to minimize. Each value yields one complete Xplor-refined structure.
+    /// <para>
+    /// Under 14N each value is a <b>separate, independent engine pass</b>: it sets CYANA's
+    /// <c>minimize</c> depth at every residue build-up stage, so each value hands Xplor a
+    /// different starting structure and produces a genuinely different model. Values must
+    /// be &gt;= 10 (the engine rejects less with ERROR 25).
+    /// </para>
+    /// <para>
+    /// Under 14G/14L these were cumulative checkpoints inside a <b>single</b> run: the
+    /// build-up phase was identical for all of them (hard-wired at 50) and only the final
+    /// minimization tail differed. That is why checkpoints were dropped.
+    /// </para>
     /// Default: [30, 50, 70, 100, 150, 300].
     /// </summary>
     public int[] IterationSteps { get; set; } = [30, 50, 70, 100, 150, 300];

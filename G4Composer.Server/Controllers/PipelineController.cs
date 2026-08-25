@@ -519,7 +519,7 @@ public sealed class PipelineController : ControllerBase
 
         try
         {
-            var items = new List<QuadroJobItem> { new(0, "struct_000.inp", inpContent) };
+            var items = new List<QuadroJobItem> { QuadroJobItem.For(_engineSelector.Active, cand.Input, 0) };
             using var jobCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             jobCts.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
 

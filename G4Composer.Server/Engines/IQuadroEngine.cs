@@ -23,7 +23,30 @@ public interface IQuadroEngine
 
     /// <summary>Generuje zawartość pliku .inp w formacie wymaganym przez wersję silnika.</summary>
     string SerializeInput(QuadroInput input);
+
+    /// <summary>
+    /// Rozkłada jedną strukturę na fizyczne uruchomienia silnika.
+    /// <para>
+    /// 14G/14L: jedno uruchomienie — <c>iteration_steps</c> każe binarce zrobić drabinkę
+    /// checkpointów wewnątrz jednego przebiegu CYANA.
+    /// </para>
+    /// <para>
+    /// 14N: nie zna <c>iteration_steps</c>. Zamiast checkpointów robimy N niezależnych
+    /// przelotów, po jednym na wartość z <see cref="QuadroInput.IterationSteps"/> —
+    /// każdy z własną fazą budowy, więc każdy daje inny model fizyczny (a nie migawkę
+    /// wzdłuż jednej trajektorii, jak checkpointy).
+    /// </para>
+    /// </summary>
+    /// <param name="baseFileName">Nazwa bazowa bez rozszerzenia, np. <c>struct_000</c>.</param>
+    IReadOnlyList<QuadroPass> SerializePasses(QuadroInput input, string baseFileName);
 }
+
+/// <summary>
+/// Jedno fizyczne wywołanie binarki: plik .inp do zapisania i liczba iteracji, którą koduje.
+/// <paramref name="Step"/> służy tylko do logowania i raportowania postępu — numery kroków
+/// przypisane klatkom biorą się z nazw plików PDB znalezionych po przebiegu.
+/// </summary>
+public sealed record QuadroPass(int Step, string FileName, string Content);
 
 /// <summary>
 /// Bazowa implementacja zawierająca wspólny formatter pliku .inp (identyczny dla 14G/14L
@@ -36,15 +59,42 @@ public abstract class QuadroEngineBase : IQuadroEngine
     public abstract string Executable { get; }
 
     public virtual string SerializeInput(QuadroInput input)
+        => BuildInp(input, ResolveName(input), IterationLine(input));
+
+    /// <summary>
+    /// Domyślnie jedno uruchomienie na strukturę — binarka sama rozwija <c>iteration_steps</c>
+    /// w drabinkę checkpointów. 14N nadpisuje to N przelotami.
+    /// </summary>
+    public virtual IReadOnlyList<QuadroPass> SerializePasses(QuadroInput input, string baseFileName)
+        => [new QuadroPass(ResolveSteps(input).Max(), $"{baseFileName}.inp", SerializeInput(input))];
+
+    /// <summary>
+    /// Linia .inp sterująca głębokością minimalizacji. 14G/14L: drabinka checkpointów
+    /// (<c>iteration_steps</c>). 14N: pojedyncza wartość (<c>iteration</c>).
+    /// </summary>
+    protected virtual string IterationLine(QuadroInput input)
+        => "iteration_steps    " + string.Join(',', ResolveSteps(input)) + "\n";
+
+    protected static string ResolveName(QuadroInput input)
+        => string.IsNullOrWhiteSpace(input.Name) ? "structure" : input.Name;
+
+    protected static int[] ResolveSteps(QuadroInput input)
+        => input.IterationSteps is { Length: > 0 } ? input.IterationSteps : [100];
+
+    /// <summary>
+    /// Wspólny formatter .inp. <paramref name="name"/> i <paramref name="iterationLine"/>
+    /// są parametrami, bo 14N generuje jeden plik na przelot — każdy z inną nazwą
+    /// (<c>&lt;name&gt;_&lt;K&gt;</c>, żeby PDB-ki się nie nadpisywały) i inną wartością iteration.
+    /// </summary>
+    protected static string BuildInp(QuadroInput input, string name, string iterationLine)
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        // Sequence is passed as-is — quadro14L.exe distinguishes between uppercase (RNA)
+        // Sequence is passed as-is — the engine distinguishes between uppercase (RNA)
         // and lowercase (DNA). Do not normalize case here; validation ensures only valid
         // characters are accepted before reaching this point.
         var sequence = input.Sequence ?? string.Empty;
 
-        var name      = string.IsNullOrWhiteSpace(input.Name)      ? "structure"                       : input.Name;
         var structure = string.IsNullOrWhiteSpace(input.Structure) ? BuildDefaultStructure(sequence)   : input.Structure;
         var chi       = string.IsNullOrWhiteSpace(input.Chi)    ? BuildDefaultChi(sequence)    : input.Chi;
         // Sugar: per-residue sugar pucker (N=North/RNA, S=South/DNA, .=default).
@@ -61,11 +111,6 @@ public abstract class QuadroEngineBase : IQuadroEngine
         // it does not affect geometry or energy. Honour the input (default 5).
         var rmLevel = input.RmLevel;
 
-        var steps = input.IterationSteps is { Length: > 0 }
-            ? input.IterationSteps
-            : [100];
-        var iterationSteps = string.Join(',', steps);
-
         // Field names padded with spaces to match the pz74 reference .inp format exactly.
         // quadro14L.exe is sensitive to whitespace style — tabs caused parse failures.
         var sb = new StringBuilder();
@@ -80,7 +125,7 @@ public abstract class QuadroEngineBase : IQuadroEngine
         sb.Append("path        ").Append(pathStr).Append('\n');
         sb.Append("test               ").Append(test).Append('\n');
         sb.Append("rm_level           ").Append(rmLevel).Append('\n');
-        sb.Append("iteration_steps    ").Append(iterationSteps).Append('\n');
+        sb.Append(iterationLine);
         return sb.ToString();
     }
 

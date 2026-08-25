@@ -7,7 +7,27 @@ using G4Composer.Server.Models;
 
 namespace G4Composer.Server.Services;
 
-public sealed record QuadroJobItem(int Index, string InpFileName, string InpContent);
+/// <summary>
+/// Jedna struktura do policzenia. <see cref="InpFileName"/>/<see cref="InpContent"/> to
+/// postać kanoniczna (podgląd, hash cache'a); <see cref="Passes"/> to fizyczne uruchomienia
+/// binarki — jedno dla 14G/14L, N dla 14N (po jednym na wartość iteration).
+/// </summary>
+public sealed record QuadroJobItem(
+    int Index, string InpFileName, string InpContent, IReadOnlyList<QuadroPass>? Passes = null)
+{
+    /// <summary>Przeloty do wykonania; gdy nie podano — jeden, po pliku kanonicznym.</summary>
+    public IReadOnlyList<QuadroPass> EffectivePasses =>
+        Passes is { Count: > 0 } ? Passes : [new QuadroPass(0, InpFileName, InpContent)];
+
+    /// <summary>Buduje pozycję, pytając silnik o rozbicie na przeloty.</summary>
+    public static QuadroJobItem For(IQuadroEngine engine, QuadroInput input, int index)
+    {
+        var baseName = $"struct_{index:D3}";
+        return new QuadroJobItem(
+            index, $"{baseName}.inp", engine.SerializeInput(input),
+            engine.SerializePasses(input, baseName));
+    }
+}
 
 public interface IQuadroJobRunner
 {
@@ -28,9 +48,12 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         new(@"Etotal\s*=\s*([-+]?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    // Matches iteration-step PDB names like "6w9p_80.pdb" — captures step number
+    // Matches iteration-step PDB names — captures the step number.
+    //   14L checkpoints:  "6w9p_80.pdb"          → 80
+    //   14N passes:       "6w9p_80.pdb"          → 80
+    //   14N alt passes:   "6w9p_80_alt.pdb"      → 80   (alternatywa14N appends "_alt" to name)
     private static readonly Regex StepPdbRegex =
-        new(@"_(\d+)\.pdb$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        new(@"_(\d+)(?:_alt)?\.pdb$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly IDockerCommandRunner    _docker;
     private readonly IQuadroEngineSelector   _engineSelector;
@@ -60,10 +83,12 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         if (items.Count == 0) return new DualRunResult(empty, empty);
 
         // Writing the .inp files is instant — no separate milestone for it; the first visible
-        // stage is the container start (which actually takes a moment).
+        // stage is the container start (which actually takes a moment). One file per pass:
+        // 14G/14L give a single pass, 14N one per iteration value.
         foreach (var item in items)
-            await File.WriteAllTextAsync(Path.Combine(jobDir, item.InpFileName),
-                item.InpContent, cancellationToken);
+            foreach (var pass in item.EffectivePasses)
+                await File.WriteAllTextAsync(Path.Combine(jobDir, pass.FileName),
+                    pass.Content, cancellationToken);
 
         var engine = _engineSelector.Active;
         var altExe = _options.AlternativeExecutable;
@@ -77,7 +102,7 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
             {
                 i++;
                 progress?.Report(new("minimizing", $"Running structure {i}/{items.Count}", i, items.Count, item.InpFileName, (double)i / items.Count * 100));
-                last = await CoreAsync(jobId, jobDir, item.InpFileName,
+                last = await CoreAsync(jobId, jobDir, item.EffectivePasses,
                     engine.Executable, engine.Image, "std", null, cancellationToken);
             }
             return new DualRunResult(last, empty);
@@ -85,25 +110,30 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
 
         // Single item: dual parallel run
         var item0  = items[0];
+        var passes = item0.EffectivePasses;
         var stdDir = Path.Combine(jobDir, "std");
         var altDir = Path.Combine(jobDir, "alt");
         Directory.CreateDirectory(stdDir);
         if (altExe is not null) Directory.CreateDirectory(altDir);
 
-        var src = Path.Combine(jobDir, item0.InpFileName);
-        File.Copy(src, Path.Combine(stdDir, item0.InpFileName), true);
-        if (altExe is not null)
-            File.Copy(src, Path.Combine(altDir, item0.InpFileName), true);
+        foreach (var pass in passes)
+        {
+            var src = Path.Combine(jobDir, pass.FileName);
+            File.Copy(src, Path.Combine(stdDir, pass.FileName), true);
+            if (altExe is not null)
+                File.Copy(src, Path.Combine(altDir, pass.FileName), true);
+        }
 
-        _logStore.Append(jobId, $"=== Dual run: {engine.Executable} + {altExe ?? "(no alternative)"} ===");
+        _logStore.Append(jobId,
+            $"=== Dual run: {engine.Executable} + {altExe ?? "(no alternative)"} | {passes.Count} pass(es) ===");
 
         // Only the standard run reports coarse progress — std + alt run in parallel on the
         // same stages, so reporting both would interleave/duplicate milestones.
-        var stdTask = CoreAsync(jobId, stdDir, item0.InpFileName,
+        var stdTask = CoreAsync(jobId, stdDir, passes,
             engine.Executable, engine.Image, "std", progress, cancellationToken);
 
         var altTask = altExe is not null
-            ? CoreAsync(jobId + "_alt", altDir, item0.InpFileName,
+            ? CoreAsync(jobId + "_alt", altDir, passes,
                 altExe, engine.Image, "alt", null, cancellationToken)
             : Task.FromResult(SingleRunResult.Empty);
 
@@ -131,18 +161,19 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
     // ── Core runner ─────────────────────────────────────────────────────────
 
     private async Task<SingleRunResult> CoreAsync(
-        string jobId, string jobDir, string inpFile,
+        string jobId, string jobDir, IReadOnlyList<QuadroPass> passes,
         string executable, string image, string prefix,
         IProgress<JobProgress>? progress,
         CancellationToken ct)
     {
         var safeId  = jobId.Length > 12 ? jobId[..12] : jobId;
-        var cname   = $"{_options.ContainerNamePrefix}_{safeId}_{prefix}_{Path.GetFileNameWithoutExtension(inpFile)}";
+        var cname   = $"{_options.ContainerNamePrefix}_{safeId}_{prefix}_{Path.GetFileNameWithoutExtension(passes[0].FileName)}";
         var mount   = jobDir.Replace('\\', '/');
         var dataDir = _options.ContainerDataDirectory;
         var workDir = _options.ContainerWorkDirectory;
 
-        _logStore.Append(jobId, $"=== Job {jobId} | {inpFile} | engine {executable} ===");
+        _logStore.Append(jobId,
+            $"=== Job {jobId} | {passes.Count} pass(es): {string.Join(", ", passes.Select(p => p.FileName))} | engine {executable} ===");
 
         progress?.Report(new("starting", "Starting Docker container", 1, 3, Percent: 12));
 
@@ -159,15 +190,29 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
         try
         {
             await WaitRunningAsync(jobId, cname, ct);
-            await ExecChecked(jobId, cname, ct, "cp", $"{dataDir}/{inpFile}", $"{workDir}/{inpFile}");
-            await ExecDebug  (jobId, cname, ct, "ls", "-lh", $"{workDir}/");
 
-            progress?.Report(new("minimizing", "Running energy minimization", 2, 3, Percent: 45));
+            // One engine invocation per pass, all inside the same container so CYANA/Xplor
+            // start-up cost is paid once. Passes are independent runs — each writes its own
+            // <name>_<K>.pdb / <name>_<K>_energy.txt, so nothing overwrites anything.
+            // Stdout of the last pass feeds the Etotal fallback in CollectFrames.
+            DockerResult quadro = default;
+            for (var p = 0; p < passes.Count; p++)
+            {
+                var pass = passes[p];
+                await ExecChecked(jobId, cname, ct, "cp", $"{dataDir}/{pass.FileName}", $"{workDir}/{pass.FileName}");
 
-            var quadro = await ExecIgnore(jobId, cname, ct,
-                "/bin/sh", "-c", $"cd {workDir} && ./{executable} {inpFile}");
+                progress?.Report(new("minimizing",
+                    passes.Count > 1
+                        ? $"Running energy minimization (pass {p + 1}/{passes.Count}, iteration {pass.Step})"
+                        : "Running energy minimization",
+                    p + 1, passes.Count,
+                    Percent: 12 + (78.0 * (p + 1) / passes.Count)));
 
-            progress?.Report(new("collecting", "Collecting structures", 3, 3, Percent: 90));
+                quadro = await ExecIgnore(jobId, cname, ct,
+                    "/bin/sh", "-c", $"cd {workDir} && ./{executable} {pass.FileName}");
+            }
+
+            progress?.Report(new("collecting", "Collecting structures", passes.Count, passes.Count, Percent: 90));
 
             await ExecDebug  (jobId, cname, ct, "ls", "-lh", $"{workDir}/");
             await ExecChecked(jobId, cname, ct, "/bin/sh", "-c",
@@ -198,10 +243,16 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
     /// Prefers *_{step}.pdb files (multi-step run); falls back to any xplor PDB.
     /// </summary>
     /// <param name="preferAlt">
-    /// True when collecting from the alt engine (alternatywa14L.exe).
-    /// That script runs two quadro14L calls in the same dir, producing both
-    /// <c>name_N.pdb</c> (inner std run) and <c>name_alt_N.pdb</c> (actual alt run).
-    /// When true, the <c>_alt_</c> files are selected; otherwise they are excluded.
+    /// True when collecting from the alt engine (alternatywa14*.exe).
+    /// That script runs the standard engine twice in the same dir, so both the inner
+    /// standard structure and the actual alternative one land side by side. The two
+    /// engines mark the alternative differently:
+    /// <list type="bullet">
+    ///   <item>14L (checkpoints): <c>name_alt_100.pdb</c> — marker in the middle</item>
+    ///   <item>14N (passes):      <c>name_100_alt.pdb</c> — marker at the end</item>
+    /// </list>
+    /// Matching only the middle form silently returned the STANDARD structure as the
+    /// alternative under 14N, so both spellings are recognised here.
     /// </param>
     private static List<IterationFrame> CollectFrames(string jobDir, string stdout, bool preferAlt = false)
     {
@@ -209,8 +260,8 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
 
         // Gather all PDB files in jobDir, respecting which engine produced them.
         var allPdbs = Directory.GetFiles(jobDir, "*.pdb");
-        var altPdbs = allPdbs.Where(p =>  Path.GetFileName(p).Contains("_alt_", StringComparison.OrdinalIgnoreCase)).ToArray();
-        var stdPdbs = allPdbs.Where(p => !Path.GetFileName(p).Contains("_alt_", StringComparison.OrdinalIgnoreCase)).ToArray();
+        var altPdbs = allPdbs.Where(p =>  IsAltPdb(p)).ToArray();
+        var stdPdbs = allPdbs.Where(p => !IsAltPdb(p)).ToArray();
         var pdbs = preferAlt && altPdbs.Length > 0 ? altPdbs : stdPdbs;
 
         // Try to find step-numbered PDBs: name_80.pdb, name_100.pdb, etc.
@@ -246,6 +297,17 @@ public sealed class QuadroJobRunner : IQuadroJobRunner
             frames.Add(new IterationFrame(100, pdbBytes, ParseEtotal(stdout)));
         }
         return frames;
+    }
+
+    /// <summary>
+    /// True for structures produced by alternatywa*.exe. Covers both naming schemes:
+    /// <c>name_alt_100.pdb</c> (14L) and <c>name_100_alt.pdb</c> / <c>name_alt.pdb</c> (14N).
+    /// </summary>
+    private static bool IsAltPdb(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path);
+        return name.EndsWith("_alt", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("_alt_", StringComparison.OrdinalIgnoreCase);
     }
 
     private static double? ReadEnergyFile(string jobDir, string pdbPath, int step)

@@ -148,8 +148,8 @@ public sealed class PdbCacheEntry
 }
 
 /// <summary>
-/// One stored iteration checkpoint's PDB content for a <see cref="PdbCacheEntry"/>.
-/// Examples get one row per displayed checkpoint; ad-hoc entries get exactly one (the best).
+/// One stored structure for a <see cref="PdbCacheEntry"/>, keyed by its iteration count.
+/// Examples get one row per iteration value; ad-hoc entries get exactly one (the best).
 /// </summary>
 public sealed class PdbCacheFrame
 {
@@ -158,7 +158,13 @@ public sealed class PdbCacheFrame
     public int PdbCacheEntryId { get; set; }
     public PdbCacheEntry Entry { get; set; } = null!;
 
-    /// <summary>Cumulative iteration-step count this checkpoint was minimized to.</summary>
+    /// <summary>
+    /// The iteration count this structure was produced with. Under 14N that is the
+    /// <c>iteration</c> of an independent engine pass (its own build-up depth), so distinct
+    /// Step values are distinct physical models. Under 14G/14L it was a cumulative checkpoint
+    /// along one trajectory. The number means different things per engine — which is why
+    /// PdbCacheService keys entries on the engine version too.
+    /// </summary>
     public int Step { get; set; }
 
     public double? Etotal { get; set; }

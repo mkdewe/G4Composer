@@ -26,14 +26,20 @@ public sealed class ValidationResult
 /// </summary>
 public sealed class QuadroInputValidator : IValidator<QuadroInput>
 {
-    // UPPERCASE = RNA (A,C,G,U) · lowercase = DNA (a,c,g,t) · mixed sequences allowed.
-    // Lowercase 'u' is NOT accepted — quadro14L explicitly rejects it (ERROR 2).
-    private static readonly HashSet<char> AllowedChars = ['A','C','G','U','a','c','g','t'];
+    // UPPERCASE = ribose · lowercase = deoxyribose · mixed sequences allowed.
+    // quadro14N widened the alphabet over 14L by adding uppercase 'T' (ribothymidine → RT)
+    // and lowercase 'u' (deoxyuridine → DU); other_residues.lib carries the matching RT/DU
+    // residues and cyana2xplor.exe the atom templates. quadro14L rejects both with ERROR 2,
+    // so if you ever roll the engine back to 14L, narrow this set again.
+    private static readonly HashSet<char> AllowedChars = ['A','C','G','U','T','a','c','g','t','u'];
 
     private const double MaxRise  = 10.0;
     private const double MinRise  = -10.0;
     private const double MaxTwist = 180.0;
     private const double MinTwist = -180.0;
+
+    // The engine rejects anything below 10 with "ERROR 25 Za mała iteracja".
+    private const int MinIteration = 10;
 
     public ValidationResult Validate(QuadroInput input)
     {
@@ -58,6 +64,16 @@ public sealed class QuadroInputValidator : IValidator<QuadroInput>
             var invalidChi = input.Chi.Where(c => c != 'S' && c != 'N' && c != 'A' && c != '.').Distinct().ToArray();
             if (invalidChi.Length > 0)
                 errors.Add($"Chi contains invalid characters: '{string.Join("', '", invalidChi)}'. Allowed: S, N, A, .");
+        }
+
+        // ── Iteration steps ───────────────────────────────────────────────────
+        // Under 14N every value becomes its own full engine pass, so a bad value costs a
+        // whole run. Previously unvalidated — a value < 10 reached the engine and died there.
+        if (input.IterationSteps is { Length: > 0 })
+        {
+            var tooSmall = input.IterationSteps.Where(s => s < MinIteration).Distinct().ToArray();
+            if (tooSmall.Length > 0)
+                errors.Add($"Iteration steps must be >= {MinIteration}; got: {string.Join(", ", tooSmall)}.");
         }
 
         // ── Orient ────────────────────────────────────────────────────────────
@@ -125,17 +141,15 @@ public sealed class QuadroInputValidator : IValidator<QuadroInput>
             return;
         }
 
-        // Uppercase T is invalid (RNA uses U, not T).
-        // Lowercase u is also invalid — quadro14L rejects it with ERROR 2.
-        if (sequence.Contains('T'))
-            errors.Add("Sequence contains uppercase 'T' — RNA residues must use 'U' (uppercase).");
-        if (sequence.Contains('u'))
-            errors.Add("Sequence contains lowercase 'u' — use uppercase 'U' for RNA uridine (quadro14L rejects lowercase 'u').");
-
+        // Uppercase 'T' (ribothymidine) and lowercase 'u' (deoxyuridine) used to be rejected
+        // here because quadro14L died on them with ERROR 2. quadro14N accepts both — verified
+        // end-to-end: GGTTGGTGTGGTTGG and gguuggugugguugg both produce a PDB under 14N and
+        // ERROR 2 under 14L. Rolling back to 14L means restoring these two guards.
         var invalid = sequence.Where(c => !AllowedChars.Contains(c)).Distinct().ToArray();
         if (invalid.Length > 0)
             errors.Add($"Sequence contains invalid characters: '{string.Join("', '", invalid)}'. " +
-                "Use UPPERCASE for RNA (A,C,G,U) or lowercase for DNA (a,c,g,t). Mixed sequences are allowed.");
+                "Use UPPERCASE for ribose (A,C,G,U,T) or lowercase for deoxyribose (a,c,g,t,u). " +
+                "Mixed sequences are allowed.");
     }
 
     private static void ValidateOrient(string orient, List<string> errors)

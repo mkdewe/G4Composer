@@ -79,15 +79,20 @@ export default function SequenceForm({ onRun, runState, prefill }) {
     const [silvaData, setSilvaData] = useState(null)   // null = loading
     const [silvaError, setSilvaError] = useState(false)
 
+    // Domyślnie pokazujemy sam wybór kuratorski: po jednym reprezentancie na kubełek
+    // (podtyp Silva × liczba tetrad), ten o najniższej energii. Pełny zestaw jest o jedno
+    // kliknięcie dalej — nic nie zostało z bazy usunięte.
+    const [curatedOnly, setCuratedOnly] = useState(true)
+
     useEffect(() => {
-        fetchSilvaGroups().then(data => {
+        fetchSilvaGroups(curatedOnly).then(data => {
             if (data) setSilvaData(data)
             else setSilvaError(true)
         })
-        fetchNonCanonicalExamples().then(data => {
-            if (data?.length) setNonCanonical(data)
+        fetchNonCanonicalExamples(curatedOnly).then(data => {
+            setNonCanonical(data ?? [])
         })
-    }, [])
+    }, [curatedOnly])
 
     // ── Canonical vs Non-canonical mode ─────────────────────────────────────
     const [mode, setMode] = useState('canonical')  // 'canonical' | 'noncanonical'
@@ -482,7 +487,24 @@ export default function SequenceForm({ onRun, runState, prefill }) {
                             — {allExampleCount} structures
                         </span>
                     )}
-                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-dim)', fontWeight: 400 }}>
+                    <button
+                        // stopPropagation: nagłówek zwija sekcję, przełącznik nie może tego robić.
+                        onClick={e => { e.stopPropagation(); setCuratedOnly(v => !v) }}
+                        title={curatedOnly
+                            ? 'Showing one representative per topology and tetrad count (lowest energy). Click to show every deposited example.'
+                            : 'Showing every deposited example. Click to narrow to one representative per topology and tetrad count.'}
+                        style={{
+                            marginLeft: 'auto', padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                            fontFamily: 'var(--mono)', borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                            border: `1px solid ${curatedOnly ? 'var(--teal)' : 'var(--border-med)'}`,
+                            background: curatedOnly ? 'var(--teal-light)' : 'var(--surface)',
+                            color: curatedOnly ? '#085041' : 'var(--text-dim)',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {curatedOnly ? 'representatives' : 'all'}
+                    </button>
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 400 }}>
                         {examplesOpen ? '▲ collapse' : '▼ expand'}
                     </span>
                 </div>

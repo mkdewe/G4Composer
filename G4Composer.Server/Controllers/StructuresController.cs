@@ -23,6 +23,15 @@ public sealed class StructuresController : ControllerBase
 
     public StructuresController(AppDbContext db) => _db = db;
 
+    /// <summary>
+    /// Czy naprawdę filtrować po <c>IsCurated</c>. Zabezpieczenie przed pustą listą: na bazie,
+    /// gdzie <c>tools/curate-examples.sh</c> jeszcze nie chodził, żaden przykład nie jest
+    /// wybrany, więc filtr wyciąłby wszystko i UI pokazałoby pustkę bez wyjaśnienia.
+    /// W takim wypadku filtr jest ignorowany.
+    /// </summary>
+    private async Task<bool> ShouldFilterCuratedAsync(bool requested, CancellationToken ct)
+        => requested && await _db.StructureExamples.AnyAsync(e => e.IsCurated, ct);
+
     // ── GET /api/structures/groups ────────────────────────────────────────
     /// <summary>
     /// Returns all Silva groups with their subtypes and example summaries.
@@ -31,10 +40,13 @@ public sealed class StructuresController : ControllerBase
     [HttpGet("groups")]
     [SwaggerOperation(Summary = "All Silva groups with subtypes", Tags = [SwaggerTag])]
     [ProducesResponseType(typeof(IReadOnlyList<SilvaGroupDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<SilvaGroupDto>>> GetGroups(CancellationToken ct)
+    public async Task<ActionResult<IReadOnlyList<SilvaGroupDto>>> GetGroups(
+        CancellationToken ct, [FromQuery] bool curatedOnly = false)
     {
         try
         {
+            var filterCurated = await ShouldFilterCuratedAsync(curatedOnly, ct);
+
             var groups = await _db.SilvaGroups
                 .AsNoTracking()
                 .OrderBy(g => g.GroupNumber)
@@ -53,9 +65,12 @@ public sealed class StructuresController : ControllerBase
                     s.Silva,
                     s.Onz,
                     s.Note,
-                    s.Examples.OrderBy(e => e.PdbId).Select(e => new StructureExampleSummaryDto(
-                        e.PdbId, e.Note, e.Tetrads, e.IsTheoretical
-                    )).ToList()
+                    s.Examples
+                        .Where(e => !filterCurated || e.IsCurated)
+                        .OrderBy(e => e.PdbId)
+                        .Select(e => new StructureExampleSummaryDto(
+                            e.PdbId, e.Note, e.Tetrads, e.IsTheoretical, e.IsCurated
+                        )).ToList()
                 )).ToList()
             )).ToList();
 
@@ -91,7 +106,7 @@ public sealed class StructuresController : ControllerBase
                 e.PdbId, e.Note, e.Tetrads, e.IsTheoretical,
                 e.InpName, e.Sequence, e.Structure, e.Chi,
                 e.Orient, e.Rise, e.Twist, e.Path,
-                e.IsTest, e.RmLevel, e.Iterations
+                e.IsTest, e.RmLevel, e.Iterations, e.IsCurated
             ));
         }
         catch (OperationCanceledException)
@@ -109,10 +124,12 @@ public sealed class StructuresController : ControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<StructureExampleSummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IReadOnlyList<StructureExampleSummaryDto>>> GetSubtypeExamples(
-        string code, CancellationToken ct)
+        string code, CancellationToken ct, [FromQuery] bool curatedOnly = false)
     {
         try
         {
+            var filterCurated = await ShouldFilterCuratedAsync(curatedOnly, ct);
+
             var subtype = await _db.SilvaSubtypes
                 .AsNoTracking()
                 .Include(s => s.Examples)
@@ -122,8 +139,10 @@ public sealed class StructuresController : ControllerBase
                 return NotFound(new ErrorDto($"Subtype '{code}' not found."));
 
             var examples = subtype.Examples
+                .Where(e => !filterCurated || e.IsCurated)
                 .OrderBy(e => e.PdbId)
-                .Select(e => new StructureExampleSummaryDto(e.PdbId, e.Note, e.Tetrads, e.IsTheoretical))
+                .Select(e => new StructureExampleSummaryDto(
+                    e.PdbId, e.Note, e.Tetrads, e.IsTheoretical, e.IsCurated))
                 .ToList();
 
             return Ok(examples);
@@ -142,13 +161,20 @@ public sealed class StructuresController : ControllerBase
     [HttpGet("noncanonical")]
     [SwaggerOperation(Summary = "Non-canonical structure examples", Tags = [SwaggerTag])]
     [ProducesResponseType(typeof(IReadOnlyList<StructureExampleDetailDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<StructureExampleDetailDto>>> GetNonCanonical(CancellationToken ct)
+    public async Task<ActionResult<IReadOnlyList<StructureExampleDetailDto>>> GetNonCanonical(
+        CancellationToken ct, [FromQuery] bool curatedOnly = false)
     {
         try
         {
+            // curatedOnly nic tu nie wycina przy obecnej regule (kurator oznacza wszystkie
+            // non-canonical), ale parametr jest przyjmowany, żeby klient mógł go podawać
+            // jednolicie i żeby zmiana reguły nie wymagała zmiany kontraktu.
+            var filterCurated = await ShouldFilterCuratedAsync(curatedOnly, ct);
+
             var examples = await _db.StructureExamples
                 .AsNoTracking()
                 .Where(e => e.SilvaSubtypeId == null)
+                .Where(e => !filterCurated || e.IsCurated)
                 .OrderBy(e => e.PdbId)
                 .ToListAsync(ct);
 
@@ -156,7 +182,7 @@ public sealed class StructuresController : ControllerBase
                 e.PdbId, e.Note, e.Tetrads, e.IsTheoretical,
                 e.InpName, e.Sequence, e.Structure, e.Chi,
                 e.Orient, e.Rise, e.Twist, e.Path,
-                e.IsTest, e.RmLevel, e.Iterations
+                e.IsTest, e.RmLevel, e.Iterations, e.IsCurated
             )).ToList();
 
             return Ok(result);

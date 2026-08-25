@@ -111,6 +111,15 @@ produces both variants (a multi-input batch runs the standard engine only) and t
 links the result to its `StructureExample`. It is idempotent: examples already cached with alt
 frames are skipped, so an interrupted run resumes.
 
+The examples browser defaults to the curated subset; the `representatives` / `all` button toggles
+it. `?curatedOnly=` on `/api/structures/{groups,noncanonical,subtypes/{code}/examples}` drives it
+and is **ignored when no example is curated yet**, so a server that has not run the script shows
+all 70 instead of an unexplained empty list.
+
+Running the script is also what makes examples load instantly: the PDB cache is filled lazily, so
+before it runs, the first click on any structure computes it (≈6 passes × 2 variants) and only
+later clicks are served from the database.
+
 ## Deploy flow (server)
 
 ```bash

@@ -19,11 +19,17 @@ public sealed record SilvaSubtypeDto(
 );
 
 /// <summary>Lightweight summary shown in the examples list (no .inp fields).</summary>
+/// <param name="IsCurated">
+/// Wybrany reprezentant swojego kubełka (podtyp Silva × liczba tetrad) — patrz
+/// <c>tools/curate-examples.sh</c>. Zwracane zawsze, żeby UI mógł wyróżnić wybrane
+/// nawet wtedy, gdy pokazuje wszystkie.
+/// </param>
 public sealed record StructureExampleSummaryDto(
     string PdbId,
     string Note,
     int Tetrads,
-    bool IsTheoretical
+    bool IsTheoretical,
+    bool IsCurated
 );
 
 /// <summary>Full .inp data returned when user clicks "Load" on an example.</summary>
@@ -42,7 +48,8 @@ public sealed record StructureExampleDetailDto(
     string Path,
     bool IsTest,
     int RmLevel,
-    int Iterations
+    int Iterations,
+    bool IsCurated = false
 );
 
 /// <summary>Result of deriving path/orient from Silva loop notation.</summary>

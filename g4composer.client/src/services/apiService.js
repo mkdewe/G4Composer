@@ -377,9 +377,12 @@ export async function fetchPipelineAltPdb(jobId) {
  * Used to populate the classification picker and examples list.
  * @returns {Promise<Array|null>}
  */
-export async function fetchNonCanonicalExamples() {
+// curatedOnly=true prosi backend o samych reprezentantów kubełków (podtyp × liczba tetrad).
+// Backend ignoruje ten filtr, jeśli nikt jeszcze nie przeliczył wyboru — inaczej lista byłaby
+// pusta na bazie, gdzie tools/curate-examples.sh nie chodził.
+export async function fetchNonCanonicalExamples(curatedOnly = false) {
   try {
-    const res = await fetch('/api/structures/noncanonical')
+    const res = await fetch(`/api/structures/noncanonical?curatedOnly=${curatedOnly}`)
     if (!res.ok) return []
     return await res.json()
   } catch {
@@ -387,9 +390,9 @@ export async function fetchNonCanonicalExamples() {
   }
 }
 
-export async function fetchSilvaGroups() {
+export async function fetchSilvaGroups(curatedOnly = false) {
   try {
-    const response = await fetch('/api/structures/groups', {
+    const response = await fetch(`/api/structures/groups?curatedOnly=${curatedOnly}`, {
       signal: AbortSignal.timeout(8000),
     })
     if (!response.ok) return null

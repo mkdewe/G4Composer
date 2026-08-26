@@ -14,11 +14,13 @@ namespace G4Composer.Server.Data.Migrations
             // tools/curate-examples.sh na podstawie policzonych energii. Domyślnie false —
             // dopóki skrypt nie przeliczy energii, nic nie jest oznaczone.
             //
-            // Bez `type:` celowo. EF wygenerował type: "INTEGER", bo lokalny provider to
-            // SQLite, a AddColumn wstawia zadeklarowany typ na Npgsql dosłownie — dokładnie
-            // tak 20260805110000_AddPdbCache wsadził do Postgresa kolumny integer zamiast
-            // boolean i trzeba to było naprawiać osobną migracją. Bez tego pola provider
-            // wyprowadza typ przy aplikowaniu: boolean na Postgresie, INTEGER na SQLite.
+            // UWAGA: usunięcie `type: "INTEGER"` wygenerowanego przez EF NIE wystarczyło.
+            // Typ kolumny bierze się z modelu, a AppDbContextModelSnapshot.cs jest generowany
+            // lokalnie, czyli pod SQLite, i ma zaszyte
+            // `b.Property<bool>("IsCurated").HasColumnType("INTEGER")` — więc na Postgresie i
+            // tak powstała kolumna integer. Naprawia to dopiero
+            // 20260826080000_FixStructureExampleBoolColumns; tamten komentarz opisuje pełny
+            // mechanizm. Nie zmieniaj tej migracji — jest już zaaplikowana na produkcji.
             migrationBuilder.AddColumn<bool>(
                 name: "IsCurated",
                 table: "StructureExamples",

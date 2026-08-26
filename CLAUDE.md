@@ -145,6 +145,23 @@ docker build -t x3dna-dssr:latest x3dna-dssr/
 
 The server may be in detached HEAD in the submodule — always `git checkout main` before `git pull`.
 
+## ⚠️ `bool` columns land in PostgreSQL as `integer`
+
+`AppDbContextModelSnapshot.cs` is generated locally, i.e. against **SQLite**, so every bool is
+recorded as `b.Property<bool>("X").HasColumnType("INTEGER")`. The column type comes from the
+**model**, so a new bool column becomes a real Postgres `integer` — deleting the `type:` argument
+from `AddColumn` does *not* help (that was tried and failed on `IsCurated`).
+
+The symptom is delayed and misleading: reads work (Npgsql maps integer→bool), but the first query
+that puts the column in a SQL predicate dies with `42804: argument of WHERE must be type boolean`.
+`IsTest` and `IsTheoretical` sat broken for months; `IsCurated` blew up `/api/structures/groups`
+the day it first appeared in an `.AnyAsync(...)`.
+
+**When adding a bool (or `DateTime`) column, pair it with a Postgres-only repair migration** —
+`if (!migrationBuilder.IsNpgsql()) return;` then `ALTER COLUMN … TYPE boolean USING (… <> 0)`,
+dropping and restoring the `DEFAULT` around it. Precedents:
+`20260805130000_FixPdbCacheColumnTypes`, `20260826080000_FixStructureExampleBoolColumns`.
+
 ## Migration conventions
 
 - Migration timestamps use format `YYYYMMDDHHMMSS` (e.g. `20260519100000_CleanupInpNames`)

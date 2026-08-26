@@ -124,6 +124,21 @@ if [ "$SKIP_COMPUTE" -eq 0 ]; then
     echo "Wybór poniżej pominie je (nie mają energii), więc ich kubełki mogą dostać"
     echo "gorszego reprezentanta. Napraw je i uruchom ponownie."
   fi
+
+  # Sukces HTTP nie znaczy, że wynik wylądował w bazie: QuadroController zapisuje do
+  # cache'a przez TrySaveToCacheAsync, który loguje i POŁYKA błędy DB, żeby nie zabijać
+  # udanego obliczenia. 2026-08-25 kosztowało to 66 policzonych na darmo struktur —
+  # zapis wywalał się na kolumnie IsCurated (integer zamiast boolean), a skrypt widział
+  # same nagłówki i raportował same sukcesy. Dlatego sprawdzamy stan po fakcie.
+  mapfile -t STILL_MISSING < <(psqlq "$MISSING_SQL")
+  if [ "${#STILL_MISSING[@]}" -gt 0 ] && [ -n "${STILL_MISSING[0]}" ]; then
+    echo
+    echo "BŁĄD: ${#STILL_MISSING[@]} struktur policzyło się, ale NIE MA ich w bazie."
+    echo "To znaczy, że zapis do cache'a padł po cichu. Sprawdź:"
+    echo "    journalctl -u g4composer --no-pager | grep -i 'failed to save result to PDB cache'"
+    echo "Wybór poniżej byłby liczony na niepełnych danych — przerywam."
+    exit 1
+  fi
 fi
 
 # ── 2. Wybór ─────────────────────────────────────────────────────────────────

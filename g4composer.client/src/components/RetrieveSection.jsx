@@ -30,19 +30,16 @@ export function RetrieveSection() {
     setFrameLoading(false)
   }, [])
 
-  // Downloads one iteration of one variant — under 14N each is its own model (its own
-  // build-up depth), not a snapshot of a shared trajectory. If nothing is selected in that
-  // row yet, falls back to that variant's lowest-energy frame so the button is never a dead end.
-  const downloadFrame = useCallback(async (variant, step) => {
-    if (!entry || step == null) return
-    const reuse = pdbBlob && variant === activeVariant && step === activeStep
-    const blob = reuse ? pdbBlob : (await fetchCacheFrame(entry.id, step, variant))?.blob
-    if (!blob) return
+  // Pobiera dokładnie ten model, który jest w podglądzie — jeden przycisk, bez wyboru
+  // wariantu obok. Wariant i iterację wybiera się klikając klatkę wyżej; ten blob jest już
+  // wczytany przez loadFrame, więc pobranie nie odpytuje serwera drugi raz.
+  const downloadActive = useCallback(() => {
+    if (!entry || !pdbBlob || activeStep == null) return
 
     const base = (entry.pdbId || `result-${entry.id}`).replace(/[^a-z0-9._-]/gi, '_').slice(0, 80)
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `${base}_${variant}_${step}it.pdb`
+    a.href = URL.createObjectURL(pdbBlob)
+    a.download = `${base}_${activeVariant}_${activeStep}it.pdb`
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 5000)
   }, [entry, pdbBlob, activeVariant, activeStep])
@@ -114,12 +111,25 @@ export function RetrieveSection() {
             <div className={styles.cardTitle} style={{ marginBottom: 0 }}>
               Result #{entry.id}{entry.pdbId ? ` · ${entry.pdbId}` : ''}
             </div>
-            <span
-              className={entry.isExample ? styles.badgeOk : styles.badgeErr}
-              style={entry.isExample ? {} : { background: 'var(--surface2)', color: 'var(--text-dim)' }}
-            >
-              {entry.isExample ? 'Curated example' : 'Ad-hoc run'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span
+                className={entry.isExample ? styles.badgeOk : styles.badgeErr}
+                style={entry.isExample ? {} : { background: 'var(--surface2)', color: 'var(--text-dim)' }}
+              >
+                {entry.isExample ? 'Curated example' : 'Ad-hoc run'}
+              </span>
+              <button
+                onClick={downloadActive}
+                disabled={frameLoading || !pdbBlob || activeStep == null}
+                className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
+                title={activeStep == null
+                  ? 'Select a model first'
+                  : `Download the model shown below — ${activeVariant === 'alt' ? 'alternative' : 'standard'}, ${activeStep} it (.pdb)`}
+                aria-label="Download the selected model"
+              >
+                <DownloadIcon />
+              </button>
+            </div>
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '4px 0 14px' }}>
             engine {entry.engineVersion} · cached {new Date(entry.createdAtUtc).toLocaleString()}
@@ -132,10 +142,6 @@ export function RetrieveSection() {
 
             const isActiveGroup = activeVariant === variant
             const label = variant === 'alt' ? 'alternative' : 'standard'
-            // Cel pobierania: wybrana klatka tego rzedu, inaczej najlepsza energetycznie.
-            const bestFrame = frames.reduce((a, b) =>
-              b.etotal != null && (a.etotal == null || b.etotal < a.etotal) ? b : a)
-            const targetStep = isActiveGroup && activeStep != null ? activeStep : bestFrame.step
 
             return (
               <div key={variant} style={{
@@ -169,17 +175,6 @@ export function RetrieveSection() {
                     </button>
                   )
                 })}
-
-                <button
-                  onClick={() => downloadFrame(variant, targetStep)}
-                  disabled={frameLoading || targetStep == null}
-                  className={`${styles.iconBtn} ${styles.iconBtnDownload}`}
-                  title={`Download ${label} iteration ${targetStep} (.pdb)`}
-                  aria-label={`Download ${label} iteration ${targetStep}`}
-                  style={{ marginLeft: 'auto' }}
-                >
-                  <DownloadIcon />
-                </button>
               </div>
             )
           })}

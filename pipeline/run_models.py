@@ -112,6 +112,10 @@ def main() -> int:
     parser.add_argument("--jobs", type=int, default=12)
     parser.add_argument("--timeout", type=int, default=1200)
     args = parser.parse_args()
+    args.inputs_dir = args.inputs_dir.resolve()
+    args.models_dir = args.models_dir.resolve()
+    args.runs_dir = args.runs_dir.resolve()
+    args.logs_dir = args.logs_dir.resolve()
 
     records = {
         record["key"]: record

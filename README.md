@@ -31,6 +31,9 @@ python3 -m venv .venv
 pip install -r requirements.txt
 ```
 
+`run_all.sh` and `run_table1.sh` use `.venv/bin/python` when it exists and fall
+back to `python3`.
+
 ## Quick start
 
 ```bash
@@ -55,8 +58,8 @@ signs are inverted and positions 2 and 4 are exchanged in every `path` token.
 
 **RMSD.** Hydrogens are removed from both the model and the reference. The
 reference is restricted to the author chain named by the input record
-(`auth_asym_id`, mapped to the mmCIF `label_asym_id`), not to whichever chain
-PyMOL would prefer. The two phosphate-oxygen aliases `OP1`/`O1P` and
+(`auth_asym_id`, which PyMOL uses as its chain identifier), not to whichever
+chain PyMOL would prefer. The two phosphate-oxygen aliases `OP1`/`O1P` and
 `OP2`/`O2P` are normalised. PyMOL `align` is run for one pass (`cycles=0`) and
 the RMSD over the common heavy atoms is recorded. This is the value called
 "all-heavy-atom RMSD" in the manuscript.
@@ -108,6 +111,5 @@ work/        generated data (git-ignored)
   regenerated; `summarize.py` stores those values as constants.
 - Reference structures are downloaded from RCSB; the manifest is the pinned
   snapshot used for the manuscript.
-- The figure behind `figures/AP_violin.pdf` is written to
-  `work/results/plots/` by `visualize.py`; the manuscript copy is produced from
-  the same measurement tables.
+- The manuscript's RMSD/energy violin (`figures/AP_violin.pdf`) is written to
+  `work/results/AP_violin.pdf` by `plot_violin.py`.

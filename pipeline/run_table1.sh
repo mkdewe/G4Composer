@@ -6,22 +6,33 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 JOBS="${JOBS:-12}"
 
+if [ -z "${PYTHON:-}" ]; then
+    if [ -x "$ROOT/.venv/bin/python" ]; then PYTHON="$ROOT/.venv/bin/python"; else PYTHON=python3; fi
+fi
+
+# NixOS: the manylinux wheels need the Nix zlib/libstdc++ runtimes.
+if command -v nix >/dev/null 2>&1; then
+    ZLIB="$(nix eval --raw nixpkgs#zlib.outPath 2>/dev/null || true)"
+    CCLIB="$(nix eval --raw nixpkgs#stdenv.cc.cc.lib.outPath 2>/dev/null || true)"
+    export LD_LIBRARY_PATH="${ZLIB:+$ZLIB/lib:}${CCLIB:+$CCLIB/lib:}${LD_LIBRARY_PATH:-}"
+fi
+
 cd "$ROOT"
 
-python3 pipeline/make_table1_inputs.py
-python3 pipeline/run_models.py \
+"$PYTHON" pipeline/make_table1_inputs.py
+"$PYTHON" pipeline/run_models.py \
     --inputs-dir work/inputs/table1 \
     --keys-file work/inputs/table1_keys.txt \
     --models-dir work/models_table1 \
     --runs-dir work/runs_table1 \
     --logs-dir work/logs_table1 \
     --jobs "$JOBS"
-python3 pipeline/score_rmsd.py \
+"$PYTHON" pipeline/score_rmsd.py \
     --inputs-dir work/inputs/table1 \
     --keys-file work/inputs/table1_keys.txt \
     --models-dir work/models_table1 \
     --output work/data/table1_scores.csv
-python3 pipeline/collect.py \
+"$PYTHON" pipeline/collect.py \
     --inputs-dir work/inputs/table1 \
     --keys-file work/inputs/table1_keys.txt \
     --scores work/data/table1_scores.csv \
@@ -29,4 +40,4 @@ python3 pipeline/collect.py \
     --output-dir work/data \
     --rmsd-name table1_rmsd.txt \
     --energy-name table1_energy_popr.txt
-python3 pipeline/summarize.py
+"$PYTHON" pipeline/summarize.py

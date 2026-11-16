@@ -5,7 +5,8 @@ Protocol
 --------
 * hydrogens are removed from both the model and the reference;
 * the reference is restricted to the **author chain** named by the input
-  record (``auth_asym_id``), not to whichever chain PyMOL would prefer;
+  record (``auth_asym_id``, which PyMOL uses as its chain identifier), not to
+  whichever chain PyMOL would prefer;
 * the two phosphate-oxygen aliases, ``OP1``/``O1P`` and ``OP2``/``O2P``, are
   normalised so the heavy-atom set is complete;
 * PyMOL ``align`` is run for one pass (``cycles=0``) and the RMSD over the
@@ -73,14 +74,15 @@ with open(output, "w", encoding="utf-8") as stream:
 '''
 
 
-def resolve_chain(record: dict, reference: Path) -> list[str]:
-    mapping = common.cif_auth_chains(reference)
-    labels = mapping.get(record["chain"], [])
-    token = record["chain_token"]
-    if token in labels:
-        return [token]
-    candidates = list(labels)
-    for candidate in (token, record["chain"]):
+def resolve_chain(record: dict) -> list[str]:
+    """Return PyMOL chain candidates for the record.
+
+    PyMOL addresses mmCIF chains by ``auth_asym_id``, which is exactly the chain
+    identifier used in the input filename, so no label mapping is needed.
+    Duplicated copies carry a ``-N`` suffix (e.g. ``C-2``).
+    """
+    candidates = []
+    for candidate in (record.get("chain_token"), record["chain"]):
         if candidate and candidate not in candidates:
             candidates.append(candidate)
     return candidates
@@ -100,7 +102,7 @@ def score_key(record: dict, args) -> list[dict]:
     if not models:
         return []
 
-    candidates = resolve_chain(record, reference)
+    candidates = resolve_chain(record)
     outdir = common.WORK / "data" / "pymol"
     outdir.mkdir(parents=True, exist_ok=True)
     output = outdir / f"{key}.json"

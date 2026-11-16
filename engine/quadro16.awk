@@ -800,7 +800,7 @@ BEGIN{
   if($1=="sequence"){seq=$2;lseq=length(seq)}
   if($1=="structure"){dot=$2;ldot=length(dot)}
   if($1=="chi"){chi=$2;lchi=length(chi)}
-  if($1=="shugar"){shugar=$2;lshugar=length(shugar)}
+  if($1=="sugar" || $1=="shugar"){shugar=$2;lshugar=length(shugar)}
   if($1=="orient"){sorient=$2;norient=split(sorient,ORIENT,";")}
   if($1=="rise"){srise=$2;nrise=split(srise,RISE,";")}
   if($1=="twist"){stwist=$2;ntwist=split(stwist,TWIST,";")}

@@ -8,7 +8,9 @@ keyword is rejected with `ERROR 26`.**
 That strictness is deliberate. Earlier versions ignored unrecognised lines, so a
 misspelt field — `shugar` for `sugar` — was read as a comment and the run
 proceeded silently with the default. The result looked entirely valid while
-being a different calculation from the one that was asked for.
+being a different calculation from the one that was asked for. Engine 16
+accepts both spellings: `sugar` is canonical, and `shugar` is retained as an
+alias for legacy inputs.
 
 The value **must not contain spaces**: the parser reads `$2`, so `path A1; B1`
 silently loses everything after the first space. Use `A1;B1`.

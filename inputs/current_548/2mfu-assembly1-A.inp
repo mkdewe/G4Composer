@@ -1,0 +1,9 @@
+name        2mfu-assembly1
+sequence    tgggtttgggttgggtttggg
+structure   ..^^....^^...^^...^^.
+chi         ..S....SS........SS..
+sugar       NSNNNSSNNNSSSNSNNSSSN
+orient      A+;B-
+rise        3.1
+twist       20.3
+path        A1;B1;B4;A4;A3;B3;A2;B2

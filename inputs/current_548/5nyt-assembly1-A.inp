@@ -1,0 +1,9 @@
+name        5nyt-assembly1
+sequence    tagggacgggcgggcagggt
+structure   ..^^^..^^^.^^^..^^^.
+chi         ....................
+sugar       NSSSSSNSSSSSSSSSSSSS
+orient      A-;B-;C-
+rise        3.4;3.3
+twist       22.6;30.5
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

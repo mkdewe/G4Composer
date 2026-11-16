@@ -1,0 +1,9 @@
+name        2la5-assembly1
+sequence    GCUGCGGUGUGGAAGGAGUGGCUGGGUUGCGCAGCG
+structure   (((((^((^.^^..^^.^.^^..^^^..))))))).
+chi         ....................................
+sugar       NNNNNSNNSNNSSNSNSNSSNSSSNSSSNNNNNNNN
+orient      A-;B+;C+
+rise        6.6;-3.4
+twist       82.6;-33
+path        A1;A4;B1;C1;B2;C2;A2;B3;C3;B4;C4;A3

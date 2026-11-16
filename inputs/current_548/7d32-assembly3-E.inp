@@ -1,0 +1,9 @@
+name        7d32-assembly3
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S..SS....S..SS.
+sugar       SSSSSSSSSSNSSSS
+orient      A+;B-
+rise        3.4
+twist       12.4
+path        A1;B1;B2;A2;A3;B3;B4;A4

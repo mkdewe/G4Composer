@@ -1,0 +1,9 @@
+name        8jic-assembly1
+sequence    tagggttagggttagggttagg
+structure   ..^^....^^.....^^...^^
+chi         ..S.....S.S....S....S.
+sugar       SSSSSSSSSNNSSSSSSSSSSS
+orient      A+;B-
+rise        3.3
+twist       17.8
+path        A1;B1;B4;A4;A2;B2;B3;A3

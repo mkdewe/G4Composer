@@ -1,0 +1,9 @@
+name        2ru7-assembly1
+sequence    GGAGGAGGAGGA
+structure   ^^.^^.^^.^^.
+chi         .....S......
+sugar       NSNNNSSSNSSN
+orient      A-;B-
+rise        3.4
+twist       29
+path        A1;B1;A4;B4;A3;B3;A2;B2

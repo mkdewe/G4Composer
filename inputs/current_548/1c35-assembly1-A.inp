@@ -1,0 +1,9 @@
+name        1c35-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         ........SS...S.
+sugar       SSSSSSSNSSNSSSS
+orient      A+;B-
+rise        3.4
+twist       -1.7
+path        A1;B1;B2;A2;A3;B3;B4;A4

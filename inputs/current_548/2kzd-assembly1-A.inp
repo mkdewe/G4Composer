@@ -1,0 +1,9 @@
+name        2kzd-assembly1
+sequence    aggggaggggctgggagggc
+structure   .^^^...^^^..^^^.^^^.
+chi         .S.....SS...S...S...
+sugar       NSSSSNNSNSNNSSNSNSSN
+orient      A+;B-;C-
+rise        3.9;3.2
+twist       22;31.4
+path        A1;B1;C1;C4;B4;A4;A3;B3;C3;A2;B2;C2

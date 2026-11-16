@@ -1,0 +1,9 @@
+name        1c38-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S...S...SS.....
+sugar       SNSNSSNSNSSSSSS
+orient      A+;B-
+rise        3.7
+twist       14.3
+path        A1;B1;B2;A2;A3;B3;B4;A4

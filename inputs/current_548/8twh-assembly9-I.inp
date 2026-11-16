@@ -1,0 +1,9 @@
+name        8twh-assembly9
+sequence    gggttgggttgggttggg
+structure   ^^^..^^^..^^^..^^^
+chi         ..................
+sugar       SSSSSSSNSSSSSSSSSS
+orient      A-;B-;C-
+rise        3.3;3.4
+twist       33.9;22.8
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

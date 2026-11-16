@@ -1,0 +1,9 @@
+name        7ntu-assembly2
+sequence    gtccgtggtagggcaggttggggtgac
+structure   ((((^.^^..^^...^^..^..).)))
+chi         ..........S........SS......
+sugar       NNNNSSNNNSSSSNSSNNSNSSSSNSN
+orient      A-;B-
+rise        3.6
+twist       -64.3
+path        A1;A2;B1;B2;A3;A4;B3;B4

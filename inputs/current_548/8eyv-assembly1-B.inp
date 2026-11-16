@@ -1,0 +1,9 @@
+name        8eyv-assembly1
+sequence    GCGCCGGUUAGGCAGAGGUGGGUGGUGUGGAGGAGUAUCUGUCCGGCGC
+structure   ((((((....((((((.^.^^^.^^(^.^^.^^.^.)))))))))))))
+chi         .................S...............SS.S............
+sugar       NSNNNS....NNNNNNSSSSNSNSNSSSNSSNNNSSNNNNNNNNNNNNN
+orient      A+;B+;C+
+rise        6.8;-3.3
+twist       -26.3;-30.6
+path        A1;B1;C1;A2;B2;C2;A3;B3;C3;B4;C4;A4

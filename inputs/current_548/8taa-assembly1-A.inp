@@ -1,0 +1,9 @@
+name        8taa-assembly1
+sequence    gtggtggtggtgatggtggtggtgg
+structure   ^.^^.^^.^^.^..^^.^^.^^.^^
+chi         .........................
+sugar       SSSSSSSSSSSSSSSSSSSSSSSSS
+orient      A-;B-;C+;D+
+rise        3.3;-6.6;-3.3
+twist       63.1;-143.1;-32.6
+path        A1;B1;A4;B4;A3;B3;A2;B2;C1;D1;C2;D2;C3;D3;C4;D4

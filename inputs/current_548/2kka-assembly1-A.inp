@@ -1,0 +1,9 @@
+name        2kka-assembly1
+sequence    agggttagggttagggttagggt
+structure   .^^....^^.....^^...^^..
+chi         .S.....S....SSS....S...
+sugar       NNNNNNNNNNNNSNSSSSNNNNN
+orient      A+;B-
+rise        4.2
+twist       13.8
+path        A1;B1;B4;A4;A2;B2;B3;A3

@@ -1,0 +1,9 @@
+name        8r4w-assembly1
+sequence    tgagggtcagggttgggttgggtaa
+structure   ...^^^...^^^..^^^..^^^...
+chi         .S.S.....SS...S....S.....
+sugar       SNSSNSSSNSNSSNSSSSSSSSNSS
+orient      A+;B-;C-
+rise        3.4;3.4
+twist       15.8;29
+path        A1;B1;C1;C4;B4;A4;A3;B3;C3;A2;B2;C2

@@ -1,0 +1,9 @@
+name        2e4i-assembly1
+sequence    agggttagggttagggttaggg
+structure   .^^^...^^^...^^^...^^^
+chi         .S.....S.....SS....S..
+sugar       NSSSSSSNNSSNSSSNSSSSSN
+orient      A+;B-;C-
+rise        3.7;3.6
+twist       12.6;27.4
+path        A1;B1;C1;A4;B4;C4;C3;B3;A3;A2;B2;C2

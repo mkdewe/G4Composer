@@ -1,0 +1,9 @@
+name        9plb-assembly1
+sequence    gtggtgtgtggtg
+structure   ^.^^.^.^.^^.^
+chi         .............
+sugar       SSSSSSSSSSSSS
+orient      A-;B-
+rise        3.3
+twist       64
+path        A1;B1;A4;B4;A3;B3;A2;B2

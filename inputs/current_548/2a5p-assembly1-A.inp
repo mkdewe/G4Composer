@@ -1,0 +1,9 @@
+name        2a5p-assembly1
+sequence    tgagggtggggagggtggggaagg
+structure   ...^^^.^^...^^^.^^^....^
+chi         .......................S
+sugar       SSSSNSSSSSNSSSSSSSSSNNSN
+orient      A-;B-;C-
+rise        3.2;3.3
+twist       31.6;29.3
+path        A1;B1;C1;A4;B4;A3;B3;C3;A2;B2;C2;C4

@@ -1,0 +1,9 @@
+name        2lyg-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S...S....S...S.
+sugar       NSNNSNSSSSNSSNS
+orient      A+;B-
+rise        3.4
+twist       17.6
+path        A1;B1;B2;A2;A3;B3;B4;A4

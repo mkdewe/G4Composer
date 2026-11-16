@@ -1,0 +1,9 @@
+name        9vmz-assembly1
+sequence    GGGACGGUCGGGUCCAGAUAUUCGUAUCUGUCGAGUAGAGUGUGGGCUC
+structure   (((.(^^.(^^.((((((((....))))))..))^..^.^.^.)).)))
+chi         .......................S..........S....S.S.......
+sugar       NNNNNSSSNNNNNNNNNNNNNSSNNNNNNNSSNSNSSNSSSNNNNNNNS
+orient      A-;B-
+rise        3.2
+twist       31.7
+path        A1;B1;A4;B4;B2;A2;B3;A3

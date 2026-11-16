@@ -1,0 +1,9 @@
+name        7oar-assembly1
+sequence    ttttttgggtgggtgggtgggttttttt
+structure   ......^^^.^^^.^^^.^^^.......
+chi         ............................
+sugar       NNNNSNSSSSSSSSNNSSNSSSSNNNN.
+orient      A-;B-;C-
+rise        3.3;3.3
+twist       31.1;32.9
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

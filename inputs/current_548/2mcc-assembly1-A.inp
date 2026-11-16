@@ -1,0 +1,9 @@
+name        2mcc-assembly1
+sequence    agggttagggttagggttaggg
+structure   ..^^...^^.....^^...^^.
+chi         ..SSSSSSS.....S....SSS
+sugar       NNNNNNSNNNNNSNNNSNNNNN
+orient      A+;B-
+rise        5
+twist       -12.2
+path        A1;B1;B4;A4;A2;B2;B3;A3

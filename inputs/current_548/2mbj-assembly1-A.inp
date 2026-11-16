@@ -1,0 +1,9 @@
+name        2mbj-assembly1
+sequence    ttagggttagggttagggttagggtta
+structure   ...^^^..(^^^...^^^...^^^)..
+chi         ...SS....S.....S.....SS....
+sugar       NNNSSSNSSNNNNNSSNSSSSSNSNNS
+orient      A+;B+;C-
+rise        3.9;3.8
+twist       29.4;21.2
+path        A1;B1;C1;C2;B2;A2;C3;B3;A3;A4;B4;C4

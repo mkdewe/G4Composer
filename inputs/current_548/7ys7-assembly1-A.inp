@@ -1,0 +1,9 @@
+name        7ys7-assembly1
+sequence    ggggcggggcggggcggggt
+structure   ^^....^^^.^^^..^^^^.
+chi         S...S.S...S....S....
+sugar       NNSSSSSSSSNNSSSNNNNN
+orient      A+;B-;C+
+rise        3.8;-6.7
+twist       23.9;126.4
+path        A1;B1;B3;A3;C1;B4;A4;C2;C3;B2;A2;C4

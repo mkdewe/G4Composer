@@ -1,0 +1,9 @@
+name        8ijc-assembly1
+sequence    agggagaggagagctctgggttgggtggg
+structure   .^^^.(((.....))).^^^..^^^.^^^
+chi         .S...............SS...S...S..
+sugar       NSNNSSNNSNNNSNNNNSNNNNNNSNNNN
+orient      A+;B-;C-
+rise        3.5;3.8
+twist       21.8;24.8
+path        A1;B1;C1;C4;B4;A4;A3;B3;C3;A2;B2;C2

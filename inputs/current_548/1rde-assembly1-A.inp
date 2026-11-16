@@ -1,0 +1,9 @@
+name        1rde-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S...S....S...S.
+sugar       SSSSSSNSNSSSNSS
+orient      A+;B-
+rise        4.2
+twist       10.4
+path        A1;B1;B2;A2;A3;B3;B4;A4

@@ -1,0 +1,9 @@
+name        4ni7-assembly1
+sequence    ggCagGtttggtattAacacgttaagtCgtgg
+structure   ^^..^^...^^..(((((..))))).....^^
+chi         S...S....S.................S..S.
+sugar       SNNSSSSSSSSSSNSSNS..SNNSSSNSSNSN
+orient      A+;B-
+rise        3.5
+twist       13.7
+path        A1;B1;B2;A2;A3;B3;B4;A4

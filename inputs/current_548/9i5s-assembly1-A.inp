@@ -1,0 +1,9 @@
+name        9i5s-assembly1
+sequence    gttagggttagggttagggttagg
+structure   ....^^....^^.....^^...^^
+chi         .S..S.....S.S....S....S.
+sugar       SSSSSNSSSSSNNSSSSSSSSSSS
+orient      A+;B-
+rise        3.6
+twist       20.8
+path        A1;B1;B4;A4;A2;B2;B3;A3

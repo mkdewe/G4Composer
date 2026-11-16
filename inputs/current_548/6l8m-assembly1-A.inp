@@ -1,0 +1,9 @@
+name        6l8m-assembly1
+sequence    gggtcaccgggcagtgggcggg
+structure   ^^(....)^^^..^.^^^.^^^
+chi         SS..........S.........
+sugar       NNSNNNNNSNSSNNSNNSSSSS
+orient      A+;B+;C+
+rise        3.4;-7.3
+twist       31.4;26.1
+path        A1;B1;B4;A4;C1;C2;B2;A2;C3;B3;A3;C4

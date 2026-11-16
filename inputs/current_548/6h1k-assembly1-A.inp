@@ -1,0 +1,9 @@
+name        6h1k-assembly1
+sequence    gggaggcgtggcctgggcgggactgggg
+structure   ^^..(((...))).^^^.^^^...^^^^
+chi         S.............S...S.....SS..
+sugar       NNSSSNNSNNNSNSNSNSNNSNSNNNNS
+orient      A+;B-;C+
+rise        3.5;-6.6
+twist       18.5;129.4
+path        A1;B1;B3;A3;C1;B4;A4;C2;C3;B2;A2;C4

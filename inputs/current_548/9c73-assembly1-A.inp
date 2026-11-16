@@ -1,0 +1,9 @@
+name        9c73-assembly1
+sequence    gttggggttggggttggggttgggg
+structure   ....^^^..^^^...^^^....^^^
+chi         S..S..........SSSS...S...
+sugar       SSSSSSSSNSSNSNNSNSNNSSNSS
+orient      A-;B-;C-
+rise        3.4;3.4
+twist       31.7;26.3
+path        A1;B1;C1;A4;B4;C4;C3;B3;A3;A2;B2;C2

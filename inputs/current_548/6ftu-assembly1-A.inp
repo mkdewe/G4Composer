@@ -1,0 +1,9 @@
+name        6ftu-assembly1
+sequence    gggggaggggtacaggggtacagggg
+structure   ^^^^((^^^^....^^^^).).^^^^
+chi         S.S...S.S.....S.S.....S.S.
+sugar       SSSNNSSNSNNNSSSSSSNSSSNSSN
+orient      A+;B-;C+;D-
+rise        3.4;3.5;3.4
+twist       18.3;38;17.8
+path        A1;B1;C1;D1;D2;C2;B2;A2;A4;B4;C4;D4;D3;C3;B3;A3

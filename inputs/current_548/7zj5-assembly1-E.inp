@@ -1,0 +1,9 @@
+name        7zj5-assembly1
+sequence    GGAUACGUCUACGCUCAGUGACGGACUCUCUUCGGAGAGUCUGACAUCCGAACCAUACACGGAUGUGCCUCGCCGAACAGUCUACGGCGAGCUUAAGCGCUGGGGACGCCCAACGCAUCACAAAGACUGAGUGAUGAACCAGAAGUAUGGACUGGUUGCGUUGGUGGAGACGGUCGGGUCCAGUUCGCUGUCGAGUAGAGUGUGGGCUCCAUCGACGCCGCUUUAAGGUCCCCAAUCGUGGCGUGUCGGCCUGCUUCGGCAGGCACUGGCGCCGGGACCUUGAAGAGAUGAGAUUUCGAUCUCAUCUUUGGGUGUCUCUGGUGCUUGAGGGCCCUGUGUUCGCACAGGGCCGCUCACUGGGUGUGGACGUAUCC
+structure   ((((((((((((((((((((((((((((((....)))))))))(((((((..[[[[[[.)))))))(((((((((..[[[[[[.)))))))((((((((((((((((((((((((((((((..]]]]]].))))))((((((..]]]]]].))))))((((((((((((.(^^.(^^.(((((....)))..))^..^.^.^.)).))))))))))))))((((((((((((.......((((((..(((((((....)))))).)).)))))))))))))))))(((((((........)))))))))))))))))))))))))))))(((((((((....))))))))))))))))))))))))))))))))
+chi         .................................S........................................................................................................................................................S.......S....S.S.......................................................S.......................................S...........................................S................................
+sugar       NNNNNNNNNNNNNNNNNNNNSNNNNNNNNNNSSNNNNNNNNNNNNNNNNNSNNNNNNNNNNNNNNSNNNNNNNNNSSNNNNNNNNNNNNNSNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNSSNNNNNNNNNNNNSNNNNNSSSNNNNNNNNNNNNNNNNNNNNNNNNNNNSSNNNNNNNNNNNSSNNNNSNNSNSSNSSSNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNSSNNNNNNNNNSSNNNNNNNSNNSNNNNNNNNNNNNNNNNSNNNNNNNNNNSSNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNSSNNNNNNNNNSNNNNNNNNNNNNNNNNNNNNNNN
+orient      A-;B-
+rise        3.3
+twist       35.6
+path        A1;B1;A4;B4;B2;A2;B3;A3

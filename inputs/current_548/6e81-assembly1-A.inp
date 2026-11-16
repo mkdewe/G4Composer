@@ -1,0 +1,9 @@
+name        6e81-assembly1
+sequence    GGCGCGAGGAAGGAGGUCUGAGGAGGUCACUGCGCC
+structure   (((((...(..^^.^^.).((^^.^^))...)))))
+chi         .............S......................
+sugar       NNNNNNNNNNSSSSNNNSSNSNSNNNNSNNNSSNNN
+orient      A-;B-
+rise        3.2
+twist       32.9
+path        A1;B1;A4;B4;A3;B3;A2;B2

@@ -1,0 +1,9 @@
+name        7w9n-assembly1
+sequence    cgatcgggtgtgggtggcgtaaagggagcatcg
+structure   ((((..^^...^^..^^(.....)^^...))))
+chi         ......S....S...S........S........
+sugar       SSSSSSNSSSSSNNSSSSSSSSSNSSSSSSNSS
+orient      A+;B-
+rise        3.7
+twist       16.4
+path        A1;B1;B4;A4;A3;B3;B2;A2

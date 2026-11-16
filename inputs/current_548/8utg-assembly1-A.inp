@@ -1,0 +1,9 @@
+name        8utg-assembly1
+sequence    UAUGGAAGAGGCGGUUGGUAU
+structure   ...^^..(.^^.^^..^^)..
+chi         ........S..S...S.....
+sugar       NNNSNSNSSSSNNNSSNNNSS
+orient      A-;B-
+rise        3.4
+twist       34.7
+path        A1;B1;A4;B4;A3;B3;A2;B2

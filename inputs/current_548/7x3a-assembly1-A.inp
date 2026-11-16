@@ -1,0 +1,9 @@
+name        7x3a-assembly1
+sequence    agggagaggagagctctgggttgggtggg
+structure   .^^^((((.....))))^^^..^^^.^^^
+chi         .S......S...S....SS...S...S..
+sugar       NNSNNNNNNNNSNSNNNSNNNNNSNNNSN
+orient      A+;B-;C-
+rise        3.8;3.3
+twist       25.5;27.8
+path        A1;B1;C1;C4;B4;A4;A3;B3;C3;A2;B2;C2

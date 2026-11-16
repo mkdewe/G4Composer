@@ -1,0 +1,9 @@
+name        6rs3-assembly1
+sequence    gggatgggacacaggggacggg
+structure   ^^...^^^.....^^^^..^^^
+chi         S....S.......S.....S..
+sugar       SSNNSSSSSNSSSNNNSSSNSS
+orient      A+;B-;C+
+rise        3.4;-6.8
+twist       19.2;38.2
+path        A1;B1;B4;A4;C1;C2;B2;A2;C3;B3;A3;C4

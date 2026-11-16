@@ -1,0 +1,9 @@
+name        8psi-assembly1
+sequence    gggtagggcggcggggcagggt
+structure   ^^...^^^..^.^^^...^^^.
+chi         S....S......S.....SS..
+sugar       SSSSNSSSSNSSSSSSNSSNNS
+orient      A+;B-;C+
+rise        3.4;-6.8
+twist       18.8;40.5
+path        A1;B1;B4;A4;C1;C2;B2;A2;C3;C4;A3;B3

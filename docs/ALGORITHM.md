@@ -130,11 +130,10 @@ A topology specified through `orient`, `rise`, `twist` and `path` does not
 determine the handedness the molecule adopts. The opposite reading gives a
 sterically plausible structure differing only in energy, so the ambiguity is not
 resolvable by inspection of the model. Constructing both and comparing `Etotal`
-resolves it by calculation — which is why quadro does it on every run rather
-than on request.
+resolves it by calculation.
 
-Stages 1–4 above therefore run twice. The second time they run on a derived
-input in which four fields are inverted together:
+Engine 16 builds one handedness per invocation. To obtain the mirror, derive a
+second input in which four fields are inverted together:
 
 | Field | Transformation | Example |
 |---|---|---|
@@ -142,42 +141,25 @@ input in which four fields are inverted together:
 | `rise` | sign flipped | `3.4` → `-3.4` |
 | `twist` | sign flipped | `19` → `-19` |
 | `path` | positions `2` ↔ `4` in every token | `A1;B1;B4;A4;A3;B3;B2;A2` → `A1;B1;B2;A2;A3;B3;B4;A4` |
-| `name` | suffixed | `foo` → `foo_alt` |
+| `name` | suffixed by the caller | `foo` → `foo_alt` |
 
 Inverting the stacking direction, the twist and the hydrogen-bond directionality
 together, and reordering the residues within each tetrad accordingly, yields the
 opposite-handed arrangement of the same residues. Inverting any one of them
 alone would describe a molecule that cannot be built.
 
-Mechanically, the engine writes the derived `.inp` next to the original and
-re-invokes itself on it with `--no-mirror`, which is what stops the recursion.
-The derived file is left in the working directory, so the second calculation is
-reproducible on its own. In 14L this lived in a separate wrapper script,
-`alternatywa14L.exe`; it is part of the engine now.
+The manuscript's production pipeline generates the derived `.inp` and runs it as
+a separate job. Both structures have identical atom counts and different
+coordinates, so the lower `Etotal` identifies the favoured handedness. Neither
+the direction nor the size of that margin is a general result: in the 14M
+reference runs, `examples/7ys7.inp` favoured the input as written by 18.9, while
+`examples/6a-1hap_js12B.inp` and `examples/6pnk.inp` favoured the mirror by 9.6
+and 1.8. (Xplor-NIH does not label the units in `<name>_energy.txt`; treat
+`Etotal` as a relative figure for ranking models of the same sequence, not as an
+absolute quantity.)
 
-One invocation therefore yields two structures with identical atom counts and
-different coordinates:
-
-```bash
-tools/run.sh --outdir out examples/6a-1hap_js12B.inp
-```
-
-```
-out/1hap_js12B_100.pdb            Etotal = -620.281   input as written
-out/1hap_js12B_100_alt.pdb        Etotal = -629.866   mirror image
-out/1hap_js12B_100_energy.txt
-out/1hap_js12B_100_alt_energy.txt
-```
-
-Here the mirror is favoured by 9.6. Neither the direction nor the size of that
-margin is a general result: `examples/7ys7.inp` goes the other way, the input as
-written winning by 18.9, and `examples/6pnk.inp` produces two readings 1.8 apart
-that settle nothing. (Xplor-NIH does not label the units in
-`<name>_energy.txt`; treat `Etotal` as a relative figure for ranking models of
-the same sequence, not as an absolute quantity.)
-
-`--no-mirror` skips the second pass. It halves the run time and gives up the
-comparison, which is worth doing only when the handedness is already settled.
+There is no built-in mirror pass in engine 16. `--no-mirror` is accepted for
+compatibility and changes nothing.
 
 ---
 
@@ -186,8 +168,8 @@ comparison, which is worth doing only when the handedness is already settled.
 A typical 15–25 nt structure takes on the order of a minute per pass on one
 core, dominated by CYANA's build-up: cost grows with the number of build-up
 stages (≈ the length of `path`) multiplied by `iteration`. The two Xplor passes
-are a fixed cost that does not depend on any `.inp` setting. The mirror pass
-doubles all of it.
+are a fixed cost that does not depend on any `.inp` setting. Running the mirror
+input doubles all of it.
 
 Nothing in the pipeline is parallelised internally. Throughput comes from
 running independent inputs concurrently in separate containers.

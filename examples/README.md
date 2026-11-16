@@ -13,9 +13,8 @@ Run one:
 tools/run.sh --outdir out examples/7ys7.inp
 ```
 
-Each of these writes two structures, `<name>.pdb` and `<name>_alt.pdb` — the
-topology as written and its mirror image. The mirror pass is part of an ordinary
-run; `--no-mirror` skips it.
+Each of these writes one structure, `<name>.pdb`. Engine 16 is single-pass; run
+the mirrored input as a second job to sample the opposite-handed stack.
 
 The `.inp` format is documented in [`../docs/INPUT-FORMAT.md`](../docs/INPUT-FORMAT.md).
 

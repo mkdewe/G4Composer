@@ -9,7 +9,7 @@
 #
 #   tools/build.sh                     ← recommended; wraps the call below
 #
-#   DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t quadro14m:latest . \
+#   DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t quadro:latest . \
 #       --build-context cyana=third_party/cyana-2.1 \
 #       --build-context xplor=third_party/xplor-nih-2.39
 #
@@ -18,10 +18,10 @@
 
 FROM ubuntu:22.04
 
-# The engine entry point. It is a build argument only so that a fork carrying a
-# differently named engine can override it; the file in engine/ is unversioned
-# on purpose, so bumping quadro means replacing engine/ and nothing else.
-ARG QUADRO_EXE=quadro.exe
+# The engine entry point.  It is a build argument only so that a fork carrying a
+# differently named engine can override it.  Version 16 ships as an awk script,
+# so the entrypoint runs it through `sh` rather than executing it directly.
+ARG QUADRO_EXE=quadro16.awk
 # Reported by `--version` and by /health-style checks. Set from VERSION.
 ARG QUADRO_VERSION=unknown
 
@@ -88,8 +88,18 @@ RUN cd /opt/bin/xplor-nih-2.39 && \
     chmod +x bin/xplor 2>/dev/null || true
 
 # ── 7. CYANA layout ──────────────────────────────────────────────────────────
+# Distributions unpacked through a filesystem that drops Unix modes (Windows
+# unzip, some archive managers, mounted shares) arrive with no file executable.
+# `chmod -R a+rX` below does NOT repair that: X only adds execute where it is
+# already set or to directories.  The launcher, its identify helper and the
+# actual CYANA binary must be executable or the run dies with
+# "/opt/bin/cyana-2.1/etc/identify: Permission denied" and then
+# "No executable found in .../src/cyana".
 RUN cd /opt/bin/cyana-2.1 && \
     chmod +x cyana cyana.sh 2>/dev/null || true && \
+    chmod +x etc/identify etc/abspath etc/install etc/keep etc/configure 2>/dev/null || true && \
+    chmod +x cyanajob cyanaclean cyanafilter cyanatable 2>/dev/null || true && \
+    chmod +x src/cyana/cyanaexe.* 2>/dev/null || true && \
     if [ -f cyana.sh ]; then ln -sf /opt/bin/cyana-2.1/cyana.sh /usr/local/bin/cyana; fi
 
 # ── 8. Permissions ───────────────────────────────────────────────────────────
@@ -118,9 +128,13 @@ RUN set -e; \
         || { echo "FATAL: 'awk' is not GNU awk. The engine uses gawk-only features (true"; \
              echo "       multidimensional arrays, strtonum) and silently misbehaves under mawk."; exit 1; }; \
     test -x /opt/bin/cyana-2.1/cyana        || { echo "FATAL: CYANA binary missing or not executable"; exit 1; }; \
+    test -x /opt/bin/cyana-2.1/etc/identify || { echo "FATAL: CYANA etc/identify missing or not executable"; exit 1; }; \
+    /opt/bin/cyana-2.1/cyana -x >/dev/null 2>&1 \
+        || { echo "FATAL: CYANA launcher cannot locate its executable (check etc/identify and src/cyana/cyanaexe.*)"; exit 1; }; \
     test -x /opt/bin/xplor-nih-2.39/bin/xplor || { echo "FATAL: Xplor-NIH binary missing or not executable"; exit 1; }; \
-    test -x "/opt/bin/${QUADRO_EXE}"        || { echo "FATAL: ${QUADRO_EXE} missing or not executable"; exit 1; }; \
-    for f in tetrad.lib bp.lib other_residues.lib ATOMTYPES.txt ryb.cya sugarbond.cya mp_makeaco.cya tor3aa; do \
+    test -f "/opt/bin/${QUADRO_EXE}"        || { echo "FATAL: ${QUADRO_EXE} missing"; exit 1; }; \
+    sh -n "/opt/bin/${QUADRO_EXE}"          || { echo "FATAL: ${QUADRO_EXE} is not a valid shell wrapper"; exit 1; }; \
+    for f in tetrad16.lib bp.lib other_residues.lib ATOMTYPES.txt ryb.cya mp_sugarbond.cya mp_makeaco.cya tor3aa; do \
         test -f "/opt/bin/$f" || { echo "FATAL: engine data file $f missing"; exit 1; }; \
     done; \
     echo "quadro image OK: engine=${QUADRO_EXE}"

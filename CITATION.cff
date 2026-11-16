@@ -8,7 +8,7 @@ abstract: >-
   residue by residue in torsion space using CYANA, then refines it in Cartesian
   space using Xplor-NIH under planarity, dihedral and hydrogen-bond restraints.
 type: software
-version: "14M"
+version: "16"
 license: MIT
 repository-code: "https://github.com/mkdewe/quadro"
 

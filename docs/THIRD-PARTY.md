@@ -144,8 +144,8 @@ cp /path/to/my.inp .
 ls *.pdb *_energy.txt
 ```
 
-That builds two structures — the input as written and its mirror image. Add
-`--no-mirror` before the file name to build only the first.
+That builds one structure. Engine 16 is single-pass; run the mirrored input as
+a second job if the opposite-handed stack is needed.
 
 The engine exits non-zero when it rejects an input, but its status is otherwise
 whatever its last `system()` call returned, so judge a run by whether a `.pdb`

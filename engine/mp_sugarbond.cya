@@ -12,17 +12,18 @@ var info echo i res n
 syntax range=@ii=$rnum(1)..$rnum(nr)
 
 info:=none; echo:=off; n=0
+m=0
 do i 1 nr
   res=rnum(i)
   if (res.ge.range(1) .and. res.le.range(2) .and. \
-      index('ADE THY GUA CYT RADE RGUA RCYT URA',rnam(i)).gt.0) then
-    n=n+1
-    distance make "C4\' $res" "O4\' $res" lol=1.39 upl=1.41 weight=10.0
-    distance make "C4\' $res" "C1\' $res" lol=2.38 upl=2.40
-    distance make "C5\' $res" "O4\' $res" lol=2.39 upl=2.39
-    distance make "H4\' $res" "O4\' $res" lol=2.11 upl=2.12
-    distance make "C3\' $res" "O4\' $res" lol=2.19 upl=2.28
+      index(' DAT DCG DGC DGT DTA DTG RAU RCG RGC RGU RUA RUG R D ',rnam(i)).gt.0) then
+    m=m+1
+    distance make "C4\' $res" "O4\'A $res" lol=1.39 upl=1.41 weight=10.0
+    distance make "C4\' $res" "C1\'A $res" lol=2.38 upl=2.40 weight=10.0
+    distance make "C5\' $res" "O4\'A $res" lol=2.39 upl=2.39 weight=10.0
+    distance make "H4\' $res" "O4\'A $res" lol=2.11 upl=2.12 weight=10.0
+    distance make "C3\' $res" "O4\'A $res" lol=2.19 upl=2.28 weight=10.0
   end if
 end do
 unset info
-print "    Constraints for $n ribose rings added."
+print "    Constraints for $n and $m ribose rings added."

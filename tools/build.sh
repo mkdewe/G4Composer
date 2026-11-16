@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build the quadro image.
 #
-#   tools/build.sh                          # uses third_party/, tags quadro14m:latest
+#   tools/build.sh                          # uses third_party/, tags quadro:latest
+#                                           # (and quadro16:latest)
 #   tools/build.sh -t myquadro:dev          # custom tag
 #   tools/build.sh --no-cache               # rebuild every layer from scratch
 #
@@ -21,13 +22,14 @@ VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
 
 CYANA_DIR="${CYANA_DIR:-$REPO/third_party/cyana-2.1}"
 XPLOR_DIR="${XPLOR_DIR:-$REPO/third_party/xplor-nih-2.39}"
-TAG="quadro$(echo "$VERSION" | tr '[:upper:]' '[:lower:]'):latest"
+TAG="${QUADRO_TAG:-quadro:latest}"
+VERSION_TAG="quadro$(echo "$VERSION" | tr '[:upper:]' '[:lower:]'):latest"
 
 NO_CACHE=()
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        -t|--tag) TAG="$2"; shift 2 ;;
+        -t|--tag) TAG="$2"; VERSION_TAG=""; shift 2 ;;
         # Rebuild every layer from scratch. Use it when verifying that the image
         # can be reproduced from the repository alone, rather than from whatever
         # happens to be in the local build cache.
@@ -46,6 +48,11 @@ if ! docker buildx version >/dev/null 2>&1; then
     exit 70
 fi
 
+TAGS=(-t "$TAG")
+if [ -n "$VERSION_TAG" ] && [ "$VERSION_TAG" != "$TAG" ]; then
+    TAGS+=(-t "$VERSION_TAG")
+fi
+
 echo
 echo "Building $TAG (engine $VERSION)"
 echo "  CYANA: $CYANA_DIR"
@@ -56,7 +63,7 @@ DOCKER_BUILDKIT=1 docker buildx build \
     --load \
     "${NO_CACHE[@]}" \
     -f "$REPO/docker/Dockerfile" \
-    -t "$TAG" \
+    "${TAGS[@]}" \
     --build-arg "QUADRO_VERSION=$VERSION" \
     --build-context "cyana=$CYANA_DIR" \
     --build-context "xplor=$XPLOR_DIR" \

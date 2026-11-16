@@ -1,34 +1,14 @@
-#!/bin/sh
-# quadro — knowledge-based 3D structure generation for G-quadruplexes.
-#
-#   quadro.exe INPUT.inp              build the input as written, then its mirror
-#   quadro.exe --no-mirror INPUT.inp  build only the input as written
-#
-# A topology given by orient/rise/twist/path does not fix the handedness of the
-# stack: the opposite reading is a sterically plausible structure that differs
-# only in energy. quadro therefore builds both by default and leaves the choice
-# to Etotal. The mirror pass is this same program re-invoked on a derived input,
-# so --no-mirror is what stops the recursion.
-
-mirror=1
-case "${1-}" in
-    --no-mirror) mirror=0; shift ;;
-esac
-
-awk -v mirror="$mirror" '
+awk '
 function get_param(){
-DIR="./"
+DIR="/home/mariusz/bin/"
 PI = atan2(1,1) * 4;DEC2RAD=PI/180;RAD2DEC=180/PI
 ALPHA="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 bracket1="([{<";bracket2=")]}>"
 SKOM1="lol=0.01 upl=0.02 weight=10"
 DOT_SYMBOLS=".([{<>}])"
-FI_TETRAD_LIB=DIR"tetrad.lib";FO_INIT="init.cya"
+FI_TETRAD_LIB=DIR"tetrad16.lib";FO_INIT="init.cya"
 AL["r"]=-51.673;BE["r"]=174.807;GA["r"]=41.685;DE["r"]=79.130;CH["r"]=-157.210;EP["r"]=-147.839;ZE["r"]=-75.097
 N0["r"]=8.240;N1["r"]=-33.549;N2["r"]=44.091;N3["r"]=-40.207;N4["r"]=20.597;P["r"]=7.977;VMAX["r"]=44.522
-# Two earlier DNA parameter sets, kept for reference. The first is B-DNA as
-# measured; the second is the RNA set reused for DNA. Neither is in use — the
-# active set is the idealised B-DNA one below.
 #AL["d"]=-29.887;BE["d"]=136.341;GA["d"]=31.143;DE["d"]=143.370;CH["d"]=-97.982;EP["d"]=-140.769;ZE["d"]=-160.498
 #N0["d"]=-33.004;N1["d"]=44.723;N2["d"]=-40.207;N3["d"]=23.060;N4["d"]=5.920;P["d"]=153.912;VMAX["d"]=44.767
 #AL["d"]=-51.673;BE["d"]=174.807;GA["d"]=41.685;DE["d"]=79.130;CH["d"]=-157.210;EP["d"]=-147.839;ZE["d"]=-75.097
@@ -43,8 +23,6 @@ DE["S"]=144.462;N1["S"]= 33.352;N2["S"]=-34.469
 CH["A"]=-165.768;CH["S"]=40.00;iteration=300
 test="n";rm_level=5;err=0;libp=0;libpr=0;lih=0;lihr=0
 wsk_lih=0;wsk_lihr=0
-# Every keyword the .inp parser understands. Anything else is ERROR 26.
-KEYWORDS=";name;sequence;structure;chi;sugar;orient;rise;twist;path;test;rm_level;iteration;my_angles;"
 }
 
 function new_x(x1,y1,cfi,sfi){return (cfi*x1-sfi*y1)}
@@ -56,55 +34,55 @@ if(err>0){return err}
 if(name==""){name="quadro7_test"}
 foi_xplor2=name"_xolor2.inp"
 
-# Check the sequence -------------------------------------------------------
-if(seq==""){err=1;printf "ERROR %d : sequence is missing\n",err;return err}
+#Sprawdzenie sekwencji----------------------------------------------------
+if(seq==""){err=1;printf "ERROR %d : Brak sekwencji\n",err;return err}
 lseq=length(seq);li_rna=0;li_dna=0
  for(i=1;i<=lseq;i++){s=substr(seq,i,1);coto[i]="."
   if(index("ACGTU",s)>0){li_rna=li_rna+1;res_rna[li_rna]=i;coto[i]="r";typ="r"}else{
   if(index("acgtu",s)>0){li_dna=li_dna+1;res_dna[li_dna]=i;coto[i]="d";typ="d"}else{
-    err=2;printf "ERROR %d : invalid residue %s%d in sequence\n",err,s,i;return err}
+    err=2;printf "ERROR %d : Nieprawidłowa reszta %s%d w sekwencji\n",err,s,i;return err}
                                                                                    }
 VAL[i]=AL[typ];VBE[i]=BE[typ];VGA[i]=GA[typ];VDE[i]=DE[typ];VCH[i]=CH[typ];VEP[i]=EP[typ];VZE[i]=ZE[typ];VN1[i]=N1[typ];VN2[i]=N2[typ]
 if(coto[i]=="r"){VHO[i]=HO}
 #printf "%s VDE[%d]= %8.3f\n",substr(seq,i,1),i,VDE[i]
                      }
 # printf "li_rna= %d li_dna= %d lseq= %d\n",li_rna,li_dna,lseq
-if((li_rna+li_dna)!=lseq){err=102;printf "ERROR %d : residue count does not match sequence length\n",err;return err}
-if(li_rna==lseq){typ_seq="RNA";udzial_rna=100.00}else{if(li_dna==lseq){typ_seq="DNA";udzial_rna=0.00}else{typ_seq="CHIMERA";udzial_rna=li_rna*100/lseq}}
+if((li_rna+li_dna)!=lseq){err=102;printf "ERROR %d : Nieprawidłowa sekwencja\n",err;return err}
+if(li_rna==lseq){typ_seq="RNA";udzial_rna=100.00}else{if(li_dna==lseq){typ_seq=="DNA";udzial_rna=0.00}else{typ_seq="CHIMERA";udzial_rna=li_rna*100/lseq}}
 # printf "typ_seq= %s udzial RNA= %6.2f\n",typ_seq,udzial_rna
 
-# Check the topology -------------------------------------------------------
-if(dot==""){err=3;printf "ERROR %d : structure is missing\n",err;return err}
-if(lseq!=ldot){err=4;printf "ERROR %d : sequence and structure differ in length (%d != %d)\n",err,lseq,ldot;return err}
+#Sprawdzenie topologii----------------------------------------------------
+if(dot==""){err=3;printf "ERROR %d : Brak topologii\n",err;return err}
+if(lseq!=ldot){err=4;printf "ERROR %d : różna długość sekwencji i topologii (%d != %d)\n",err,lseq,ldot;return err}
 if(index(dot,"^")>0){typ_dot=1}else{typ_dot=0}
 ntetrad=0;li=0
 if(typ_dot==0){
  for(i=1;i<=ldot;i++){s=substr(dot,i,1)
  if(index(DOT_SYMBOLS,s)==0){k=index(ALPHA,s);if((k>0)&&(k<27)){li=li+1;po[li]=i}else{
- err=104;printf "ERROR %d : invalid character in structure at position %d\n",err,i;return err}}
+ err=104;printf "ERROR %d blad w topologii w pozycji %d\n",err,i;return err}}
                      }
- if(li!=npath){err=105;printf "ERROR %d : structure and path disagree\n",err;return err}
+ if(li!=npath){err=105;printf "ERROR %dniezgodnosc topologii i path\n",err,i;return err}
  for(i=1;i<=li;i++){
  if(substr(PATH[i],1,1)!=substr(dot,po[i],1)){
- err=105;printf "ERROR %d : structure and path disagree\n",err;return err}
+ err=105;printf "ERROR %dniezgodnosc topologii i path\n",err,i;return err}
                    } 
                  }else{
  for(i=1;i<=ldot;i++){s=substr(dot,i,1)
  if(substr(dot,i,1)=="^"){li=li+1;po[li]=i}else{if(index(ALPHA,s)>0){
- err=104;printf "ERROR %d : invalid character in structure at position %d\n",err,i;return err}}
+ err=104;printf "ERROR %d blad w topologii w pozycji %d\n",err,i;return err}}
                      }
- if(li!=npath){err=105;printf "ERROR %d : structure and path disagree\n",err;return err}
+ if(li!=npath){err=105;printf "ERROR %dniezgodnosc topologii i path\n",err,i;return err}
  for(i=1;i<=li;i++){s1=substr(dot,1,po[i]-1)""substr(PATH[i],1,1)""substr(dot,po[i]+1);dot=s1}
                       }
-if((li%4)!=0){err=104;printf "ERROR %d : invalid structure\n",err;return err}
+if((li%4)!=0){err=104;printf "ERROR %d blad w topologi\n",err;return err}
 ntetrad=li/4;lip=li
 # printf "ntetrad= %d\n",ntetrad
 if(po[li]<lseq){lip=lip+1;po[lip]=ldot;printf "po[%d]= %d ldot= %d\n",lip,po[lip],ldot}
 for(i=1;i<=ldot;i++){
-    s1=substr(seq,i,1);s1a=toupper(s1);k1=index("GU",s1a)
+    s1=substr(seq,i,1);s1a=toupper(s1);k1=index("GUT",s1a)
     s2=substr(dot,i,1);s2a=toupper(s2);k2=index(ALPHA,s2a)
     if((k2>0)&&(k1>0)){if(k2>k2max){k2max=k2};li=li+1;seq_tetr[k2]=seq_tetr[k2]""s1}else{
-      if((k2>0)&&(k1==0)){err=5;printf "ERROR %d : tetrad residue %s%d must be G, g, U or u\n",err,s1,i}
+      if((k2>0)&&(k1==0)){err=5;printf "ERROR %d : raszta %s%d powinna byc G|g|U|u|T|t\n",err,i,s1}
                                                                                  }
                     }
 for(i=1;i<=ldot;i++){
@@ -114,7 +92,7 @@ for(i=1;i<=ldot;i++){
    s1=substr(dot,j,1);if(s1==z1){h=h+1}else{if(s1==z2){h=h-1}}
                         }
   if(h==0){libp=libp+1;bp0[libp]=k;bp1[libp]=i;bp2[libp]=j}else{
-    err=105;printf "ERROR %d : invalid structure\n",err;return err}
+    err=105;printf "ERROR %d blad w topologi\n",err;return err}
         }else{k=index(bracket2,s)
   if(k>0){z1=substr(bracket1,k,1);z2=substr(bracket2,k,1);h=-1;j=i
   while((h<0)&&(j>1)){j=j-1
@@ -123,22 +101,22 @@ for(i=1;i<=ldot;i++){
   if(h==0){libpr=libpr+1;bp_rev0[libpr]=k
      bp_rev1[libpr]=i;bp_rev2[libpr]=j
           }else{
-   err=105;printf "ERROR %d : invalid structure\n",err;return err
+   err=105;printf "ERROR %d blad w topologi\n",err;return err
                }
          }   }      }
-if(libp!=libpr){err=105;printf "ERROR %d : unbalanced brackets in structure\n",err}
+if(libp!=libpr){err=105;printf "blad w strukturze\n"}
 if(libp>0){
 for(i=1;i<=libp;i++){s1=(substr(seq,bp1[i],1));s2=(substr(seq,bp2[i],1))
 s=s1""s2;k=index("atgcgta",s);if(k!=0){typ_bp[i]=s}else{
 k=index("AUGCGUATGTA",s);if(k!=0){typ_bp[i]=s}else{
-err=106;printf "ERROR %d : invalid base pair in structure\n",err}}
+err=106;printf "ERROR %d bledna para\n",err}}
 printf "%2d %s%d %s%d typ_bp[%d]= %s\n",i,substr(seq,bp1[i],1),bp1[i],substr(seq,bp2[i],1),bp2[i],i,typ_bp[i]
                     }
 if(libpr>0){
 for(i=1;i<=libpr;i++){s1=(substr(seq,bp_rev1[i],1));s2=(substr(seq,bp_rev2[i],1))
 s=s1""s2;k=index("atgcgtaugua",s);if(k!=0){typ_bpr[i]=s}else{
 k=index("AUGCGUA",s);if(k!=0){typ_bpr[i]=s}else{
-err=106;printf "ERROR %d : invalid base pair in structure\n",err}}
+err=106;printf "ERROR %d bledna para\n",err}}
 printf "%2d %s%d %s%d typ_bpr[%d]= %s\n",i,substr(seq,bp_rev1[i],1),bp_rev1[i],substr(seq,bp_rev2[i],1),bp2[i],i,typ_bpr[i]
                     }
            }
@@ -155,39 +133,39 @@ for(i=2;i<=libpr;i++){
                     }
 
           }
-# Check chi and sugar ------------------------------------------------------
+#sprawdzenie chi i shugar ---------------------------------------------------
 if(chi==""){lchi=lseq;for(i=1;i<=lchi;i++){chi=chi"."}}
-if(lchi!=lseq){err=17; printf "ERROR %d : chi length does not match sequence length\n",err;return err}
-# chi is overridden to anti for residues in a Watson-Crick pair (2026-03-25)
+if(lchi!=lseq){err=17; printf "ERROR nieprawidłowa długość parametru chi\n";return err}
+# wprowadzenie poprawki parametru chi 25.03.26 w zleżności od par WC
 if(libp>0){
 for(i=1;i<=libp;i++){
 if(toupper(substr(chi,bp1[i],1))!="S"){s=substr(chi,1,bp1[i]-1)"A"substr(chi,bp1[i]+1);chi=s}
 if(toupper(substr(chi,bp2[i],1))!="S"){s=substr(chi,1,bp2[i]-1)"A"substr(chi,bp2[i]+1);chi=s}
                     }
-printf "chi after Watson-Crick correction: %s\n",chi
+printf "nowe chi %s\n",chi
           }
-for(i=1;i<=lchi;i++){s=substr(chi,i,1);CHIFIX[i]=0;if(index(".AaSs",s)==0){err=18;printf "ERROR %d : invalid chi character %s at position %d\n",err,s,i;return err}
+for(i=1;i<=lchi;i++){s=substr(chi,i,1);CHIFIX[i]=0;if(index(".AaSs",s)==0){err=18;printf "ERROR Błąd parametru chi w pozycji %d %s\n",i,s;return err}
 if(s!="."){typ=toupper(s);VCH[i]=CH[typ];if(index("AS",s)>0){CHIFIX[i]=1}}
 # printf "TUTAJ %s %s VCH[%d]= %8.3f CHIFIX[%d]= %8.3f\n",substr(seq,i,1),substr(chi,i,1),i,VCH[i],d,CHIFIX[i]
                     }
-if(sugar==""){lsugar=lseq;for(i=1;i<=lsugar;i++){sugar=sugar"."}}
-if(lsugar!=lseq){err=19;printf "ERROR %d : sugar length does not match sequence length\n",err;return err}
-for(i=1;i<=lsugar;i++){s=substr(sugar,i,1);SUGARFIX[i]=0;if(index(".NnSs",s)==0){err=20;printf "ERROR %d : invalid sugar character %s at position %d\n",err,s,i;return err}
-if(s!="."){typ=toupper(s);VDE[i]=DE[typ];VN1[i]=N1[typ];VN2[i]=N2[typ];if(index("NS",s)>0){SUGARFIX[i]=1}}
-#printf "%s %s VDE[%d]= %8.3f SUGARFIX[%d]= %8.3f\n",substr(seq,i,1),substr(sugar,i,1),i,VDE[i],i,SUGARFIX[i]
+if(shugar==""){lshugar=lseq;for(i=1;i<=lshugar;i++){shugar=shugar"."}}
+if(lshugar!=lseq){err=19;printf "ERROR nieprawidłowa długość parametru shugar\n";return err}
+for(i=1;i<=lshugar;i++){s=substr(shugar,i,1);SHUGARFIX[i]=0;if(index(".NnSs",s)==0){err=20;printf "ERROR Błąd parametru shugar w pozycji %d %s\n",i,s;return err}
+if(s!="."){typ=toupper(s);VDE[i]=DE[typ];VN1[i]=N1[typ];VN2[i]=N2[typ];if(index("NS",s)>0){SHUGARFIX[i]=1}}
+#printf "TUTAJ_93 %s %s VDE[%d]= %8.3f SHUGARFIX[%d]= %8.3f\n",substr(seq,i,1),substr(shugar,i,1),i,VDE[i],i,SHUGARFIX[i]
                     }
 
-# Check orient -------------------------------------------------------------
-if(norient!=ntetrad){err=11;printf "ERROR %d : malformed orient\n",err; return err}
+#Sprawdzenie orientacji-------------------------------------------------------
+if(norient!=ntetrad){err=11;printf "ERROR %d : Błedna sorient\n",err; return err}
 for(i=1;i<=norient;i++){
-  if(substr(ALPHA,i,1)!=substr(ORIENT[i],1,1)){err=12;printf "ERROR %d : orient letter does not match the tetrad position\n",err; return err}
-  if((substr(ORIENT[i],2,1)!="+")&&(substr(ORIENT[i],2,1)!="-")){err=13;printf "ERROR %d : malformed orient\n",err; return err}
+  if(substr(ALPHA,i,1)!=substr(ORIENT[i],1,1)){err=12;printf "ERROR %d : Błedny orient\n",err; return err}
+  if((substr(ORIENT[i],2,1)!="+")&&(substr(ORIENT[i],2,1)!="-")){err=13;printf "ERROR %d : Błedna sorient\n",err; return err}
                        }
 
 if(err==0){
  for(i=1;i<=ntetrad;i++){s1=substr(seq_tetr[i],1,1);s2=substr(ORIENT[i],2,1)
 #  printf "TUTAJ_105 %d %s %s\n",i,seq_tetr[i],ORIENT[i]
-  if(i==1){if(index("GU",s1)>0){nazwa_lib[i]="R"s1"4"}else{nazwa_lib[i]="D"toupper(s1)"4"}
+  if(i==1){if(index("GUT",s1)>0){nazwa_lib[i]="R"s1"4"}else{nazwa_lib[i]="D"toupper(s1)"4"}
    if(s2=="+"){nazwa_lib[i]=nazwa_lib[i]"P"}else{nazwa_lib[i]=nazwa_lib[i]"M"}
           }else{
   nazwa_lib[i]=nazwa_lib[i]=toupper(s1)"4"
@@ -207,7 +185,7 @@ if(length(name)>5){s=substr(name,1,5)}else{s=name}
 #printf "TUTAJ_123 RESIDUE   %-5s%5d%5d%5d%5d\n",s,n_angles_first,n_atoms_first,first_atom_lib_res[numer_lib[1]],n_atoms_first-1
           }
 
-# Check rise and twist -----------------------------------------------------
+#Sprawdzenie rise i twist-------------------------------------------------------
 nrise=split(srise,RISE,";");if(nrise<ntetrad){for(i=nrise+1;i<ntetrad;i++){RISE[i]=RISE[1]}}
 ntwist=split(stwist,TWIST,";");if(ntwist<ntetrad){for(i=ntwist+1;i<ntetrad;i++){TWIST[i]=TWIST[1]}}
 rise_sum[1]=0;twist_sum[1]=0;cfitwist[1]=1.0;sfitwist[1]=0.0
@@ -219,8 +197,8 @@ for(i=2;i<=ntetrad;i++){
                        }
 #for(i=1;i<=ntetrad;i++){printf "rise_sum[%d]= %6.2f RISE[%s]= %6.2f\n",i,rise_sum[i],i,RISE[i]}
 
-# Check path ---------------------------------------------------------------
-npath=split(spath,VPATH,";");if(ntetrad*4!=npath){err=14;printf "ERROR %d : malformed path\n",err}else{
+#Sprawdzenie path-----------------------------------------------------------------
+npath=split(spath,VPATH,";");if(ntetrad*4!=npath){err=14;printf "ERROR %d : Błedny path\n",err}else{
 #for(i=1;i<=npath;i++){printf "%2d %s\n",i,VPATH[i]}
 li=0;
 for(i=1;i<=ldot;i++){s1=substr(dot,i,1);k=index(ALPHA,s1);if(k!=0){li=li+1;NPATH[VPATH[li]]=i}}
@@ -234,7 +212,7 @@ matrix[n][length(stetr[n])]=po[i]
                      }
 for(i=1;i<=ntetrad;i++){s=toupper(stetr[i])
 # printf "TUTAJ_152 %s\n",stetr[i]
- if((s!="GGGG")&&(s!="UUUU")&&(s!="TTTT")){err=15;printf "ERROR %d : malformed path\n",err}
+ if((s!="GGGG")&&(s!="UUUU")&&(s!="TTTT")){err=15;printf "ERROR %d : Błedny path\n",err}
                        }
 k=0;for(i=1;i<=ntetrad;i++){for(j=1;j<=4;j++){k=k+1;printf " %4d %2s",matrix[i][j],VPATH[k]>"matrix.txt"};printf "\n">"matrix.txt"}
 #for(i=1;i<=ntetrad;i++){printf "TUTAJ_156 %d %s %s\n",i,seq_tetr[i],stetr[i]}
@@ -280,7 +258,7 @@ function get_tetrad_lib(){
 function print_tetrad_lib(){
  for(i=1;i<=nlib;i++){printf "name_lib_res[%d]= %s\n",i,name_lib_res[i]
   for(j=1;j<=n_angles_lib_res[i];j++){
-   printf "name_angle_lib[%2d][%2d]= %s",i,j,name_angle_lib[i][j]
+   printf "TUTAJ_199 name_angle_lib[%2d][%2d]= %s",i,j,name_angle_lib[i][j]
    if(a1_lib[i][j]==0){s1="...."}else{s1=name_atom_lib[i][a1_lib[i][j]]}
    if(a2_lib[i][j]==0){s2="...."}else{s2=name_atom_lib[i][a2_lib[i][j]]}
    if(a3_lib[i][j]==0){s3="...."}else{s3=name_atom_lib[i][a3_lib[i][j]]}
@@ -325,7 +303,7 @@ function create_def_angles(){la=0;tetr="A"
 
 function print_def_angles(){
  for(i=1;i<=la;i++){
-  printf "%4d %-5s    0    0    0.0000",i,angle[i]
+  printf "TUTUJ_244 %4d %-5s    0    0    0.0000",i,angle[i]
   for(ii=1;ii<=5;ii++){printf "%5d",angle_def[i][ii]};printf "\n"
 }}
 
@@ -431,11 +409,11 @@ printf "angle free \042??A %d..%d\042\n",helisr2[gg]-lhelisr[gg]+1,helisr2[gg] >
 for(g=0;g<lhelisr[wsk_lihr];g++){
 k3=k1+g;k4=k2-g
 printf "distance make \042PA %d\042 \042P %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
-printf "distance make \042O5\\O47A %d\042 \042O5\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
-printf "distance make \042C5\\O47A %d\042 \042C5\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
-printf "distance make \042C4\\O47A %d\042 \042C4\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
-printf "distance make \042C3\\O47A %d\042 \042C3\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
-printf "distance make \042O3\\O47A %d\042 \042O3\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
+printf "distance make \042O5\\\O47A %d\042 \042O5\\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
+printf "distance make \042C5\\\O47A %d\042 \042C5\\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
+printf "distance make \042C4\\\O47A %d\042 \042C4\\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
+printf "distance make \042C3\\\O47A %d\042 \042C3\\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
+printf "distance make \042O3\\\O47A %d\042 \042O3\\\O47 %d\042 lol=0.01 upl=0.10 weight=10\n",k4,k3 > FO_INIT
 #printf "minimize %d\n",iteration > FO_INIT
                                 }
 #printf "minimize %d\n",iteration > FO_INIT
@@ -448,7 +426,7 @@ odp=0
 while((helis1[wsk_lih+1]>=z1)&&(helis1[wsk_lih+1]<=z2)&&(wsk_lih<=lih)){
 odp=odp+1;wsk_lih=wsk_lih+1}
 if(wsk_lih>lih){wsk_lih=wsk_lih-1}
-printf "------------ wsk_lih= %d range: %d %d\n",wsk_lih,z1,z2
+printf "------------ wsk_lih= %d zakres: %d %d\n",wsk_lih,z1,z2
 set_angle_fix_nawiasow_otwartych()
 return odp
 }
@@ -458,7 +436,7 @@ odp=0
 while((helisr1[wsk_lihr+1]>=z1)&&(helisr1[wsk_lihr+1]<=z2)&&(wsk_lihr<=lihr)){
 odp=odp+1;wsk_lihr=wsk_lihr+1}
 if(wsk_lihr>lihr){wsk_lihr=wsk_lihr-1}
-printf "++++++++++++ wsk_lihr= %d range: %d %d\n",wsk_lihr,z1,z2
+printf "++++++++++++ wsk_lihr= %d zakres: %d %d\n",wsk_lihr,z1,z2
 set_angle_fix_nawiasow_zamknietych()
 return odp
 }
@@ -467,26 +445,42 @@ return odp
 function print_init_cya(){m1=1
 fo_agnles_cya=name"_angles.cya"; system("cp "DIR"ryb.cya "fo_agnles_cya)
 first=NPATH[VPATH[1]]
-if(my_angles!=""){system("cat "sryb" >> "fo_agnles_cya)}
+if(my_angles!=""){
+#system("cat "sryb" >> "fo_agnles_cya)
+while(getline<my_angles>0){
+  for(i=1;i<(NF-1);i=i+3){
+if($i=="AL"){VAL[$(i+1)]=strtonum($(i+2))}
+if($i=="BE"){VBE[$(i+1)]=strtonum($(i+2))}
+if($i=="GA"){VGA[$(i+1)]=strtonum($(i+2))}
+if($i=="DE"){VDE[$(i+1)]=strtonum($(i+2))}
+if($i=="N1"){VN1[$(i+1)]=strtonum($(i+2))}
+if($i=="N2"){VN2[$(i+1)]=strtonum($(i+2))}
+if($i=="EP"){VEP[$(i+1)]=strtonum($(i+2))}
+if($i=="ZE"){VZE[$(i+1)]=strtonum($(i+2))}
+if($i=="CH"){VCH[$(i+1)]=strtonum($(i+2))}
+                         }
+                          }
+                 }
 printf "read lib Q.lib\nread seq Q%d\n",first > FO_INIT
 n=ntetrad*4
 for(i=1;i<first;i++){
 printf "angle set \042AL* %d\042 %8.3f\nangle set \042BE* %d\042 %8.3f\n",i,VAL[i],i,VBE[i] > FO_INIT
 printf "angle set \042GA* %d\042 %8.3f\nangle set \042DE* %d\042 %8.3f\n",i,VGA[i],i,VDE[i] > FO_INIT
-printf "angle set \042EP* %d\042 %8.3f\nangle set \042ZE* %d\042 %8.3f\n",i,VEP[i],i,VZE[i] > FO_INIT
+if(i>1){printf "angle set \042EP* %d\042 %8.3f\n",i-1,VEP[i-1] > FO_INIT}
+printf "angle set \042ZE* %d\042 %8.3f\n",i,VZE[i] > FO_INIT
 printf "angle set \042N1* %d\042 %8.3f\nangle set \042N2* %d\042 %8.3f\n",i,VN1[i],i,VN2[i] > FO_INIT
 printf "angle set \042CH* %d\042 %8.3f\n",i,VCH[i] > FO_INIT
 if(coto[i]=="r"){printf "angle set \042HO* %d\042 %8.3f\n",i,VHO[i] > FO_INIT}
 if(CHIFIX[i]==1){printf "angle fix \042CH* %d\042\n",i > FO_INIT}
-if(SUGARFIX[i]==1){printf "angle fix \042DE* %d\042\n",i > FO_INIT
+if(SHUGARFIX[i]==1){printf "angle fix \042DE* %d\042\n",i > FO_INIT
                     printf "angle fix \042N1* %d\042\n",i > FO_INIT
                     printf "angle fix \042N2* %d\042\n",i > FO_INIT
                    }
-printf "distance make \042O4\\\047 %d\042 \042C4\\\047 %d\042 lol=1.30 upl=1.60 weight=10\n",i,i > FO_INIT
-printf "distance make \042C1\\\047 %d\042 \042C4\\\047 %d\042 lol=2.10 upl=2.58 weight=10\n",i,i > FO_INIT
-printf "distance make \042O4\\\047 %d\042 \042H4\\\047 %d\042 lol=1.93 upl=2.37 weight=10\n",i,i > FO_INIT
-printf "distance make \042O4\\\047 %d\042 \042C3\\\047 %d\042 lol=2.08 upl=2.55 weight=10\n",i,i > FO_INIT
-printf "distance make \042O4\\\047 %d\042 \042C5\\\047 %d\042 lol=2.08 upl=2.55 weight=10\n",i,i > FO_INIT
+#printf "distance make \042O4\\\047 %d\042 \042C4\\\047 %d\042 lol=1.30 upl=1.60 weight=10\n",i,i > FO_INIT
+#printf "distance make \042C1\\\047 %d\042 \042C4\\\047 %d\042 lol=2.10 upl=2.58 weight=10\n",i,i > FO_INIT
+#printf "distance make \042O4\\\047 %d\042 \042H4\\\047 %d\042 lol=1.93 upl=2.37 weight=10\n",i,i > FO_INIT
+#printf "distance make \042O4\\\047 %d\042 \042C3\\\047 %d\042 lol=2.08 upl=2.55 weight=10\n",i,i > FO_INIT
+#printf "distance make \042O4\\\047 %d\042 \042C5\\\047 %d\042 lol=2.08 upl=2.55 weight=10\n",i,i > FO_INIT
                     }
 czy_sa_nawiasy_otwarte(1,first)
 czy_sa_nawiasy_zamkniete(1,first)
@@ -494,12 +488,13 @@ czy_sa_nawiasy_zamkniete(1,first)
 i=first
 printf "angle set \042AL* %d\042 %8.3f\nangle set \042BE* %d\042 %8.3f\n",i,VAL[i],i,VBE[i] > FO_INIT
 printf "angle set \042GA* %d\042 %8.3f\nangle set \042DE* %d\042 %8.3f\n",i,VGA[i],i,VDE[i] > FO_INIT
-printf "angle set \042EP* %d\042 %8.3f\nangle set \042ZE* %d\042 %8.3f\n",i,VEP[i],i,VZE[i] > FO_INIT
+if(i>1){printf "angle set \042EP* %d\042 %8.3f\n",i-1,VEP[i-1] > FO_INIT}
+printf "angle set \042ZE* %d\042 %8.3f\n",i,VZE[i] > FO_INIT
 printf "angle set \042N1* %d\042 %8.3f\nangle set \042N2* %d\042 %8.3f\n",i,VN1[i],i,VN2[i] > FO_INIT
 printf "angle set \042CH* %d\042 %8.3f\n",i,VCH[i] > FO_INIT
 if(CHIFIX[i]==1){printf "angle fix \042CH* %d\042\n",i > FO_INIT}
 if(coto[i]=="r"){printf "angle set \042HO* %d\042 %8.3f\n",i,VHO[i] > FO_INIT}
-if(SUGARFIX[i]==1){printf "angle fix \042DE* %d\042\n",i > FO_INIT
+if(SHUGARFIX[i]==1){printf "angle fix \042DE* %d\042\n",i > FO_INIT
                     printf "angle fix \042N1* %d\042\n",i > FO_INIT
                     printf "angle fix \042N2* %d\042\n",i > FO_INIT
                    }
@@ -516,10 +511,11 @@ printf "minimize %d\n",iteration > FO_INIT
 if(test=="y"){printf "write temperary%d.pdb\n",first > FO_INIT}
 #printf "angle free\n" > FO_INIT
 printf "write ang Q%d fixed\n",first > FO_INIT
+#DOTAD JEST DOBRZE
 for(j=2;j<=lip;j++){
 printf "read seq Q%d append\n",po[j] > FO_INIT
 printf "read ang Q%d\n",po[j-1] > FO_INIT
-printf "%ssugarbond 1..%d\n",DIR,po[j] > FO_INIT
+printf "%smp_sugarbond 1..%d\n",DIR,po[j] > FO_INIT
 for(i=1;i<=po[j];i++){
 if(i==first){
 printf "distance make \042O4\\\047 %d\042 \042C4\\\047 %d\042 lol=1.30 upl=1.60 weight=10\n",i,i > FO_INIT
@@ -531,15 +527,17 @@ printf "distance make \042O4\\\047 %d\042 \042C5\\\047 %d\042 lol=2.08 upl=2.55 
 #else{printf "%ssugarbond 1..%d\n",DIR,i > FO_INIT}
                      }
 for(i=po[j-1];i<po[j];i++){
+if(i!=po[j-1]){
 printf "angle set \042AL* %d\042 %8.3f\nangle set \042BE* %d\042 %8.3f\n",i,VAL[i],i,VBE[i] > FO_INIT
 printf "angle set \042GA* %d\042 %8.3f\nangle set \042DE* %d\042 %8.3f\n",i,VGA[i],i,VDE[i] > FO_INIT
-printf "angle set \042EP* %d\042 %8.3f\nangle set \042ZE* %d\042 %8.3f\n",i,VEP[i],i,VZE[i] > FO_INIT
 printf "angle set \042N1* %d\042 %8.3f\nangle set \042N2* %d\042 %8.3f\n",i,VN1[i],i,VN2[i] > FO_INIT
 printf "angle set \042CH* %d\042 %8.3f\n",i,VCH[i] > FO_INIT
+}
+if(i>1){printf "angle set \042EP* %d\042 %8.3f\nangle set \042ZE* %d\042 %8.3f\n",i-1,VEP[i-1],i,VZE[i] > FO_INIT}
 if(CHIFIX[i]==1){printf "angle fix \042CH* %d\042\n",i > FO_INIT}
 if(coto[i]=="r"){printf "angle set \042HO* %d\042 %8.3f\n",i,VHO[i] > FO_INIT}
 if(CHIFIX[i]==1){printf "angle fix \042CH* %d\042\n",i > FO_INIT}
-if(SUGARFIX[i]==1){printf "angle fix \042DE* %d\042\n",i > FO_INIT
+if(SHUGARFIX[i]==1){printf "angle fix \042DE* %d\042\n",i > FO_INIT
                     printf "angle fix \042N1* %d\042\n",i > FO_INIT
                     printf "angle fix \042N2* %d\042\n",i > FO_INIT
                    }
@@ -547,12 +545,12 @@ if(SUGARFIX[i]==1){printf "angle fix \042DE* %d\042\n",i > FO_INIT
 i=po[j]
 printf "angle set \042AL* %d\042 %8.3f\nangle set \042BE* %d\042 %8.3f\n",i,VAL[i],i,VBE[i] > FO_INIT
 printf "angle set \042GA* %d\042 %8.3f\nangle set \042DE* %d\042 %8.3f\n",i,VGA[i],i,VDE[i] > FO_INIT
-printf "angle set \042EP* %d\042 %8.3f\nangle set \042ZE* %d\042 %8.3f\n",i,VEP[i],i,VZE[i] > FO_INIT
+if(i>1){printf "angle set \042EP* %d\042 %8.3f\nangle set \042ZE* %d\042 %8.3f\n",i-1,VEP[i-1],i,VZE[i] > FO_INIT}
 printf "angle set \042N1* %d\042 %8.3f\nangle set \042N2* %d\042 %8.3f\n",i,VN1[i],i,VN2[i] > FO_INIT
 printf "angle set \042CH* %d\042 %8.3f\n",i,VCH[i] > FO_INIT
 if(CHIFIX[i]==1){printf "angle fix \042CH* %d\042\n",i > FO_INIT}
 if(coto[i]=="r"){printf "angle set \042HO* %d\042 %8.3f\n",i,VHO[i] > FO_INIT}
-if(SUGARFIX[i]==1){printf "angle fix \042DE* %d\042\n",i > FO_INIT
+if(SHUGARFIX[i]==1){printf "angle fix \042DE* %d\042\n",i > FO_INIT
                     printf "angle fix \042N1* %d\042\n",i > FO_INIT
                     printf "angle fix \042N2* %d\042\n",i > FO_INIT
                    }
@@ -593,15 +591,22 @@ printf "write final_cyana.pdb\n" >  FO_INIT
 printf "quit\n" > FO_INIT
 }
 
+#function write_seq(){
+#for(i=1;i<=ldot;i++){
+#  printf "%s",new_res[i]>"Q.seq"
+#  if(i%20==0){printf "\n">"Q.seq"}else{printf " ">"Q.seq"}
+#                    }
+#if(i%20!=0){printf "\n">"Q.seq"}
+#}
 
 function write_seq(){
 for(i=1;i<=ldot;i++){
 res_name=substr(seq,i,1);s=substr(dot,i,1);t=toupper(s);k=index(ALPHA,t);s1=substr(seq,i,1)
 if(k==0){if(index("ACGTU",s1)>0){new_res[i]="R"s1}else{if(index("acgtu",s1)>0){new_res[i]="D"toupper(s1)}else{
-err=16;printf "ERROR %d : invalid residue %s in sequence\n",err,s1}}
+err=16;printf "ERROR %d Nieprawidlowa reszta %s w sekwencji\n",s1}}
         }else{li_path=li_path+1;if(li_path==1){new_res[i]="Q"}else{
 if(index("ACGTU",s1)>0){new_res[i]="R"}else{if(index("acgtu",s1)>0){new_res[i]="D"}else{
-err=16;printf "ERROR %d : invalid residue %s in sequence\n",err,s1}}}
+err=16;printf "ERROR %d Nieprawidlowa reszta %s w sekwencji\n",s1}}}
 }}
 if(libp>0){
 for(i=1;i<=libp;i++){
@@ -631,41 +636,41 @@ for(i=1;i<=libp;i++){printf "revbp2[%d]=%d\n",bp2[i],bp1[i] >> "g.exe"}
 print "}\n{" >> "g.exe"
 print "if($1==\042ATOM\042){liat=liat+1;n=strtonum(substr($0,23,4))" >> "g.exe"
 print " if(n!=res_prev){lir=lir+1;start[lir]=liat;koniec[lir]=liat;res_prev=n}else{koniec[lir]=liat}" >> "g.exe"
-print "   name_at[liat]=substr($0,13,5);chain[liat]=substr($0,18,5);nres[liat]=strtonum(substr($0,23,4));coor[liat]=substr($0,27)" >> "g.exe"
+print "   name_at[liat]=substr(\$0,13,5);chain[liat]=substr(\$0,18,5);nres[liat]=strtonum(substr(\$0,23,4));coor[liat]=substr($0,27)" >> "g.exe"
 print "}}" >> "g.exe"
 print "END{fo=\042t.pdb\042" >> "g.exe"
-print "for(i=1;i<=lir;i++){printf \042%2d %-4s %4d %4d\\n\042,i,res[i],start[i],koniec[i]" >> "g.exe"
+print "for(i=1;i<=lir;i++){printf \042\%2d \%-4s \%4d \%4d\\n\042,i,res[i],start[i],koniec[i]" >> "g.exe"
 print " if(length(res[i])==1){" >> "g.exe"
 print "  if(res[i]==\042Q\042){fist=i;lipath=1" >> "g.exe"
 print "   for(j=start[i];j<=koniec[i];j++){" >> "g.exe"
 print "    sp=substr(name_at[j],4,2);sp1=substr(name_at[j],5,1)" >> "g.exe"
 print "    if((sp1==\042 \042)||(sp==\042A1\042)){gsub(\042A1\042,\042  \042,name_at[j])" >> "g.exe"
-print " num=num+1;printf \042ATOM%7d %s%s   A%4d%s\\n\042,num,name_at[j],substr(seq,nres[j],1),nres[j],coor[j] > fo" >> "g.exe"
+print " num=num+1;printf \042ATOM\%7d \%s\%s   A\%4d\%s\\n\042,num,name_at[j],substr(seq,nres[j],1),nres[j],coor[j] > fo" >> "g.exe"
 print " }}}" >> "g.exe"
 print " if((res[i]==\042D\042)||(res[i]==\042R\042)){lipath=lipath+1;ss=VPATH[lipath]" >> "g.exe"
 print "  for(j=start[i];j<=koniec[i];j++){" >> "g.exe"
-print " num=num+1;printf \042ATOM%7d %s%s   A%4d%s\\n\042,num,name_at[j],substr(seq,nres[j],1),nres[j],coor[j] > fo}" >> "g.exe"
+print " num=num+1;printf \042ATOM\%7d \%s\%s   A\%4d\%s\\n\042,num,name_at[j],substr(seq,nres[j],1),nres[j],coor[j] > fo}" >> "g.exe"
 print "  for(j=start[fist];j<=koniec[fist];j++){" >> "g.exe"
 print "   sp=substr(name_at[j],4,2);sp1=substr(name_at[j],1,3)" >> "g.exe"
 print "   if(sp==ss){" >> "g.exe"
 print "     if((sp1!=\042 O\\047\042)&&(sp1!=\042 C\\047\042)){" >> "g.exe"
-print " num=num+1;printf \042ATOM%7d %-5s%s   A%4d%s\\n\042,num,substr(name_at[j],1,3),substr(seq,nres[i],1),i,coor[j] > fo" >> "g.exe"
+print " num=num+1;printf \042ATOM\%7d \%-5s\%s   A\%4d\%s\\n\042,num,substr(name_at[j],1,3),substr(seq,nres[i],1),i,coor[j] > fo" >> "g.exe"
 print "}}}}" >> "g.exe"
 print " if(res[i]==\042B\042){" >> "g.exe"
 print "  for(j=start[revbp2[i]];j<=koniec[revbp2[i]];j++){" >> "g.exe"
 print "   k=index(name_at[j],\042A\042)" >> "g.exe"
 print "    if(k>0){" >> "g.exe"
-print " num=num+1;printf \042ATOM%7d %-5s%s   A%4d%s\\n\042,num,substr(name_at[j],1,k-1),substr(seq,i,1),i,coor[j] > fo" >> "g.exe"
+print " num=num+1;printf \042ATOM\%7d \%-5s\%s   A\%4d\%s\\n\042,num,substr(name_at[j],1,k-1),substr(seq,i,1),i,coor[j] > fo" >> "g.exe"
 print " }}}" >> "g.exe"
 print "    }else{" >> "g.exe"
 print " if(length(res[i])==2){" >> "g.exe"
 print "  for(j=start[i];j<=koniec[i];j++){" >> "g.exe"
-print " num=num+1;printf \042ATOM%7d %-5s%s   A%4d%s\\n\042,num,name_at[j],substr(seq,i,1),i,coor[j] > fo}" >> "g.exe"
+print " num=num+1;printf \042ATOM\%7d \%-5s\%s   A\%4d\%s\\n\042,num,name_at[j],substr(seq,i,1),i,coor[j] > fo}" >> "g.exe"
 print "  }else{" >> "g.exe"
 print " if(length(res[i])==3){" >> "g.exe"
 print "  for(j=start[i];j<=koniec[i];j++){" >> "g.exe"
 print "   k=index(name_at[j],\042A\042)" >> "g.exe"
-print " num=num+1;printf \042ATOM%7d %-5s%s   A%4d%s\\n\042,num,name_at[j],substr(seq,i,1),i,coor[j] > fo" >> "g.exe"
+print " num=num+1;printf \042ATOM\%7d \%-5s\%s   A\%4d\%s\\n\042,num,name_at[j],substr(seq,i,1),i,coor[j] > fo" >> "g.exe"
 print "}}}}}}\047 final_cyana.pdb" >> "g.exe"
 close("g.exe")
 system("chmod +x g.exe")
@@ -771,87 +776,17 @@ printf "flags exclude * include bond angl cdih impr vdw noe elec plan end\n" > f
 printf "minimize powell nstep=1000 nprint=100 end\n" > fo
 printf "evaluate ($filename=\042%s_xplor.pdb\042)\nwrite coordinates output =$filename end\nenergy end\nstop\n",name > fo
 close(fo)
+#system("xplor <"fo)
+#system("xplor2pdb1.exe g1.pdb >"name".pdb")
         }
 }
 
 function rm_files(){
-if(rm_level>=5){system("rm -f matrix.txt g.exe t_*.inp *_xplor.pdb* t1.* t.* Q.lib Q.seq *_angles.cya init.cya final_cyana.pdb g.pdb* Q*.ang Q*.seq")}
-if(rm_level==4){system("rm -f matrix.txt g.exe t_*.inp *_xplor.pdb* t1.* t.* Q.lib Q.seq *_angles.cya init.cya g.pdb* Q*.ang Q*.seq")}
-if(rm_level==3){system("rm -f matrix.txt g.exe t_*.inp *_xplor.pdb* t1.* t.* g.pdb* Q*.ang Q.seq")}
-if(rm_level==2){system("rm -f matrix.txt g.exe t_*.inp *_xplor.pdb* t1.* t.* g.pdb* *_angles.cya init.cya")}
-}
-
-# ── The mirror pass ──────────────────────────────────────────────────────────
-# The mirror of an input is the same residues in the opposite-handed stack. Four
-# fields carry the handedness and all four are inverted together:
-#
-#   orient   every + becomes - and every - becomes +   (the hydrogen-bond
-#            directionality of each tetrad, WH <-> HW)
-#   rise     sign flipped   (the stacking direction along z)
-#   twist    sign flipped   (the sense of rotation between tetrads)
-#   path     positions 2 and 4 swapped in every token  (the residue order
-#            within each tetrad, which follows from the two above)
-#
-# Inverting any one of them alone would describe a molecule that cannot be
-# built; inverting all four describes a real alternative structure.
-#
-# Only `name` is not part of the transformation — it is suffixed so the second
-# pass writes alongside the first rather than over it.
-
-function flip_sign(v){
-if(substr(v,1,1)=="-"){return substr(v,2)}
-if(substr(v,1,1)=="+"){return "-"substr(v,2)}
-return "-"v
-}
-
-function flip_list(v,   n,A,i,out){
-n=split(v,A,";");out=flip_sign(A[1])
-for(i=2;i<=n;i++){out=out";"flip_sign(A[i])}
-return out
-}
-
-function flip_orient(v,   n,A,i,out,s){
-n=split(v,A,";");out=""
-for(i=1;i<=n;i++){s=substr(A[i],2,1)
-  if(s=="+"){s="-"}else{if(s=="-"){s="+"}}
-  if(i>1){out=out";"}
-  out=out""substr(A[i],1,1)""s
-                 }
-return out
-}
-
-function flip_path(v,   n,A,i,out,s){
-n=split(v,A,";");out=""
-for(i=1;i<=n;i++){s=substr(A[i],2,1)
-  if(s=="2"){s="4"}else{if(s=="4"){s="2"}}
-  if(i>1){out=out";"}
-  out=out""substr(A[i],1,1)""s
-                 }
-return out
-}
-
-function mirror_name(v,   k){
-k=index(v,".")
-if(k==0){return v"_alt"}
-return substr(v,1,k-1)".alt_"substr(v,k+1)
-}
-
-# Writes the mirrored input next to the original and returns its name.
-function write_mirror(   fo,i,k,n,f,F){
-f=FILENAME;k=index(f,".")
-if(k==0){fo=f"_alt.inp"}else{fo=substr(f,1,k-1)"_alt"substr(f,k)}
-printf "" > fo
-for(i=1;i<=nraw;i++){n=split(raw[i],F," ")
-  if(n==0){print "" > fo}else{
-  if(F[1]=="name"){printf "name\t\t%s\n",mirror_name(F[2]) > fo}else{
-  if(F[1]=="orient"){printf "orient\t\t%s\n",flip_orient(F[2]) > fo}else{
-  if(F[1]=="rise"){printf "rise\t\t%s\n",flip_list(F[2]) > fo}else{
-  if(F[1]=="twist"){printf "twist\t\t%s\n",flip_list(F[2]) > fo}else{
-  if(F[1]=="path"){printf "path\t\t%s\n",flip_path(F[2]) > fo}else{
-  print raw[i] > fo}}}}}}
-                    }
-close(fo)
-return fo
+if(rm_level>=5){system("rm matrix.txt g.exe g.aco t_*.inp *_xplor.pdb* t1.* t.* Q.lib Q.seq *_angles.cya init.cya final_cyana.pdb g.pdb* Q*.ang Q*.seq")}
+if(rm_level==4){system("rm matrix.txt g.exe t_*.inp *_xplor.pdb* t1.* t.* Q.lib Q.seq *_angles.cya init.cya g.pdb* Q*.ang Q*.seq")}
+if(rm_level==3){system("rm matrix.txt g.exe t_*.inp *_xplor.pdb* t1.* t.* g.pdb* Q*.ang Q.seq")}
+if(rm_level==2){system("rm matrix.txt g.exe t_*.inp *_xplor.pdb* t1.* t.* g.pdb* *_angles.cya init.cya")}
+if(rm_level==1){system("rm matrix.txt g.exe t_*.inp *_xplor.pdb* t1.* t.* g.pdb*")}
 }
 
 BEGIN{
@@ -861,50 +796,43 @@ BEGIN{
 # print_tetrad_lib()
 }
 {
-# Keep every line so the mirror pass can rewrite the file it came from.
-  nraw=nraw+1;raw[nraw]=$0
   if($1=="name"){name=$2}
   if($1=="sequence"){seq=$2;lseq=length(seq)}
   if($1=="structure"){dot=$2;ldot=length(dot)}
   if($1=="chi"){chi=$2;lchi=length(chi)}
-  if($1=="sugar"){sugar=$2;lsugar=length(sugar)}
+  if($1=="shugar"){shugar=$2;lshugar=length(shugar)}
   if($1=="orient"){sorient=$2;norient=split(sorient,ORIENT,";")}
   if($1=="rise"){srise=$2;nrise=split(srise,RISE,";")}
   if($1=="twist"){stwist=$2;ntwist=split(stwist,TWIST,";")}
   if($1=="path"){spath=$2;npath=split(spath,PATH,";")}
   if($1=="test"){test=$2}
   if($1=="rm_level"){rm_level=strtonum($2)}
-  if($1=="iteration"){iteration=$2;if(iteration<10){err=25;printf "ERROR %d : iteration must be at least 10, got %d\n",err,iteration}}
+  if($1=="iteration"){iteration=$2;if(iteration<10){err=25;printf "ERROR %d Za mała iteracja %d\n",err,iteration}}
   if($1=="my_angles"){my_angles=$2;
-  if(index($2,".cya")!=length($2)-3){
-   err=16;printf "ERROR %d : my_angles must name a .cya file\n",err
-                                      }else{my_angles=substr($2,1,index($2,".cya")-1)}
+#  if(index($2,".cya")!=length($2)-3){
+#   err=16;printf "ERROR %d plik my_angles musi mieć rozszerzenie .cya\n",err
+#                                      }else{my_angles=substr($2,1,index($2,".cya")-1)}
                      }
-# Reject anything that is not a keyword, a comment or a blank line. Without this
-# a misspelt field is read as a comment and the run silently proceeds with the
-# default — which is far worse than failing, because the result looks valid.
-  if((NF>0)&&(substr($1,1,1)!="#")&&(index(KEYWORDS,";"$1";")==0)){
-    err=26;printf "ERROR %d : unknown keyword \042%s\042 on line %d\n",err,$1,FNR}
 }
 END{
 chack_input()
 if(err==0){
 #write_VTOR()
 #print ntetrad
-# ── Torsion-angle definitions ─────────────────────────────────────────────
+#-------------------DEFINICJA KATÓW -----------------------------------------------------
 #if(err==0){
 create_def_angles()
 # print_header();print_def_angles()
 system("cat "DIR"ATOMTYPES.txt > Q.lib")
 write_header();write_def_angles()
-# ── Atom definitions ──────────────────────────────────────────────────────
+#-------------------DEFINICJA ATOMÓw -----------------------------------------------------
 create_def_atoms()
 #print_def_atoms()
 write_def_atoms();system("cat "DIR"other_residues.lib >> Q.lib")
 if(libp>0){system("cat "DIR"bp.lib >> Q.lib")}
 print_init_cya()
 write_seq()
-# ── Run CYANA, then Xplor-NIH ─────────────────────────────────────────────
+#-------------------URUCHOMIENIE_CYANY -------------------------------------------------
 if(err==0){
 system("cyana")
 cyana2xplor()
@@ -925,9 +853,6 @@ system("xplor < t_xplor3.inp > "name"_energy.txt")
 #printf "lchi= %d\n",lchi
 #for(i=1;i<=npath;i++){printf "i= %d NPATH[VPATH[%d]]= %3d VPATH[%d]= %s po[%d]= %2d\n",i,i,NPATH[VPATH[i]],i,VPATH[i],i,po[i]}
 rm_files()
-# Base-pair and helix bookkeeping. Only useful when a run has gone wrong, so it
-# is printed under `test y` rather than on every run.
-if(test=="y"){
 printf "libp= %d    libpr= %d\n",libp,libpr
 for(i=1;i<=libp;i++){printf "bp1[%d]= %4d bp2[%d]= %4d bp0[%d]= %d bp_rev1[%d]= %4d bp_rev2[%d]= %4d bp_rev0[%d]= %d\n",i,bp1[i],i,bp2[i],i,bp0[i],i,bp_rev1[i],i,bp_rev2[i],i,bp_rev0[i]}
 for(i=1;i<=libp;i++){
@@ -944,14 +869,12 @@ printf "helis1[%d]= %d    helisr1[%d]= %d   helisr2[%d]= %d  lhelisr[%d]= %d\n",
 if(helis1[i]==1){helisa_seq[i]=substr(seq,1,lhelis[i]+1)}else{helisa_seq[i]=substr(seq,helis1[i]-1,lhelis[i]+2)}
 printf "%s\n",helisa_seq[i]
                    }
-             }
-# Second pass: the same topology read with the opposite handedness. Skipped on a
-# failed run, because a mirror of an input that does not build is not useful.
-if((mirror==1)&&(err==0)){
- fo_mirror=write_mirror()
- printf "\n── mirror pass: %s ──\n",fo_mirror
- system(DIR"quadro.exe --no-mirror "fo_mirror)
-                         }
-# A rejected input must not look like a successful run to whatever called us.
-if(err>0){exit 1}
-}' "$1"
+for(i=1;i<=lih;i++){
+  i1=helis1[i]-1;i2=helis2[i]+1;ss=""
+  for(j=0;j<lhelis[i];j++){
+    i1=i1+1;i2=i2-1;ss=ss""substr(seq,i1,1)""substr(seq,i2,1)";"
+                          }
+  printf "%s\n",substr(ss,1,length(ss)-1)
+                   }
+for(i=1;i<=ntetrad;i++){printf "TUTAJ_156 %d %s %s\n",i,seq_tetr[i],stetr[i]}
+}' $1

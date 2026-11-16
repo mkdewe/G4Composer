@@ -4,7 +4,7 @@
  N. Tjandra, and G.M. Clore              J. Magn. Res., 160, 66-74 (2003). 
  http://nmr.cit.nih.gov/xplor-nih        based on X-PLOR 3.851 by A.T. Brunger 
 
- User: unknown      on: a0c6a0f746(x86_64/Linux  )  at:  8-Sep-26 00:26:36
+ User: unknown      on: e710ffcd32(x86_64/Linux  )  at: 16-Nov-26 13:10:18
  X-PLOR>parameter @TOPPAR:dna-rna-allatom.param end 
  ASSFIL: file /opt/bin/xplor-nih-2.39/toppar/dna-rna-allatom.param opened.
  PARRDR>!RNA PARAMETER FILE 'FRAMEOWRK' FROM PARALLHDG.DNA AND ATOM NAMES 
@@ -19,10 +19,10 @@
  PARRDR>set echo=off message=off end 
  PARRDR> end 
  X-PLOR>structure @t1.psf end 
- ASSFIL: file /tmp/quadro.xfeGXqSK/t1.psf opened.
+ ASSFIL: file /tmp/quadro.GowmuwFl/t1.psf opened.
  STRUcture>PSF 
- REMARKS FILENAME="/tmp/quadro.xfeGXqSK/t1.psf"
- REMARKS DATE: 8-Sep-26  00:26:35       created by user: unknown
+ REMARKS FILENAME="/tmp/quadro.GowmuwFl/t1.psf"
+ REMARKS DATE:16-Nov-26  13:10:18       created by user: unknown
  XPLOR: current counts (number in parenthesis is maximum)
  NATOM=        488(MAXA=         800)  NBOND=        526(MAXB=         800)
  NTHETA=       957(MAXT=        1600)  NGRP=         175(MAXGRP=       200)
@@ -33,21 +33,21 @@
  X-PLOR>evaluate ($filename="1hap_js12B_100_xplor.pdb") 
  EVALUATE: symbol $FILENAME set to "1hap_js12B_100_xplor.pdb" (string)
  X-PLOR>coor @$filename end 
- ASSFIL: file /tmp/quadro.xfeGXqSK/1hap_js12B_100_xplor.pdb opened.
- COOR>REMARK FILENAME="/tmp/quadro.xfeGXqSK/1hap_js12B_100_xplor.pdb" 
- COOR>REMARK DATE: 8-Sep-26  00:26:36       created by user: unknown 
- COOR>ATOM      1  H5T GUA     1       2.591   1.206   0.932  1.00  0.00      STRA 
- COOR>ATOM      2  O5' GUA     1       2.947   1.531   0.100  1.00  0.00      STRA 
+ ASSFIL: file /tmp/quadro.GowmuwFl/1hap_js12B_100_xplor.pdb opened.
+ COOR>REMARK FILENAME="/tmp/quadro.GowmuwFl/1hap_js12B_100_xplor.pdb" 
+ COOR>REMARK DATE:16-Nov-26  13:10:18       created by user: unknown 
+ COOR>ATOM      1  H5T GUA     1       2.456   1.467  -1.105  1.00  0.00      STRA 
+ COOR>ATOM      2  O5' GUA     1       2.382   2.419  -1.005  1.00  0.00      STRA 
  X-PLOR> end 
  %X-PLOR-ERR: "END" not allowed. "STOP" terminates program
  X-PLOR>energy end 
  MAKINB: mode   5 found   2716 exclusions,    1188 interactions(1-4) and   1528 GB exclusions
  --------------- cycle=     1 --------------------------------------------------
- | Etotal =-620.281   grad(E)=4.887      E(BOND)=7.048      E(ANGL)=47.733     |
- | E(DIHE)=0.000      E(IMPR)=19.243     E(VDW )=-175.594   E(ELEC)=-518.711   |
+ | Etotal =-614.388   grad(E)=4.957      E(BOND)=6.789      E(ANGL)=50.531     |
+ | E(DIHE)=0.000      E(IMPR)=20.945     E(VDW )=-176.540   E(ELEC)=-516.113   |
  -------------------------------------------------------------------------------
  X-PLOR>stop 
  HEAP:   maximum use=  2317710 current use=  1797230
- X-PLOR: total CPU time=      0.0100 s
- X-PLOR: entry time at 00:26:36  8-Sep-26
- X-PLOR: exit time at 00:26:36  8-Sep-26
+ X-PLOR: total CPU time=      0.0300 s
+ X-PLOR: entry time at 13:10:18 16-Nov-26
+ X-PLOR: exit time at 13:10:18 16-Nov-26

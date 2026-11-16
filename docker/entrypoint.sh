@@ -19,17 +19,17 @@ usage() {
 quadro — G-quadruplex 3D structure generator
 
 USAGE
-    docker run --rm -v "\$PWD:/work" quadro14m:latest [OPTIONS] INPUT.inp [INPUT2.inp ...]
+    docker run --rm -v "\$PWD:/work" quadro:latest [OPTIONS] INPUT.inp [INPUT2.inp ...]
 
     Paths are relative to /work, i.e. to the directory you mounted.
 
-    Each input is built twice by default: as written, and mirrored — the same
-    residues in the opposite-handed stack. That yields NAME.pdb and NAME_alt.pdb;
-    keep whichever has the lower Etotal.
+    Engine 16 is single-pass: one input produces one PDB.  To sample the
+    opposite-handed stack, run the mirrored input (orient/rise/twist signs
+    inverted, path positions 2 and 4 exchanged) as a second input.
 
 OPTIONS
-    --no-mirror         Build only the input as written, skipping the mirror
-                        pass. Halves the run time and gives up the comparison.
+    --no-mirror         Accepted for compatibility. Engine 16 is already
+                        single-pass, so this changes nothing.
     --outdir DIR        Write results to DIR (relative to /work). Default: /work.
     --shell             Drop into an interactive shell inside the container.
     --version           Print the engine version and exit.
@@ -42,7 +42,7 @@ OUTPUT
     holding the full engine output.
 
 EXAMPLE
-    docker run --rm -v "\$PWD:/work" quadro14m:latest examples/7ys7.inp
+    docker run --rm -v "\$PWD:/work" quadro:latest examples/7ys7.inp
 
 SEE ALSO
     docs/INPUT-FORMAT.md for the .inp file format.
@@ -68,7 +68,7 @@ if [ ${#inputs[@]} -eq 0 ]; then
     exit 64
 fi
 
-if [ ! -x "$QUADRO_HOME/$ENGINE" ]; then
+if [ ! -f "$QUADRO_HOME/$ENGINE" ]; then
     echo "quadro: engine '$ENGINE' not found in $QUADRO_HOME" >&2
     exit 70
 fi
@@ -118,7 +118,10 @@ for input in "${inputs[@]}"; do
     # The exit status is not the success criterion. The engine's own status is
     # whatever its last system() call returned, which says nothing about whether
     # a structure was built. Judge the run by whether it produced a PDB.
-    ( cd "$run_dir" && "./$ENGINE" "${ENGINE_OPTS[@]}" "$base" ) > "$log" 2>&1
+    case "$ENGINE" in
+        *.awk) ( cd "$run_dir" && sh "./$ENGINE" "$base" ) > "$log" 2>&1 ;;
+        *)     ( cd "$run_dir" && "./$ENGINE" "${ENGINE_OPTS[@]}" "$base" ) > "$log" 2>&1 ;;
+    esac
     engine_status=$?
 
     # Collect by the input's `name` field, not by extension. The working

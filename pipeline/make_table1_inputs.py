@@ -10,17 +10,10 @@ run.
 from __future__ import annotations
 
 import argparse
-import csv
 from pathlib import Path
 
 import common
-
-TARGETS = [
-    "1kf1_assembly1_A", "5lqh_assembly1_A", "2mbj_assembly1_A", "2kf8_assembly1_A",
-    "2mft_assembly1_A", "1hut_assembly1_D", "5oph_assembly1_A", "1hao_assembly1_D",
-    "9uk8_assembly3_C", "2hy9_assembly1_1", "2lod_assembly1_A", "6l92_assembly1_A",
-    "2mfu_assembly1_A", "6r9k_assembly1_A", "6r9l_assembly1_A",
-]
+import table1
 
 
 def main() -> int:
@@ -31,7 +24,7 @@ def main() -> int:
     records = {record["key"]: record for record in map(common.describe_input, common.selected_input_paths())}
     args.output_dir.mkdir(parents=True, exist_ok=True)
     keys = []
-    for key in TARGETS:
+    for key in table1.keys():
         record = records[key]
         fields = common.parse_inp(Path(record["path"]))
         steps = max(1, record["tetrads"] - 1)

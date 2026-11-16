@@ -18,23 +18,9 @@ import numpy as np
 from scipy.stats import binomtest, spearmanr
 
 import common
+import table1
 
 MANUAL_EXCLUSIONS = {"7zj4-assembly1-E.inp", "7zj5-assembly1-E.inp"}
-
-# 3D-NuS-Qplex column of Table 1.  These are the published comparator values and
-# are not regenerated here.
-QPLEX = {
-    "1KF1": 5.005, "5LQH": 6.209, "2MBJ": 7.420, "2KF8": 7.102, "2MFT": 5.312,
-    "1HUT": 5.892, "5OPH": 4.539, "1HAO": 4.959, "9UK8": 4.502, "2HY9": 6.715,
-    "2LOD": 6.352, "6L92": 5.424, "2MFU": 6.576, "6R9K": 8.082, "6R9L": 7.845,
-}
-TABLE1_KEYS = {
-    "1KF1": "1kf1_assembly1_A", "5LQH": "5lqh_assembly1_A", "2MBJ": "2mbj_assembly1_A",
-    "2KF8": "2kf8_assembly1_A", "2MFT": "2mft_assembly1_A", "1HUT": "1hut_assembly1_D",
-    "5OPH": "5oph_assembly1_A", "1HAO": "1hao_assembly1_D", "9UK8": "9uk8_assembly3_C",
-    "2HY9": "2hy9_assembly1_1", "2LOD": "2lod_assembly1_A", "6L92": "6l92_assembly1_A",
-    "2MFU": "2mfu_assembly1_A", "6R9K": "6r9k_assembly1_A", "6R9L": "6r9l_assembly1_A",
-}
 
 
 def load_table(path: Path) -> dict[str, list[float]]:
@@ -48,6 +34,24 @@ def load_table(path: Path) -> dict[str, list[float]]:
         if len(cells) < 13:
             continue
         out[cells[0]] = [float(value) for value in cells[1:13]]
+    return out
+
+
+def load_qplex_scores(path: Path) -> dict[str, float]:
+    if not path.exists():
+        raise SystemExit(
+            f"missing {path}; run pipeline/score_qplex.py first"
+        )
+    out: dict[str, float] = {}
+    for row in csv.DictReader(path.open(encoding="utf-8")):
+        if row["status"] != "ok" or not row["rmsd_heavy"]:
+            raise SystemExit(
+                f"Qplex model {row['pdb']} did not score: {row.get('error', '')}"
+            )
+        out[row["pdb"]] = float(row["rmsd_heavy"])
+    missing = [target["pdb"] for target in table1.TARGETS if target["pdb"] not in out]
+    if missing:
+        raise SystemExit(f"Qplex scores missing for: {', '.join(missing)}")
     return out
 
 
@@ -91,6 +95,7 @@ def main() -> int:
     parser.add_argument("--energy", type=Path, default=common.DATA / "G16_energy_popr.txt")
     parser.add_argument("--table1-rmsd", type=Path, default=common.DATA / "table1_rmsd.txt")
     parser.add_argument("--table1-energy", type=Path, default=common.DATA / "table1_energy_popr.txt")
+    parser.add_argument("--qplex-scores", type=Path, default=common.DATA / "qplex_scores.csv")
     parser.add_argument("--inputs-dir", type=Path, default=common.INPUTS)
     parser.add_argument("--results", type=Path, default=common.RESULTS / "AP_unweighted_548")
     parser.add_argument("--reports", type=Path, default=common.REPORTS)
@@ -180,18 +185,23 @@ def main() -> int:
     payload["s1_table"] = s1
 
     default = load_table(args.table1_rmsd)
+    qplex_scores = load_qplex_scores(args.qplex_scores)
     rows = []
-    for pdb, key in TABLE1_KEYS.items():
+    for target in table1.TARGETS:
+        pdb = target["pdb"]
+        key = target["key"]
         oracle = min(rmsd[key]) if key in rmsd else None
         default_value = min(default[key]) if key in default else None
-        rows.append(dict(pdb=pdb, key=key, qplex=QPLEX[pdb], oracle=oracle, default=default_value, improvement=QPLEX[pdb] - oracle if oracle is not None else None))
+        qplex_value = qplex_scores[pdb]
+        rows.append(dict(pdb=pdb, key=key, qplex=qplex_value, oracle=oracle, default=default_value, improvement=qplex_value - oracle if oracle is not None else None))
     with (args.reports / "table1.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
 
-    oracles = np.array([row["oracle"] for row in rows if row["oracle"] is not None])
-    qplex = np.array([row["qplex"] for row in rows])
+    paired_rows = [row for row in rows if row["oracle"] is not None]
+    oracles = np.array([row["oracle"] for row in paired_rows])
+    qplex = np.array([row["qplex"] for row in paired_rows])
     diffs = qplex - oracles
     comparable = [row for row in rows if row["default"] is not None and row["oracle"] is not None]
     payload["table1"] = dict(

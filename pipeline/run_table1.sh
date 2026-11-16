@@ -19,6 +19,8 @@ fi
 
 cd "$ROOT"
 
+"$PYTHON" pipeline/fetch_references.py --keys "$("$PYTHON" pipeline/table1.py)"
+"$PYTHON" pipeline/score_qplex.py
 "$PYTHON" pipeline/make_table1_inputs.py
 "$PYTHON" pipeline/run_models.py \
     --inputs-dir work/inputs/table1 \

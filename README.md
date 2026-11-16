@@ -44,9 +44,11 @@ JOBS=12 bash pipeline/run_all.sh
 JOBS=12 bash pipeline/run_table1.sh
 ```
 
-`run_all.sh` downloads the references, builds 6,516 models, scores them,
-clusters the inputs, and writes the manuscript numbers. `run_table1.sh` builds
-the nominal-geometry variant used in the third column of Table 1.
+`run_all.sh` downloads the references, scores the bundled Qplex models, builds
+6,516 models, scores them, clusters the inputs, and writes the manuscript
+numbers. `run_table1.sh` fetches the 15 Table 1 references, scores the Qplex
+models, and builds the nominal-geometry variant used in the third column of
+Table 1.
 
 ## Protocol
 
@@ -64,6 +66,13 @@ chain PyMOL would prefer. The two phosphate-oxygen aliases `OP1`/`O1P` and
 the RMSD over the common heavy atoms is recorded. This is the value called
 "all-heavy-atom RMSD" in the manuscript.
 
+**3D-NuS-Qplex.** The fifteen Qplex models in `qplex/` are rescored with the
+same procedure, not taken from published values. They have no chain ID and use
+`ADE`/`GUA`/`THY`/`CYT` residue names, so PyMOL aligns them to the reference by
+sequence. The files retain the server's hydrogens; both sides are stripped
+before alignment, which is why the Table 1 Qplex column differs from the
+all-atom values reported previously.
+
 **Energy.** `<name>_energy.txt` is the Xplor-NIH force-field evaluation of the
 final coordinates; it is used only to rank models of the same input.
 
@@ -76,6 +85,10 @@ final coordinates; it is used only to rank models of the same input.
 - `references/manifest.csv` — per key, the RCSB URL and the SHA256 of the
   decompressed mmCIF. `fetch_references.py` refuses a file whose hash differs,
   so an upstream change in the PDB archive cannot silently change the numbers.
+- `qplex/` — the fifteen 3D-NuS-Qplex models for Table 1, one per target, with
+  SHA256 hashes in `qplex/manifest.csv` and provenance in
+  `qplex/PROVENANCE.md`. These are scored locally; no published Qplex values are
+  reused.
 
 The three mixed DNA/RNA records `4ni7-assembly1-B`, `4ni9-assembly1-B` and
 `4ni9-assembly1-D` cannot be built by engine 16 (`ERROR 106 bledna para`).
@@ -91,24 +104,27 @@ them are Affinity Propagation representatives, so the RMSD statistics cover
 | `work/data/G16_rmsd.txt` | 12-column RMSD table (heavy atoms) |
 | `work/data/G16_energy_popr.txt` | 12-column energy table |
 | `work/data/table1_*.txt` | default-parameter branch |
+| `work/data/qplex_scores.csv` | all-heavy-atom RMSD of the fifteen Qplex models |
 | `work/results/AP_unweighted_548/` | Affinity Propagation clusters and representatives |
 | `work/reports/numbers.json` | every manuscript statistic |
 | `work/reports/S1_table.csv` | subgroup table (S1) |
-| `work/reports/table1.csv` | G4Composer columns of Table 1 |
+| `work/reports/table1.csv` | Table 1, including the Qplex column |
 
 ## Layout
 
 ```
 inputs/      548 input records and their manifest
 references/  pinned RCSB manifest (files are downloaded into work/)
+qplex/       fifteen 3D-NuS-Qplex models and their manifest
 pipeline/    the scripts
 work/        generated data (git-ignored)
 ```
 
 ## Notes
 
-- The 3D-NuS-Qplex column of Table 1 is an external benchmark and is not
-  regenerated; `summarize.py` stores those values as constants.
+- The 3D-NuS-Qplex models are bundled and rescored by `score_qplex.py`; the
+  Table 1 Qplex column is therefore regenerated from the same protocol as the
+  G4Composer columns, not copied from a publication.
 - Reference structures are downloaded from RCSB; the manifest is the pinned
   snapshot used for the manuscript.
 - The manuscript's RMSD/energy violin (`figures/AP_violin.pdf`) is written to

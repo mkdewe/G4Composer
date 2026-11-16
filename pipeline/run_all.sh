@@ -20,6 +20,7 @@ fi
 cd "$ROOT"
 
 "$PYTHON" pipeline/fetch_references.py
+"$PYTHON" pipeline/score_qplex.py
 "$PYTHON" pipeline/run_models.py --jobs "$JOBS" || echo "WARNING: some model builds failed"
 "$PYTHON" pipeline/score_rmsd.py --output work/data/scores.csv || echo "WARNING: some models failed to score"
 "$PYTHON" pipeline/collect.py

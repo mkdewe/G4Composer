@@ -6,9 +6,8 @@ of a G-quadruplex — which residues form which tetrad, in which orientation,
 stacked with what rise and twist — into input decks for two established
 structure-calculation programs, and run them in the right order.
 
-The engine is a single AWK program (`engine/quadro.exe`, ~950 lines). The
-`.exe` extension is the author's convention; it is a text script, and you can
-read it.
+The engine is a single AWK program (`engine/quadro16.awk`, ~950 lines). It is a
+shell-executable text script, run through `sh`; you can read it.
 
 ```
  .inp ──▶ parse & validate ──▶ ideal tetrad geometry ──▶ CYANA deck ──▶ CYANA

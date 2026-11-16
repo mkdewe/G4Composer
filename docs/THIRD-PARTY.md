@@ -117,7 +117,7 @@ will not find them otherwise.
 ### 4. Prepare the engine directory
 
 The engine resolves its data files **relative to the current directory**
-(`DIR="./"` near the top of `engine/quadro.exe`). So it must be run from a
+(`DIR="./"` near the top of `engine/quadro16.awk`). So it must be run from a
 directory containing all of `engine/`, and the files must have Unix line endings:
 
 ```bash
@@ -131,7 +131,7 @@ If your copy of the engine carries an absolute `DIR="..."` path instead, point
 it at the working directory once:
 
 ```bash
-sed -i 's|^DIR="/.*"$|DIR="./"|' quadro.exe
+sed -i 's|^DIR="/.*"$|DIR="./"|' quadro16.awk
 ```
 
 ### 5. Run
@@ -140,7 +140,7 @@ Copy your `.inp` into that directory and run the engine from there:
 
 ```bash
 cp /path/to/my.inp .
-./quadro.exe my.inp
+sh quadro16.awk my.inp
 ls *.pdb *_energy.txt
 ```
 

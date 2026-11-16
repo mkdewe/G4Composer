@@ -9,7 +9,7 @@
 set -uo pipefail
 
 QUADRO_HOME="${QUADRO_HOME:-/opt/bin}"
-ENGINE="${QUADRO_EXE:-quadro.exe}"
+ENGINE="${QUADRO_EXE:-quadro16.awk}"
 WORK="/work"
 OUTDIR="$WORK"
 ENGINE_OPTS=()

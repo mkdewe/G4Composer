@@ -1,0 +1,117 @@
+{
+  "dataset": {
+    "instances": 546,
+    "pdb_entries": 406,
+    "kinds": {
+      "DNA": 415,
+      "RNA": 123,
+      "chimeric": 8
+    },
+    "tetrads": {
+      "2": 155,
+      "3": 327,
+      "4": 64
+    },
+    "clusters": 325,
+    "representatives": 325
+  },
+  "rmsd": {
+    "n": 323,
+    "minimum": 1.235,
+    "q1": 3.7465,
+    "median": 4.533,
+    "q3": 5.776,
+    "maximum": 12.208,
+    "whisker_low": 1.235,
+    "whisker_high": 8.793
+  },
+  "energy": {
+    "n": 323,
+    "minimum": -1539.971,
+    "q1": -893.2405,
+    "median": -782.392,
+    "q3": -621.1405,
+    "maximum": 6093.096,
+    "whisker_low": -1206.464,
+    "whisker_high": -239.589
+  },
+  "energy_selected": {
+    "n": 323,
+    "minimum": 1.235,
+    "q1": 4.048500000000001,
+    "median": 4.909,
+    "q3": 6.824,
+    "maximum": 20.048,
+    "whisker_low": 1.235,
+    "whisker_high": 10.884,
+    "same_model": 32,
+    "same_fraction": 9.907120743034056,
+    "median_degradation": 0.3569999999999993,
+    "spearman_rho": 0.24672977502979299,
+    "spearman_p": 7.235546108151514e-06,
+    "within_input_spearman_median": 0.1328671328671329,
+    "at_most_9A": 299
+  },
+  "s1_table": [
+    {
+      "subgroup": "All representatives",
+      "n": 323,
+      "min_rmsd": 4.533,
+      "energy_selected_rmsd": 4.909,
+      "n_with_energy": 323
+    },
+    {
+      "subgroup": "DNA",
+      "n": 260,
+      "min_rmsd": 4.329,
+      "energy_selected_rmsd": 4.621,
+      "n_with_energy": 260
+    },
+    {
+      "subgroup": "RNA",
+      "n": 58,
+      "min_rmsd": 6.844,
+      "energy_selected_rmsd": 7.774,
+      "n_with_energy": 58
+    },
+    {
+      "subgroup": "Chimeric DNA/RNA",
+      "n": 5,
+      "min_rmsd": 5.041,
+      "energy_selected_rmsd": 5.246,
+      "n_with_energy": 5
+    },
+    {
+      "subgroup": "Two tetrads",
+      "n": 76,
+      "min_rmsd": 5.538,
+      "energy_selected_rmsd": 7.253,
+      "n_with_energy": 76
+    },
+    {
+      "subgroup": "Three tetrads",
+      "n": 206,
+      "min_rmsd": 4.627,
+      "energy_selected_rmsd": 5.064,
+      "n_with_energy": 206
+    },
+    {
+      "subgroup": "Four tetrads",
+      "n": 41,
+      "min_rmsd": 3.505,
+      "energy_selected_rmsd": 3.643,
+      "n_with_energy": 41
+    }
+  ],
+  "table1": {
+    "rows": 15,
+    "qplex_median": 6.142245292663574,
+    "oracle_median": 4.216,
+    "median_difference": 1.4731551704406742,
+    "oracle_better": 15,
+    "sign_test_p": 6.103515625e-05,
+    "default_better": 7,
+    "default_worse": 8,
+    "default_ties": 0
+  }
+}

@@ -1,0 +1,8 @@
+subgroup,n,min_rmsd,energy_selected_rmsd,n_with_energy
+All representatives,323,4.533,4.909,323
+DNA,260,4.329,4.621,260
+RNA,58,6.844,7.774,58
+Chimeric DNA/RNA,5,5.041,5.246,5
+Two tetrads,76,5.538,7.253,76
+Three tetrads,206,4.627,5.064,206
+Four tetrads,41,3.505,3.643,41

@@ -239,6 +239,16 @@ Xplor-NIH layout are all easy to get subtly wrong by hand.
 
 ---
 
+## Manuscript reproduction
+
+The complete reproduction package for the G4Composer manuscript is in
+[`reproduction/`](reproduction/): the pipeline, all 6,516 main models, the 180
+Table 1 models and the 15 3D-NuS-Qplex models. The analyses can be rerun
+without CYANA or Xplor-NIH from the archived coordinates; see
+[`reproduction/README.md`](reproduction/README.md).
+
+---
+
 ## Citation
 
 If you use quadro, please cite the software (see `CITATION.cff`, or the "Cite

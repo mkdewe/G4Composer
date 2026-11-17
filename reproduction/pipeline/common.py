@@ -12,10 +12,18 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUTS = ROOT / "inputs" / "current_548"
 WORK = ROOT / "work"
 REFERENCES = WORK / "references"
-MODELS = WORK / "models"
+MODELS = ROOT / "models"
+MODELS_TABLE1 = ROOT / "models_table1"
 DATA = WORK / "data"
 RESULTS = WORK / "results"
 REPORTS = WORK / "reports"
+
+MANUAL_EXCLUSIONS = {"7zj4-assembly1-E.inp", "7zj5-assembly1-E.inp"}
+KNOWN_UNBUILDABLE = {
+    "4ni7_assembly1_B": "ERROR 106 bledna para (mixed DNA/RNA base pair)",
+    "4ni9_assembly1_B": "ERROR 106 bledna para (mixed DNA/RNA base pair)",
+    "4ni9_assembly1_D": "ERROR 106 bledna para (mixed DNA/RNA base pair)",
+}
 
 DEPTHS = (30, 50, 70, 100, 150, 300)
 MODES = ("n", "a")

@@ -27,6 +27,7 @@ import common
 
 PYMOL_TEMPLATE = r'''
 import json
+from pathlib import Path
 from pymol import cmd
 
 reference = {reference!r}
@@ -70,7 +71,9 @@ for item in models:
     rows.append(row)
 
 with open(output, "w", encoding="utf-8") as stream:
-    json.dump(dict(reference=reference, chain=chain, rows=rows), stream, indent=2)
+    for row in rows:
+        row.pop("path", None)
+    json.dump(dict(reference=Path(reference).name, chain=chain, rows=rows), stream, indent=2)
 '''
 
 

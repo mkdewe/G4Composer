@@ -21,7 +21,17 @@ cd "$ROOT"
 
 "$PYTHON" pipeline/fetch_references.py
 "$PYTHON" pipeline/score_qplex.py
-"$PYTHON" pipeline/run_models.py --jobs "$JOBS" || echo "WARNING: some model builds failed"
+
+FORCE_ARGS=()
+if [ "${FORCE:-0}" = "1" ]; then FORCE_ARGS=(--force); fi
+
+if [ "${FORCE:-0}" != "1" ] && "$PYTHON" pipeline/check_models.py --quiet; then
+    echo "main models present; skipping generation"
+else
+    "$PYTHON" pipeline/run_models.py --jobs "$JOBS" "${FORCE_ARGS[@]}" || echo "WARNING: some model builds failed"
+fi
+"$PYTHON" pipeline/sanitize.py models models_table1 || true
+
 "$PYTHON" pipeline/score_rmsd.py --output work/data/scores.csv || echo "WARNING: some models failed to score"
 "$PYTHON" pipeline/collect.py
 "$PYTHON" pipeline/cluster_ap.py --inputs inputs/current_548 --output work/results/AP_unweighted

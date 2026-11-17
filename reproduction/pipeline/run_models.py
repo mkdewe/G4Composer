@@ -19,12 +19,8 @@ from pathlib import Path
 
 import common
 
-MANUAL_EXCLUSIONS = {"7zj4-assembly1-E.inp", "7zj5-assembly1-E.inp"}
-KNOWN_UNBUILDABLE = {
-    "4ni7_assembly1_B": "ERROR 106 bledna para (mixed DNA/RNA base pair)",
-    "4ni9_assembly1_B": "ERROR 106 bledna para (mixed DNA/RNA base pair)",
-    "4ni9_assembly1_D": "ERROR 106 bledna para (mixed DNA/RNA base pair)",
-}
+MANUAL_EXCLUSIONS = common.MANUAL_EXCLUSIONS
+KNOWN_UNBUILDABLE = common.KNOWN_UNBUILDABLE
 
 
 def build_fields(record: dict, name: str, depth: int, mode: str) -> list[tuple[str, str]]:
@@ -50,8 +46,11 @@ def run_task(record: dict, depth: int, mode: str, args) -> dict:
     key = record["key"]
     name = f"{key}_{depth}_{mode}"
     tag = f"d{depth}_{mode}"
-    if task_done(key, depth, mode, args.models_dir):
+    if not args.force and task_done(key, depth, mode, args.models_dir):
         return {"key": key, "tag": tag, "status": "skip"}
+    if args.force:
+        common.model_path(key, depth, mode, args.models_dir).unlink(missing_ok=True)
+        common.energy_path(key, depth, mode, args.models_dir).unlink(missing_ok=True)
 
     run_dir = args.runs_dir / key / tag
     if run_dir.exists():
@@ -111,6 +110,8 @@ def main() -> int:
     parser.add_argument("--image", default=os.environ.get("QUADRO_IMAGE", "quadro:latest"))
     parser.add_argument("--jobs", type=int, default=12)
     parser.add_argument("--timeout", type=int, default=1200)
+    parser.add_argument("--force", action="store_true", help="rebuild models even when present")
+    parser.add_argument("--no-build", action="store_true", help="fail if any model is missing; never run Docker")
     args = parser.parse_args()
     args.inputs_dir = args.inputs_dir.resolve()
     args.models_dir = args.models_dir.resolve()
@@ -149,7 +150,19 @@ def main() -> int:
             encoding="utf-8",
         )
 
+    if args.no_build:
+        missing = [item for item in tasks if not task_done(item[0]["key"], item[1], item[2], args.models_dir)]
+        if missing:
+            print(f"{len(missing)} model(s) missing; refusing to build (--no-build)", file=sys.stderr)
+            for record, depth, mode in missing[:10]:
+                print(f"  {record['key']} {depth}{mode}", file=sys.stderr)
+            return 1
+        print(f"all {len(tasks)} model(s) present")
+        return 0
+
     failures = 0
+    built = 0
+    reused = 0
     done = 0
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {pool.submit(run_task, record, depth, mode, args): (record["key"], depth, mode) for record, depth, mode in tasks}
@@ -161,10 +174,12 @@ def main() -> int:
                 failures += 1
                 print(f"{label} FAILED")
             elif result["status"] == "ok":
+                built += 1
                 print(f"{label} ok ({result['seconds']}s)")
             else:
-                print(f"{label} skip")
+                reused += 1
 
+    print(f"models: built {built}, reused {reused}, failed {failures} (of {len(tasks)})")
     if failures:
         print(f"{failures} task(s) failed; see {args.logs_dir}", file=sys.stderr)
     return 1 if failures else 0

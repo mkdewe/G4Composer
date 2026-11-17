@@ -22,23 +22,32 @@ cd "$ROOT"
 "$PYTHON" pipeline/fetch_references.py --keys "$("$PYTHON" pipeline/table1.py)"
 "$PYTHON" pipeline/score_qplex.py
 "$PYTHON" pipeline/make_table1_inputs.py
-"$PYTHON" pipeline/run_models.py \
-    --inputs-dir work/inputs/table1 \
-    --keys-file work/inputs/table1_keys.txt \
-    --models-dir work/models_table1 \
-    --runs-dir work/runs_table1 \
-    --logs-dir work/logs_table1 \
-    --jobs "$JOBS"
+
+FORCE_ARGS=()
+if [ "${FORCE:-0}" = "1" ]; then FORCE_ARGS=(--force); fi
+
+if [ "${FORCE:-0}" != "1" ] && "$PYTHON" pipeline/check_models.py --table1 --quiet; then
+    echo "Table 1 models present; skipping generation"
+else
+    "$PYTHON" pipeline/run_models.py \
+        --inputs-dir work/inputs/table1 \
+        --keys-file work/inputs/table1_keys.txt \
+        --models-dir models_table1 \
+        --runs-dir work/runs_table1 \
+        --logs-dir work/logs_table1 \
+        --jobs "$JOBS" "${FORCE_ARGS[@]}"
+fi
+"$PYTHON" pipeline/sanitize.py models_table1 || true
 "$PYTHON" pipeline/score_rmsd.py \
     --inputs-dir work/inputs/table1 \
     --keys-file work/inputs/table1_keys.txt \
-    --models-dir work/models_table1 \
+    --models-dir models_table1 \
     --output work/data/table1_scores.csv
 "$PYTHON" pipeline/collect.py \
     --inputs-dir work/inputs/table1 \
     --keys-file work/inputs/table1_keys.txt \
     --scores work/data/table1_scores.csv \
-    --models-dir work/models_table1 \
+    --models-dir models_table1 \
     --output-dir work/data \
     --rmsd-name table1_rmsd.txt \
     --energy-name table1_energy_popr.txt

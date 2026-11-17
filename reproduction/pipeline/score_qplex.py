@@ -24,6 +24,7 @@ import table1
 
 PYMOL_TEMPLATE = r'''
 import json
+from pathlib import Path
 from pymol import cmd
 
 targets = @@TARGETS@@
@@ -62,6 +63,9 @@ for item in targets:
     rows.append(row)
 
 with open(output, "w", encoding="utf-8") as stream:
+    for row in rows:
+        row["reference"] = Path(row["reference"]).name
+        row["path"] = Path(row["path"]).name
     json.dump(dict(rows=rows), stream, indent=2)
 '''
 

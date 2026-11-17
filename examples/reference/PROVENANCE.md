@@ -6,9 +6,10 @@ behaves sanely before trusting it on real work.
 
 Because CYANA and Xplor-NIH are supplied by each user rather than pinned by this
 repository, results can differ slightly between installations. **Compare
-`Etotal` and heavy-atom RMSD, not the files byte for byte** — each PDB carries a
-`REMARK` line with the run's scratch path and timestamp, so even two runs on the
-same machine differ textually.
+`Etotal` and heavy-atom RMSD, not the files byte for byte.** The archived PDBs
+have the run-specific `REMARK FILENAME`/`REMARK DATE` lines stripped, and the
+energy files are reduced to the final `Etotal` summary, so a fresh run will not
+be textually identical even when the coordinates agree.
 
 Regenerate with:
 

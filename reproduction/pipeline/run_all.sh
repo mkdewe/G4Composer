@@ -30,7 +30,7 @@ if [ "${FORCE:-0}" != "1" ] && "$PYTHON" pipeline/check_models.py --quiet; then
 else
     "$PYTHON" pipeline/run_models.py --jobs "$JOBS" "${FORCE_ARGS[@]}" || echo "WARNING: some model builds failed"
 fi
-"$PYTHON" pipeline/sanitize.py models models_table1 || true
+"$PYTHON" pipeline/sanitize.py || true
 
 "$PYTHON" pipeline/score_rmsd.py --output work/data/scores.csv || echo "WARNING: some models failed to score"
 "$PYTHON" pipeline/collect.py

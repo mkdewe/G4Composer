@@ -38,9 +38,8 @@ bash pipeline/run_analysis.sh
 ```
 
 This checks that every model/energy pair is present, downloads the RCSB
-references, rescoring the Qplex models, rescoring the G4Composer models,
-reclustering the inputs, redrawing the violin and regenerating every table and
-statistic. PyMOL must be on `PATH`.
+references, rescores the Qplex and G4Composer models, reclusters the inputs,
+redraws the violin and regenerates every table and statistic. PyMOL must be on `PATH`.
 
 ## Rebuilding from scratch
 

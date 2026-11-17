@@ -1,0 +1,9 @@
+name        2m6v-assembly1
+sequence    gggttgggttttgggtggg
+structure   ^^...(^^....^^.)^^.
+chi         S....SS.....S.S.S..
+sugar       SSNNSNNSNSSSSNNSSNN
+orient      A+;B-
+rise        3.3
+twist       16.1
+path        A1;B1;B4;A4;A2;B2;B3;A3

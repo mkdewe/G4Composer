@@ -1,0 +1,9 @@
+name        6tc8-assembly1
+sequence    gggatgggacacaggggacggg
+structure   ^^...^^^.....^^^^..^^^
+chi         S....S.......S.....S..
+sugar       SSSSSNSSSSSSSNNNSSSSSS
+orient      A+;B-;C+
+rise        3.5;-6.9
+twist       20;40
+path        A1;B1;B4;A4;C1;C2;B2;A2;C3;B3;A3;C4

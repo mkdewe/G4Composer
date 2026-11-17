@@ -1,0 +1,9 @@
+name        8u5z-assembly3
+sequence    GCGUACGAAGGUGAGGAGAGGCGAGGAAGAGUACGC
+structure   ((((((...^^.^.^^.^.^^.^.^^..^.))))))
+chi         ....................................
+sugar       NNNNNNNNNSNSSNNNSSSSNSSNNNSSSNNNNNNS
+orient      A-;B-;C+
+rise        3.4;3.4
+twist       34.6;26.7
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

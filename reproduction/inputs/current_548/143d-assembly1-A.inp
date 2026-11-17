@@ -1,0 +1,9 @@
+name        143d-assembly1
+sequence    agggttagggttagggttaggg
+structure   .^^^.(.^^^...^^^..)^^^
+chi         ..S....S.S....S....S.S
+sugar       SSSSSSSSSSSSSSSSSSSSSS
+orient      A-;B+;C-
+rise        3.6;3.5
+twist       35.1;12.4
+path        A1;B1;C1;C4;B4;A4;A2;B2;C2;C3;B3;A3

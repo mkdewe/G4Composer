@@ -1,0 +1,9 @@
+name        8vx8-assembly1
+sequence    gggtgggtagggtggg
+structure   ^^^.^^^..^^^.^^^
+chi         ................
+sugar       SSN.SSS..NSSSNNS
+orient      A-;B-;C-
+rise        3.2;3.2
+twist       31.5;23.6
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

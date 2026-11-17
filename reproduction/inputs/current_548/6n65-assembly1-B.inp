@@ -1,0 +1,9 @@
+name        6n65-assembly1
+sequence    agggcggtgtgggaatagggaa
+structure   .^^^.^^.^.^^^....^^^..
+chi         ....S..........S....S.
+sugar       SSSSNSNSSSSSSSSSSSSSSN
+orient      A-;B-;C-
+rise        3.4;3.4
+twist       30.8;28.7
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

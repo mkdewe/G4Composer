@@ -1,0 +1,9 @@
+name        6jwd-assembly1
+sequence    ggggcggggcggggcggggt
+structure   ^^^...^^^.^^^...^^^.
+chi         S.....S...S.....S...
+sugar       NNNSNNNNSSNNNNSSNNNN
+orient      A+;B-;C-
+rise        4.1;4.2
+twist       20.8;25.4
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

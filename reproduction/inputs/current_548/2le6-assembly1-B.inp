@@ -1,0 +1,9 @@
+name        2le6-assembly1
+sequence    gggtgggtgggtgggt
+structure   ^^^.^^^.^^^.^^^.
+chi         ................
+sugar       NSSSSNSSSNNNSSSN
+orient      A-;B-;C-
+rise        3.3;3.3
+twist       29.8;28.8
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

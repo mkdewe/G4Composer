@@ -1,0 +1,9 @@
+name        7pne-assembly1
+sequence    ttaggtgggtagggtgggctagtcattttgactagg
+structure   ...^^.^^^..^^^.^^^(((((((...)))))))^
+chi         ...................................S
+sugar       NSSSSSSSSNSNNSSSSSSSSSSNSNNSNSSSNSSN
+orient      A-;B-;C-
+rise        3.4;3.5
+twist       26.8;119.9
+path        A1;B1;A4;B4;C1;A3;B3;C4;A2;B2;C3;C2

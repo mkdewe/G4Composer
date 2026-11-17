@@ -1,0 +1,9 @@
+name        8u5k-assembly2
+sequence    GCGUACGAAGGAGAGGAGAGGAAGAGGAGAGUACGC
+structure   ((((((...^^.^.^^.^.^^..^.^^.^.))))))
+chi         ....................................
+sugar       NNNNNNNNNSNSSNNNSSSSNSSSNNNSSNNNNNNN
+orient      A-;B-;C+
+rise        3.3;3.4
+twist       34.2;27.3
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

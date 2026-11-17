@@ -1,0 +1,9 @@
+name        2m53-assembly1
+sequence    tgtgGgggtggacgggccggGtaGa
+structure   ...^^^^^..^..^^^..^^^....
+chi         .........................
+sugar       SNSNNSSSSSSSNNNSSSNNNSSNS
+orient      A-;B-;C-
+rise        3.5;3.4
+twist       13.6;31.3
+path        A1;B1;C1;B4;C4;A4;A3;B3;C3;A2;B2;C2

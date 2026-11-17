@@ -1,0 +1,9 @@
+name        2kpr-assembly1
+sequence    gggtggggaaggggtgggt
+structure   ^^..^^^...^^^^.^^^.
+chi         S...S.....S....S...
+sugar       SSSSSNSSSSNNSSSSSNN
+orient      A+;B-;C+
+rise        3.6;-6.9
+twist       18.7;36.1
+path        A1;B1;B4;A4;C1;C2;B2;A2;C3;B3;A3;C4

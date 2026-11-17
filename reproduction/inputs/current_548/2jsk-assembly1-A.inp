@@ -1,0 +1,9 @@
+name        2jsk-assembly1
+sequence    tagggttagggttagggttaggg
+structure   (.^^^...^^^...^^^..)^^^
+chi         ..S.....S.....SS....S..
+sugar       SSSSSNSSSSSSNSSSSNSSSNS
+orient      A+;B-;C-
+rise        3.4;3.4
+twist       19.1;28.9
+path        A1;B1;C1;A4;B4;C4;C3;B3;A3;A2;B2;C2

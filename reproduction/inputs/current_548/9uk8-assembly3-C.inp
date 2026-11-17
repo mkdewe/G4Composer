@@ -1,0 +1,9 @@
+name        9uk8-assembly3
+sequence    ggggccggggccggggccggggcc
+structure   ^^^^..^^^^..^^^^..^^^^..
+chi         S.S.S.S.S...S.S...S.S..S
+sugar       SSSNSSSNSS..SSSNSSSNNSSS
+orient      A+;B-;C+;D-
+rise        3.4;3.6;3.4
+twist       17.1;36.8;14
+path        A1;B1;C1;D1;D2;C2;B2;A2;A3;B3;C3;D3;D4;C4;B4;A4

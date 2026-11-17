@@ -1,0 +1,9 @@
+name        2n6c-assembly1
+sequence    tgagggtggtgagggtggggaagg
+structure   ...^^^.^^...^^^.^^^....^
+chi         .S....................SS
+sugar       NNNNSNNSNSNNNNNNSSNSSNNN
+orient      A-;B-;C-
+rise        3.3;3.4
+twist       32.1;31.1
+path        A1;B1;C1;A4;B4;A3;B3;C3;A2;B2;C2;C4

@@ -1,0 +1,9 @@
+name        2gku-assembly1
+sequence    ttgggttagggttagggttaggga
+structure   (.^^^...^^^...^^^..)^^^.
+chi         ..S.....S.....SS....S...
+sugar       SNNNSSNSSNSSNSNSNSSNNNNS
+orient      A+;B-;C-
+rise        3.6;3.6
+twist       15.5;27.4
+path        A1;B1;C1;A4;B4;C4;C3;B3;A3;A2;B2;C2

@@ -1,0 +1,9 @@
+name        9i1p-assembly2
+sequence    agggtgggtagggtgggtttt
+structure   .^^^.^^^..^^^.^^^....
+chi         ........SS........SS.
+sugar       NSSNSSSSNNSSNSSSSSNSN
+orient      A-;B-;C-
+rise        3.3;3.4
+twist       32.2;29.9
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

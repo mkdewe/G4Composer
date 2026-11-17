@@ -1,0 +1,9 @@
+name        9p9x-assembly1
+sequence    aagggagggcggcggggcaggg
+structure   ..^^^.^^^.^^.^^^.....^
+chi         S..................S..
+sugar       SSSSSSSSNSSSSSSSSNSNSS
+orient      A-;B-;C-
+rise        3.4;3.4
+twist       29.8;27.3
+path        A1;B1;C1;A4;B4;C4;A3;B3;A2;B2;C2;C3

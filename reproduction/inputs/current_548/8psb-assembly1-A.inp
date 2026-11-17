@@ -1,0 +1,9 @@
+name        8psb-assembly1
+sequence    agggtagggcggcggggacgggt
+structure   .^^^..^^^.^^.^^^.....^.
+chi         ...................S...
+sugar       NSSSSSSNSSSSSSSSNSSSSSS
+orient      A-;B-;C-
+rise        3.4;3.4
+twist       28.4;27.1
+path        A1;B1;C1;A4;B4;C4;A3;B3;A2;B2;C2;C3

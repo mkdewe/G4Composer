@@ -1,0 +1,9 @@
+name        9ehe-assembly1
+sequence    cttagtagggttgatgcggcagtgggcttcgcagttcctgcgaggggactaag
+structure   ((((((..^^.....((^^....^^))..((((.....))))..^^.))))))
+chi         ......S.S....S...S.....S....................S........
+sugar       SNSSSSSSSSSNNSNSNSSNSSNSSSSNSSSSSSNSSSSSNNSSNSSSNSSSS
+orient      A+;B-
+rise        3.5
+twist       15.2
+path        A1;B1;B2;A2;A3;B3;B4;A4

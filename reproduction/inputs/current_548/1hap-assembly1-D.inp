@@ -1,0 +1,9 @@
+name        1hap-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S...S...SS.S.S.
+sugar       SNSNSSNSSSSSNSN
+orient      A+;B-
+rise        3.5
+twist       18.6
+path        A1;B1;B4;A4;A3;B3;B2;A2

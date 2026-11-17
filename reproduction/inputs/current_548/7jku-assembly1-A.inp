@@ -1,0 +1,9 @@
+name        7jku-assembly1
+sequence    gttggggttggggttggggttggggt
+structure   ...^^^^..^^^^..^^^^..^^^^.
+chi         ..........................
+sugar       NSNSSSSSSSSNSNNSSNSSSSSSSN
+orient      A-;B-;C-;D-
+rise        3.2;3.3;3.4
+twist       36.9;24.4;24.3
+path        A1;B1;C1;D1;A4;B4;C4;D4;A3;B3;C3;D3;A2;B2;C2;D2

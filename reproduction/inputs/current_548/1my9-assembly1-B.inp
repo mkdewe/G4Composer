@@ -1,0 +1,9 @@
+name        1my9-assembly1
+sequence    GGAGGUUUUGGAGG
+structure   ^^.^^....^^.^^
+chi         ..............
+sugar       SSNNNNNNNSSNSS
+orient      A-;B-
+rise        4.1
+twist       32
+path        A1;B1;A4;B4;A3;B3;A2;B2

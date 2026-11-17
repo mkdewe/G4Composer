@@ -1,0 +1,9 @@
+name        4q9q-assembly1
+sequence    GGACGCGACCGAAAUGGUGAAGGACGGGUCCAGUGCGAAACACGCACUGUUGAGUAGAGUGUGAGCUCCGUAACUGGUCGCGUC
+structure   .((((((((((..((((.(..^^.(^^.(((((((((.....)))))))..))^..^.^.^.)..).))))..).)))))))))
+chi         .....................................................S....S.S.......................
+sugar       NNNNNNNNNNNNNNNNNNSNNSSSNNNNNNNNNNNNNSSSNNNNNNNNNSNNSNSSSSSSNNNNNNNNNNNNNNNNNNNNNNNN
+orient      A-;B-
+rise        3.3
+twist       31.9
+path        A1;B1;A4;B4;B2;A2;B3;A3

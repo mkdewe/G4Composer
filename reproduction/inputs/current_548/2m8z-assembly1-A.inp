@@ -1,0 +1,9 @@
+name        2m8z-assembly1
+sequence    ggttggcgcgaagcattcgcgggttgg
+structure   ^^..^^((((((...))))))^^..^^
+chi         S...S................S...S.
+sugar       NSNNNSSSNSSNSSNNSNSNSNSNNNS
+orient      A+;B-
+rise        3.9
+twist       19.8
+path        A1;B1;B2;A2;A3;B3;B4;A4

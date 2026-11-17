@@ -1,0 +1,9 @@
+name        2kf7-assembly1
+sequence    gggttagggttagggttagggt
+structure   ^^....^^.....^^...^^..
+chi         S.....S......S....S...
+sugar       SSNNNSNSSSSSNSSSSNSSSN
+orient      A+;B-
+rise        3.6
+twist       21.2
+path        A1;B1;B4;A4;A2;B2;B3;A3

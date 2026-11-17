@@ -1,0 +1,9 @@
+name        9o70-assembly3
+sequence    gtggtggtggtgttggtggtggtgtg
+structure   ^.^^.^^.^^.^..^^.^^.^^.^.^
+chi         ..........................
+sugar       SSSSSSSSSSSSNSSSSSSSSSSSNN
+orient      A-;B-;C+;D+
+rise        3.3;-9.9;3.3
+twist       61.9;-114.4;-26.9
+path        A1;B1;A4;B4;A3;B3;A2;B2;C1;D1;C2;D2;C3;D3;C4;D4

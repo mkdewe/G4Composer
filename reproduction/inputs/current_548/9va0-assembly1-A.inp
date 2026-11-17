@@ -1,0 +1,9 @@
+name        9va0-assembly1
+sequence    aatgggagggtctgggagggcc
+structure   ...^^^.^^^...^^^.^^^..
+chi         S.....S...............
+sugar       SNSSNSSSNNSSSSSSSSSNNS
+orient      A-;B-;C-
+rise        3.2;3.2
+twist       26.8;21.6
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

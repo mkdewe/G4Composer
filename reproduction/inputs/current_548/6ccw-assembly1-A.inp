@@ -1,0 +1,9 @@
+name        6ccw-assembly1
+sequence    ttagggttagggttagggttagggtt
+structure   ...^^^...^^^...^^^...^^^..
+chi         S..S.....SS.S..S..S..S....
+sugar       SSNSNSSNNSNNNSNNNNSSNSNSNS
+orient      A+;B-;C-
+rise        3.8;3.7
+twist       19.3;29.3
+path        A1;B1;C1;C4;B4;A4;A3;B3;C3;A2;B2;C2

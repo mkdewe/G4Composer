@@ -1,0 +1,9 @@
+name        9mxo-assembly1
+sequence    ggtggtggtgtgttgtggtggtggtg
+structure   ^^.^^.^^.^.^..^.^^.^^.^^.^
+chi         ..........................
+sugar       SSSSSSSSSSNSSSSSSSSSSSSSSS
+orient      A+;B+;C-;D-
+rise        3.3;3.4;3.3
+twist       -27.1;77.8;63.6
+path        A1;B1;A2;B2;A3;B3;A4;B4;C1;D1;C4;D4;C3;D3;C2;D2

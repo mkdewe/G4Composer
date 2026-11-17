@@ -1,0 +1,9 @@
+name        6e8t-assembly1
+sequence    GUACGAAGGAAGGUUUGGUAUGUGGUAUAUUCGUAC
+structure   (((((((^^..^^...^^...^.^.....)))))))
+chi         .........S........S..S.SS.S.........
+sugar       NNNNNNNSSS.NNSSSNSNSSNSSSNSSNNNNNNNS
+orient      A-;B-
+rise        3.4
+twist       31.1
+path        A1;B1;A4;B4;A3;B3;B2;A2

@@ -1,0 +1,9 @@
+name        8twh-assembly5
+sequence    gggttgggttgggttggg
+structure   ^^^..^^^..^^^..^^^
+chi         ....S.........S...
+sugar       SSSNNSSSSSSSSNSSSS
+orient      A-;B-;C-
+rise        3.3;3.4
+twist       34.9;22.9
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

@@ -1,0 +1,9 @@
+name        2kf8-assembly1
+sequence    gggttagggttagggttagggt
+structure   ^^....^^.....^^...^^..
+chi         S.....S......S....S...
+sugar       NSSSNSNSSSSNNSNSSNSNSS
+orient      A+;B-
+rise        3.2
+twist       18.4
+path        A1;B1;B4;A4;A2;B2;B3;A3

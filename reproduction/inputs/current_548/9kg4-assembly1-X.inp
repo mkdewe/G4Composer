@@ -1,0 +1,9 @@
+name        9kg4-assembly1
+sequence    aaagggtcgggactgggcggggtt
+structure   ...^^^..^^^...^^^.^^^...
+chi         ........................
+sugar       SSSSNSSSNNSSNSSSSSSSSNSN
+orient      A-;B-;C-
+rise        3.4;3.4
+twist       19.1;28.5
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

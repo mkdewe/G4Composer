@@ -1,0 +1,9 @@
+name        7oav-assembly1
+sequence    GGCUAGCUGGAGGGGCGCCAGUUCGCUGGUGGUUGGGUGCGGUCGGCUAGCC
+structure   ((((((((^(.^^.(((((((....))))).^...^^.))^^.)))))))))
+chi         ........................S...........................
+sugar       NNNNNNNNSSNNSSNNNNNNNNSSNNNNNNSSNNNNSSNNNSSNNNNNNNNN
+orient      A-;B+
+rise        3.4
+twist       57.1
+path        A1;A4;B1;B2;A2;B3;B4;A3

@@ -1,0 +1,9 @@
+name        7oqt-assembly1
+sequence    ggcttaggcttaggcttagg
+structure   ^^....^^....^^....^^
+chi         S...........S.....S.
+sugar       NNSSSSSSSSSSNSSSNSSN
+orient      A+;B-
+rise        3.4
+twist       20.7
+path        A1;B1;B4;A4;A2;B2;B3;A3

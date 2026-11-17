@@ -1,0 +1,9 @@
+name        9p3a-assembly1
+sequence    tgtggtggtggtgttggtggtggtgtg
+structure   .^.^^.^^.^^.^..^^.^^.^^.^.^
+chi         S..........................
+sugar       NSSSSSSSSSSSSSSSSNSSSSSSSSN
+orient      A+;B+;C-;D-
+rise        3.3;6.6;-3.2
+twist       -51.1;143.2;27.3
+path        A1;B1;A2;B2;A3;B3;A4;B4;C1;D1;C4;D4;C3;D3;C2;D2

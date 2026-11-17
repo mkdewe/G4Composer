@@ -1,0 +1,9 @@
+name        7zkm-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S...S...SS...S.
+sugar       SNSSSSNSNSSNSSN
+orient      A+;B-
+rise        3.4
+twist       16.2
+path        A1;B1;B2;A2;A3;B3;B4;A4

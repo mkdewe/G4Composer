@@ -1,0 +1,9 @@
+name        9kcq-assembly1
+sequence    agggttagggtttgggttaggg
+structure   .^^^.((^^^...^^^.))^^^
+chi         ..S....S.SS...S....S.S
+sugar       SNNSNSSSSNSNSSSNSSSSSS
+orient      A-;B+;C-
+rise        3.3;3.3
+twist       31;18.7
+path        A1;B1;C1;C4;B4;A4;A2;B2;C2;C3;B3;A3

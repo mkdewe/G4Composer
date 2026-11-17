@@ -1,0 +1,9 @@
+name        5yey-assembly1
+sequence    gggttagggttagggtttggg
+structure   ^^^...^^^...^^^...^^^
+chi         S.....SS....S.....SS.
+sugar       SSNSSSSNSSNSSSSNSSSSN
+orient      A+;B-;C-
+rise        3.4;3.3
+twist       18.9;31.7
+path        A1;B1;C1;C2;B2;A2;A3;B3;C3;C4;B4;A4

@@ -1,0 +1,9 @@
+name        7v3t-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S...S....S...S.
+sugar       NNNNSNSSNNNNSNN
+orient      A+;B-
+rise        3.9
+twist       15.5
+path        A1;B1;B2;A2;A3;B3;B4;A4

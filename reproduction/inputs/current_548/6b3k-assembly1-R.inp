@@ -1,0 +1,9 @@
+name        6b3k-assembly1
+sequence    GACGCGACCGAAAUGGUGAAGGACGGGUCCAGUGCGAGACCCGCACUGUUGAGUAGAGUGUGAGCUCCGUAACUGGUCGCGUC
+structure   ((((((((((..((((.(..^^.(^^.(((((((((.....)))))))..))^..^.^.^.)..).))))..).)))))))))
+chi         ....................................................S...SS.S.......................
+sugar       NNNNNNNNNNNNNNNNNSNNSSSNNNSNNNNNNNNNSSSNNNNNNNNNNSSSNSSSNSSSNNNNNNNNNNNNNSNNNNNNNNN
+orient      A-;B-
+rise        3.2
+twist       34.5
+path        A1;B1;A4;B4;B2;A2;B3;A3

@@ -23,7 +23,7 @@ tools/run.sh --outdir examples/reference \
 
 | Component | Version / build |
 |---|---|
-| quadro engine | 16 (`quadro16.awk`, `tetrad16.lib`) |
+| engine | G4Composer 1.0 (`g4composer.awk`, `tetrad.lib`) |
 | CYANA | 2.1 |
 | Xplor-NIH | 2.39, Linux x86-64 |
 | Base image | `ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc` |
@@ -32,7 +32,7 @@ tools/run.sh --outdir examples/reference \
 
 ## Results
 
-Engine 16 is single-pass: each input yields one structure. Run the mirrored
+G4Composer 1.0 is single-pass: each input yields one structure. Run the mirrored
 input as a second job to sample the opposite-handed stack.
 
 | Input | Output | Atoms | Residues | `Etotal` |
@@ -43,16 +43,10 @@ input as a second job to sample the opposite-handed stack.
 
 All three runs completed with no `ERROR` lines in the engine output.
 
-Engine 16 now reads the documented `sugar` keyword (`shugar` is kept as an
+G4Composer 1.0 now reads the documented `sugar` keyword (`shugar` is kept as an
 alias). `7ys7.inp` and `6pnk.inp` carry non-default pucker annotations, so their
 `Etotal` values changed when the fix was applied; `6a-1hap_js12B.inp` has no
 `sugar` line and is unchanged.
 
-## Previous engines
-
-The 14M repository shipped both handednesses automatically; its reference values
-were −620.281 / −629.866 (`1hap_js12B`), −867.460 / −848.524 (`7ys7`) and
-−665.030 / −666.835 (`6pnk`). Under 14L, `6a-1hap_js12B.inp` and `6pnk.inp` gave
-−624.033 and −676.819. The engines hand Xplor-NIH different starting structures,
-so the energies are not expected to agree. Version 16 is the engine used for the
-archived per-model RMSD and energy values in the G4Composer manuscript.
+These G4Composer 1.0 runs use the same engine as the archived per-model RMSD,
+lDDT and energy values in the G4Composer manuscript.

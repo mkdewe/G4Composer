@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1.7
 #
-# quadro — container recipe
+# g4composer — container recipe
 #
 # CYANA and Xplor-NIH are NOT part of this repository and NOT part of the default
 # build context. They arrive through BuildKit *named build contexts*, so the same
 # Dockerfile works whether they sit in this repo's third_party/ or somewhere else
-# entirely (e.g. shared between several quadro versions in a parent repository).
+# entirely (e.g. shared between several g4composer versions in a parent repository).
 #
 #   tools/build.sh                     ← recommended; wraps the call below
 #
-#   DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t quadro:latest . \
+#   DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t g4composer:latest . \
 #       --build-context cyana=third_party/cyana-2.1 \
 #       --build-context xplor=third_party/xplor-nih-2.39
 #
@@ -18,12 +18,12 @@
 
 FROM ubuntu:22.04
 
-# The engine entry point.  It is a build argument only so that a fork carrying a
-# differently named engine can override it.  Version 16 ships as an awk script,
+# The engine entry point. It is a build argument only so that a fork carrying a
+# differently named engine can override it. G4Composer 1.0 ships as an awk script,
 # so the entrypoint runs it through `sh` rather than executing it directly.
-ARG QUADRO_EXE=quadro16.awk
+ARG G4COMPOSER_EXE=g4composer.awk
 # Reported by `--version` and by /health-style checks. Set from VERSION.
-ARG QUADRO_VERSION=unknown
+ARG G4COMPOSER_VERSION=1.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -50,12 +50,12 @@ ENV LANG=en_US.UTF-8 \
 COPY --from=cyana . /opt/bin/cyana-2.1/
 COPY --from=xplor . /opt/bin/xplor-nih-2.39/
 
-# ── 3. quadro itself ─────────────────────────────────────────────────────────
+# ── 3. g4composer itself ─────────────────────────────────────────────────────────
 # engine/ is copied flat into /opt/bin because the engine resolves its data
 # files relative to the working directory (DIR="./" — see step 5). Keeping the
 # layout flat is what makes that assumption hold.
 COPY engine/ /opt/bin/
-COPY docker/entrypoint.sh /usr/local/bin/quadro-run
+COPY docker/entrypoint.sh /usr/local/bin/g4composer-run
 
 # ── 4. Normalise line endings ────────────────────────────────────────────────
 # The engine is authored on Windows and awk and CYANA both choke on a stray \r.
@@ -64,16 +64,16 @@ COPY docker/entrypoint.sh /usr/local/bin/quadro-run
 # core.autocrlf=true, or a fresh engine dropped in straight from the author.
 RUN find /opt/bin -type f -exec sh -c \
         'file "$1" | grep -qE "text|script" && dos2unix "$1"' _ {} \; 2>/dev/null || true && \
-    dos2unix /usr/local/bin/quadro-run && chmod +x /usr/local/bin/quadro-run
+    dos2unix /usr/local/bin/g4composer-run && chmod +x /usr/local/bin/g4composer-run
 
 # ── 5. Pin the engine's data directory to the working directory ──────────────
 # The engine resolves tetrad.lib and friends through DIR, and is always run from
 # a directory that holds them, so DIR must be "./". It already is — but the
 # author's own copies carry an absolute path into a home directory, so the sed
 # rewrites one if it reappears and the grep makes the build fail if it cannot.
-RUN sed -i 's|^DIR="/.*"$|DIR="./"|' "/opt/bin/${QUADRO_EXE}" && \
-    grep -q '^DIR="\./"$' "/opt/bin/${QUADRO_EXE}" || \
-    { echo "FATAL: could not pin DIR=\"./\" in ${QUADRO_EXE}"; exit 1; }
+RUN sed -i 's|^DIR="/.*"$|DIR="./"|' "/opt/bin/${G4COMPOSER_EXE}" && \
+    grep -q '^DIR="\./"$' "/opt/bin/${G4COMPOSER_EXE}" || \
+    { echo "FATAL: could not pin DIR=\"./\" in ${G4COMPOSER_EXE}"; exit 1; }
 
 # ── 6. Xplor-NIH layout ──────────────────────────────────────────────────────
 # Xplor resolves its own binaries through arch/equivList; the distribution
@@ -104,14 +104,14 @@ RUN cd /opt/bin/cyana-2.1 && \
 
 # ── 8. Permissions ───────────────────────────────────────────────────────────
 RUN chmod -R a+rX /opt/bin && \
-    chmod +x "/opt/bin/${QUADRO_EXE}" \
+    chmod +x "/opt/bin/${G4COMPOSER_EXE}" \
              /opt/bin/cyana2xplor.exe /opt/bin/xplor2pdb2.exe \
              /opt/bin/t2dih.exe /opt/bin/tor3aa 2>/dev/null || true
 
 # ── 9. Environment ───────────────────────────────────────────────────────────
-ENV QUADRO_EXE=${QUADRO_EXE} \
-    QUADRO_VERSION=${QUADRO_VERSION} \
-    QUADRO_HOME=/opt/bin \
+ENV G4COMPOSER_EXE=${G4COMPOSER_EXE} \
+    G4COMPOSER_VERSION=${G4COMPOSER_VERSION} \
+    G4COMPOSER_HOME=/opt/bin \
     PATH="/opt/bin:/opt/bin/cyana-2.1:/opt/bin/xplor-nih-2.39/bin:${PATH}" \
     CYANA="/opt/bin/cyana-2.1" \
     XPLOR="/opt/bin/xplor-nih-2.39" \
@@ -132,16 +132,16 @@ RUN set -e; \
     /opt/bin/cyana-2.1/cyana -x >/dev/null 2>&1 \
         || { echo "FATAL: CYANA launcher cannot locate its executable (check etc/identify and src/cyana/cyanaexe.*)"; exit 1; }; \
     test -x /opt/bin/xplor-nih-2.39/bin/xplor || { echo "FATAL: Xplor-NIH binary missing or not executable"; exit 1; }; \
-    test -f "/opt/bin/${QUADRO_EXE}"        || { echo "FATAL: ${QUADRO_EXE} missing"; exit 1; }; \
-    sh -n "/opt/bin/${QUADRO_EXE}"          || { echo "FATAL: ${QUADRO_EXE} is not a valid shell wrapper"; exit 1; }; \
-    for f in tetrad16.lib bp.lib other_residues.lib ATOMTYPES.txt ryb.cya mp_sugarbond.cya mp_makeaco.cya tor3aa; do \
+    test -f "/opt/bin/${G4COMPOSER_EXE}"        || { echo "FATAL: ${G4COMPOSER_EXE} missing"; exit 1; }; \
+    sh -n "/opt/bin/${G4COMPOSER_EXE}"          || { echo "FATAL: ${G4COMPOSER_EXE} is not a valid shell wrapper"; exit 1; }; \
+    for f in tetrad.lib bp.lib other_residues.lib ATOMTYPES.txt ryb.cya mp_sugarbond.cya mp_makeaco.cya tor3aa; do \
         test -f "/opt/bin/$f" || { echo "FATAL: engine data file $f missing"; exit 1; }; \
     done; \
-    echo "quadro image OK: engine=${QUADRO_EXE}"
+    echo "g4composer image OK: engine=${G4COMPOSER_EXE}"
 
 # ── 11. Runtime ──────────────────────────────────────────────────────────────
 # /work is the mount point for the user's inputs and outputs.
 WORKDIR /work
 VOLUME ["/work"]
-ENTRYPOINT ["/usr/local/bin/quadro-run"]
+ENTRYPOINT ["/usr/local/bin/g4composer-run"]
 CMD ["--help"]

@@ -1,12 +1,12 @@
-# How quadro builds a structure
+# How G4Composer builds a structure
 
-quadro is a **generator and driver**, not a minimiser. It computes no energies
+G4Composer is a **generator and driver**, not a minimiser. It computes no energies
 and moves no atoms itself. What it does is translate a topological description
 of a G-quadruplex — which residues form which tetrad, in which orientation,
 stacked with what rise and twist — into input decks for two established
 structure-calculation programs, and run them in the right order.
 
-The engine is a single AWK program (`engine/quadro16.awk`, ~950 lines). It is a
+The engine is a single AWK program (`engine/g4composer.awk`, ~950 lines). It is a
 shell-executable text script, run through `sh`; you can read it.
 
 ```
@@ -131,7 +131,7 @@ sterically plausible structure differing only in energy, so the ambiguity is not
 resolvable by inspection of the model. Constructing both and comparing `Etotal`
 resolves it by calculation.
 
-Engine 16 builds one handedness per invocation. To obtain the mirror, derive a
+G4Composer 1.0 builds one handedness per invocation. To obtain the mirror, derive a
 second input in which four fields are inverted together:
 
 | Field | Transformation | Example |
@@ -150,14 +150,11 @@ alone would describe a molecule that cannot be built.
 The manuscript's production pipeline generates the derived `.inp` and runs it as
 a separate job. Both structures have identical atom counts and different
 coordinates, so the lower `Etotal` identifies the favoured handedness. Neither
-the direction nor the size of that margin is a general result: in the 14M
-reference runs, `examples/7ys7.inp` favoured the input as written by 18.9, while
-`examples/6a-1hap_js12B.inp` and `examples/6pnk.inp` favoured the mirror by 9.6
-and 1.8. (Xplor-NIH does not label the units in `<name>_energy.txt`; treat
-`Etotal` as a relative figure for ranking models of the same sequence, not as an
-absolute quantity.)
+the direction nor the size of that margin is a general result. Xplor-NIH does not
+label the units in `<name>_energy.txt`; treat `Etotal` as a relative figure for
+ranking models of the same sequence, not as an absolute quantity.
 
-There is no built-in mirror pass in engine 16. `--no-mirror` is accepted for
+There is no built-in mirror pass in G4Composer 1.0. `--no-mirror` is accepted for
 compatibility and changes nothing.
 
 ---

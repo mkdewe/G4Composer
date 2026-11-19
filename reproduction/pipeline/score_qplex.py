@@ -41,7 +41,7 @@ for item in targets:
         if cmd.count_atoms(f'ref_obj and chain "{chain}"') == 0:
             raise ValueError("reference has no chain " + repr(chain))
         cmd.remove(f'ref_obj and not chain "{chain}"')
-        # The Qplex files use O1P/O2P; normalise the reference to the same names.
+        # The 3D-NuS-Qplex files use O1P/O2P; normalise the reference to the same names.
         cmd.alter("ref_obj and name OP1", 'name="O1P"')
         cmd.alter("ref_obj and name OP2", 'name="O2P"')
         cmd.remove("ref_obj and hydro")
@@ -100,7 +100,7 @@ def main() -> int:
     missing_refs = [item for item in targets if not Path(item["reference"]).exists()]
     if missing:
         for item in missing:
-            print(f"missing Qplex model: {item['path']}", file=sys.stderr)
+            print(f"missing 3D-NuS-Qplex model: {item['path']}", file=sys.stderr)
         return 1
     if missing_refs:
         for item in missing_refs:

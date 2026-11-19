@@ -35,7 +35,7 @@ def sanitize_energy(path: Path) -> bool:
     summary = next((line for line in lines if ETOTAL.search(line)), None)
     if summary is None:
         raise SystemExit(f"no Etotal line in {path}")
-    text = "# quadro 16 / Xplor-NIH 2.39 energy summary\n" + summary.rstrip() + "\n"
+    text = "# G4Composer 1.0 / Xplor-NIH 2.39 energy summary\n" + summary.rstrip() + "\n"
     if text != path.read_text(encoding="utf-8", errors="replace"):
         path.write_text(text, encoding="utf-8")
         return True
@@ -48,13 +48,12 @@ def main() -> int:
         "directories",
         nargs="*",
         type=Path,
-        help="directories to sanitize (default: models, models_table1, examples/reference)",
+        help="directories to sanitize (default: models and examples/reference)",
     )
     args = parser.parse_args()
 
     directories = args.directories or [
         common.MODELS,
-        common.MODELS_TABLE1,
         common.ROOT.parent / "examples" / "reference",
     ]
     changed_pdb = changed_energy = 0

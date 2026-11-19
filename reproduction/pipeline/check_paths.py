@@ -19,13 +19,12 @@ def main() -> int:
         "directories",
         nargs="*",
         type=Path,
-        help="directories to scan (default: models, models_table1, qplex, reports, figures)",
+        help="directories to scan (default: models, qplex, reports, figures)",
     )
     args = parser.parse_args()
 
     directories = args.directories or [
         common.MODELS,
-        common.MODELS_TABLE1,
         common.ROOT / "qplex",
         common.ROOT / "reports",
         common.ROOT / "figures",

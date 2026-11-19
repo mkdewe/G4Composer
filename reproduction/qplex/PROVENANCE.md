@@ -24,6 +24,6 @@ modified.
 same model for both; the two targets are nevertheless scored against their own
 experimental structures.
 
-The Qplex files use `O1P`/`O2P` for the phosphate oxygens; the scorer renames
+The 3D-NuS-Qplex files use `O1P`/`O2P` for the phosphate oxygens; the scorer renames
 the reference's `OP1`/`OP2` to match, so no phosphate atom is silently dropped
 from the common heavy-atom set.

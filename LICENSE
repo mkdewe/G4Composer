@@ -26,13 +26,13 @@ SCOPE OF THIS LICENCE
 
 The MIT licence above covers ONLY the files authored in this repository:
 
-    engine/     the quadro engine and its helper scripts and libraries
+    engine/     the G4Composer engine and its helper scripts and libraries
     docker/     the container recipe
     tools/      the build and run wrappers
     docs/       the documentation
     examples/   the example inputs and reference outputs
 
-It does NOT and CANNOT cover the two external programs quadro depends on at
+It does NOT and CANNOT cover the two external programs G4Composer depends on at
 run time. Those are separately licensed and are deliberately absent from this
 repository — you must obtain them yourself:
 

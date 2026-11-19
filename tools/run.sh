@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Convenience wrapper around `docker run` for the quadro image.
+# Convenience wrapper around `docker run` for the g4composer image.
 #
 #   tools/run.sh examples/7ys7.inp
 #   tools/run.sh --no-mirror --outdir out examples/7ys7.inp
@@ -12,7 +12,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
-IMAGE="${QUADRO_IMAGE:-quadro:latest}"
+IMAGE="${G4COMPOSER_IMAGE:-g4composer:latest}"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "run.sh: image '$IMAGE' not found. Build it first:" >&2

@@ -4,7 +4,7 @@ One plain-text file describes one G-quadruplex to build. Each line is
 `keyword value` — whitespace-separated, one keyword per line, order irrelevant.
 Blank lines and `#`-prefixed comments are allowed.
 
-Engine 16 accepts two spellings of the pucker field: `sugar` is canonical, and
+G4Composer 1.0 accepts two spellings of the pucker field: `sugar` is canonical, and
 `shugar` is kept as an alias for legacy inputs.
 
 The value **must not contain spaces**: the parser reads `$2`, so `path A1; B1`
@@ -33,7 +33,7 @@ iteration   100
 
 ### `name` — output base name
 Every result file is named after it: `<name>.pdb`, `<name>_energy.txt`.
-Defaults to `quadro7_test` if omitted. Keep it filesystem-safe.
+Defaults to `g4composer_test` if omitted. Keep it filesystem-safe.
 
 ### `sequence` — the nucleotide sequence *(required)*
 **Case encodes the sugar, not the base.**
@@ -45,8 +45,8 @@ Defaults to `quadro7_test` if omitted. Keep it filesystem-safe.
 
 Case selects the sugar and the letter selects the base, independently, so all
 ten combinations are meaningful: uppercase `T` is ribothymidine and lowercase
-`u` is deoxyuridine. Both were rejected by 14L and were added in 14M together
-with the `RT` and `DU` entries in `other_residues.lib`.
+`u` is deoxyuridine, with matching `RT` and `DU` entries in
+`other_residues.lib`.
 
 Mixed case is allowed and gives a chimeric RNA/DNA molecule; the engine reports
 the RNA fraction. Anything else is rejected with `ERROR 2`.
@@ -194,7 +194,7 @@ structure the Cartesian refinement receives, not how good the final answer is �
 2000 hard-wired Xplor-NIH steps follow regardless. See [ALGORITHM.md](ALGORITHM.md).
 
 > `iteration_steps`, which produced several checkpoints from one build-up, was a
-> local patch on 14L and is **not** part of 14M or engine 16. To sample several
+> local patch on 14L and is **not** part of G4Composer 1.0. To sample several
 > depths, run the engine once per `iteration` value and keep the lowest
 > `Etotal`.
 
@@ -226,7 +226,7 @@ For a run with `name FOO`:
 | `FOO_energy.txt` | final Xplor-NIH energy terms, including `Etotal` |
 | `FOO.runlog` | full engine output (written by the container entrypoint) |
 
-Engine 16 produces **one** pair per run. To sample the opposite-handed stack,
+G4Composer 1.0 produces **one** pair per run. To sample the opposite-handed stack,
 run the mirrored input as a second job (see
 [ALGORITHM.md](ALGORITHM.md#the-mirror-pass)); keep whichever has the lower
 `Etotal`.

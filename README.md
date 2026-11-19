@@ -1,23 +1,25 @@
-# quadro
+# G4Composer 1.0
 
 **Knowledge-based 3D structure generation for G-quadruplexes.**
 
-quadro builds an atomic model of a G-quadruplex from a topological description:
+G4Composer builds an atomic model of a G-quadruplex from a topological description:
 which residues form which tetrad, in which glycosidic orientation, stacked with
 what rise and twist. It assembles the molecule residue by residue in torsion
 space with CYANA, then refines it in Cartesian space with Xplor-NIH.
 
-Engine version in this repository: **16** (see `VERSION`).  Version 16 is the
-archived engine used for the manuscript measurements.
+This is the engine released as **G4Composer 1.0**. Inside the repository it
+keeps the identifiers it was archived under: `VERSION` reads `16`, the script is
+`engine/quadro16.awk`, and `--version` reports `quadro 16`. Version 16 is the
+engine used for the manuscript measurements.
 
 > ### ⚠ Two dependencies are not included and cannot be
 >
-> quadro drives **CYANA 2.1** (commercial licence) and **Xplor-NIH 2.39** (free
+> G4Composer drives **CYANA 2.1** (commercial licence) and **Xplor-NIH 2.39** (free
 > for non-profit institutions). Both licences forbid passing the software on to
 > third parties, so neither is in this repository and neither may be baked into
-> a publicly pullable Docker image. You install both yourself, once.
+> a publicly pullable Docker image.
 >
-> **→ [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md)** — where to get them, where to
+> **→ [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md)** - where to get them, where to
 > put them, what the licences say.
 
 ---
@@ -41,10 +43,10 @@ tools/run.sh --outdir out examples/6a-1hap_js12B.inp
 ```
 
 `Etotal` in the energy file is the figure to compare when ranking several models
-of the same sequence — lower is better.
+of the same sequence - lower is better.
 
 Reference results for all three examples, and the environment that produced
-them, are in [`examples/reference/`](examples/reference/) — compare against
+them, are in [`examples/reference/`](examples/reference/) - compare against
 those to check a fresh installation.
 
 ### One handedness per run
@@ -54,7 +56,7 @@ determine the handedness of the stack. The opposite reading produces a
 sterically plausible structure that differs only in energy, so the ambiguity
 cannot be resolved by inspection of the model.
 
-Engine 16 builds one handedness per invocation. The mirror input is produced by
+G4Composer 1.0 builds one handedness per invocation. The mirror input is produced by
 inverting the signs in `orient`, `rise` and `twist` and exchanging positions 2
 and 4 in every `path` token; run it as a second job and compare `Etotal`. The
 transformation is specified in
@@ -73,7 +75,7 @@ docker run --rm -v "$PWD:/work" quadro:latest --help
 
 ## Input
 
-One plain-text `.inp` file per structure — `keyword value`, one per line, order
+One plain-text `.inp` file per structure - `keyword value`, one per line, order
 irrelevant. This is `examples/6pnk.inp`, the three-tetrad DNA G-quadruplex used
 in the animations above:
 
@@ -156,10 +158,6 @@ steps follow regardless. More is therefore not monotonically better: a deeper
 build-up fixes some structures and breaks others. The useful move is to run
 several depths and keep the lowest `Etotal`.
 
-A line that is neither a keyword, a comment nor blank is rejected outright
-(`ERROR 26`) rather than ignored — a misspelt field used to pass silently and
-leave the run using the default.
-
 Full reference, including the labelled `structure` notation, the optional
 `my_angles` field and the error table:
 **[docs/INPUT-FORMAT.md](docs/INPUT-FORMAT.md)**.
@@ -179,8 +177,8 @@ Full reference, including the labelled `structure` notation, the optional
 |---|---|---|---|
 | Build-up, once per residue in `path` order | CYANA | torsion angles | `iteration` each |
 | Closing pass | CYANA | torsion angles | 100 |
-| Refinement 1 — tetrad core frozen | Xplor-NIH | Cartesian | 1000 |
-| Refinement 2 — all released, planar + dihedral + NOE restraints | Xplor-NIH | Cartesian | 1000 |
+| Refinement 1 - tetrad core frozen | Xplor-NIH | Cartesian | 1000 |
+| Refinement 2 - all released, planar + dihedral + NOE restraints | Xplor-NIH | Cartesian | 1000 |
 
 One invocation runs the sequence once. The mirror input, when wanted, is a
 separate job; see [the mirror pass](docs/ALGORITHM.md#the-mirror-pass).
@@ -188,18 +186,18 @@ separate job; see [the mirror pass](docs/ALGORITHM.md#the-mirror-pass).
 **[docs/ALGORITHM.md](docs/ALGORITHM.md)** describes each stage, with the
 relevant lines of the engine quoted.
 
-**Stage 1 — ideal tetrad geometry.** Tetrad polarity (`orient`), the
+**Stage 1 - ideal tetrad geometry.** Tetrad polarity (`orient`), the
 pseudo-atoms and the rotation about the N9–C1′ bond, the pseudo-residue **Q**,
-and the stacking of three tetrads by `translate z` and `rotation z` — that is,
+and the stacking of three tetrads by `translate z` and `rotation z` - that is,
 by `rise` and `twist`, both measured from the first tetrad and therefore signed.
 
-![Stage 1 — building the pseudo-residue Q and stacking three tetrads](docs/media/stage1-tetrad-geometry.webp)
+![Stage 1 - building the pseudo-residue Q and stacking three tetrads](docs/media/stage1-tetrad-geometry.webp)
 
-**Stage 2 — build-up in torsion space.** From the bare quadruplex core to the
+**Stage 2 - build-up in torsion space.** From the bare quadruplex core to the
 final structure, one fragment at a time. The `path` bar along the top
 highlights each token as its residue is added.
 
-![Stage 2 — multi-stage minimisation in torsion-angle space, fragment by fragment](docs/media/stage2-torsion-buildup.webp)
+![Stage 2 - multi-stage minimisation in torsion-angle space, fragment by fragment](docs/media/stage2-torsion-buildup.webp)
 
 Both animations run at 5× speed. The source films, and the mapping between
 their G4Composer interface labels and the `.inp` keywords, are in
@@ -210,13 +208,14 @@ their G4Composer interface labels and the `.inp` keywords, are in
 ## Repository layout
 
 ```
-engine/         the engine and its data libraries — copied verbatim into the image
+engine/         the engine and its data libraries - copied verbatim into the image
 docker/         Dockerfile and container entrypoint
 tools/          build / run / dependency-check wrappers
 docs/           input format, algorithm, third-party setup
 docs/media/     animations of the first two stages
 examples/       example inputs and reference outputs
-third_party/    empty — you install CYANA and Xplor-NIH here
+reproduction/   manuscript reproduction package - pipeline, archived models, reports
+third_party/    empty - you install CYANA and Xplor-NIH here
 ```
 
 `engine/*.exe` are AWK and shell scripts, not Windows binaries. The extension is
@@ -226,14 +225,14 @@ the author's convention; the files are plain text and meant to be read.
 
 ## Requirements
 
-- Linux or macOS with Docker **23+** (or `buildx` — named build contexts are
+- Linux or macOS with Docker **23+** (or `buildx` - named build contexts are
   required by the build)
 - ~4 GB of disk for the image, most of it Xplor-NIH
 - A CYANA 2.1 licence and an Xplor-NIH download
 
 Running natively on Linux, without the container, is documented in
 [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md#option-b--native-linux). Docker is
-recommended because the Dockerfile is the canonical record of the environment —
+recommended because the Dockerfile is the canonical record of the environment -
 the 32-bit runtime libraries CYANA 2.1 needs, the GNU awk requirement, and the
 Xplor-NIH layout are all easy to get subtly wrong by hand.
 
@@ -265,7 +264,7 @@ request:
 
 ## Licence
 
-MIT for everything in this repository — see [`LICENSE`](LICENSE).
+MIT for everything in this repository - see [`LICENSE`](LICENSE).
 
-The MIT grant covers quadro itself only. CYANA and Xplor-NIH are separately
+The MIT grant covers G4Composer itself only. CYANA and Xplor-NIH are separately
 licensed, are not part of this repository, and are not covered by it.

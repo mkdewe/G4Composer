@@ -2,15 +2,10 @@
 
 One plain-text file describes one G-quadruplex to build. Each line is
 `keyword value` — whitespace-separated, one keyword per line, order irrelevant.
-Blank lines and `#`-prefixed comments are allowed; **anything else that is not a
-keyword is rejected with `ERROR 26`.**
+Blank lines and `#`-prefixed comments are allowed.
 
-That strictness is deliberate. Earlier versions ignored unrecognised lines, so a
-misspelt field — `shugar` for `sugar` — was read as a comment and the run
-proceeded silently with the default. The result looked entirely valid while
-being a different calculation from the one that was asked for. Engine 16
-accepts both spellings: `sugar` is canonical, and `shugar` is retained as an
-alias for legacy inputs.
+Engine 16 accepts two spellings of the pucker field: `sugar` is canonical, and
+`shugar` is kept as an alias for legacy inputs.
 
 The value **must not contain spaces**: the parser reads `$2`, so `path A1; B1`
 silently loses everything after the first space. Use `A1;B1`.
@@ -199,8 +194,7 @@ structure the Cartesian refinement receives, not how good the final answer is �
 2000 hard-wired Xplor-NIH steps follow regardless. See [ALGORITHM.md](ALGORITHM.md).
 
 > `iteration_steps`, which produced several checkpoints from one build-up, was a
-> local patch on 14L and is **not** part of 14M. An input still carrying it is
-> now rejected with `ERROR 26` rather than silently ignored. To sample several
+> local patch on 14L and is **not** part of 14M or engine 16. To sample several
 > depths, run the engine once per `iteration` value and keep the lowest
 > `Etotal`.
 
@@ -264,7 +258,6 @@ output, and a rejected input exits non-zero.
 | 19 | `sugar` length ≠ `sequence` length |
 | 20 | invalid character in `sugar` (allowed: `.NnSs`) |
 | 25 | `iteration` value below 10 |
-| 26 | unrecognised keyword — see the note at the top of this page |
 | 102 | `sequence` failed the residue-count cross-check |
 | 104 | tetrad-residue count is not a multiple of 4, or bad `structure` character |
 | 105 | `structure` and `path` disagree |

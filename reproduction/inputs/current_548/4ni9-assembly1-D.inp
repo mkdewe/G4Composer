@@ -1,0 +1,9 @@
+name        4ni9-assembly1
+sequence    ggCagGtttggtattAacACgttaagtCgtgg
+structure   ^^..^^...^^..((((....)))).....^^
+chi         S...S....S..........S......S..S.
+sugar       SSNSSSSSNSSSSNSSNNSSSNNSSSNSSNSN
+orient      A+;B-
+rise        3.6
+twist       12.9
+path        A1;B1;B2;A2;A3;B3;B4;A4

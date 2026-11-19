@@ -1,0 +1,9 @@
+name        6xcl-assembly1
+sequence    agggttagggttagggttaggg
+structure   .^^^...^^^...^^^...^^^
+chi         ......................
+sugar       SSNSNNSSSSNNSSSSNNSSSS
+orient      A-;B-;C-
+rise        3.3;3.4
+twist       28.9;28.7
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

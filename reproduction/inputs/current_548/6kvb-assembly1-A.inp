@@ -1,0 +1,9 @@
+name        6kvb-assembly1
+sequence    tggtggtggtggttgtggtggtggttgt
+structure   .^^.^^.^^.^^..^.^^.^^.^^..^.
+chi         SS...........SSS..S.......S.
+sugar       NNSNSSSSSSSSSNSNSSSSSSSSSSNS
+orient      A+;B-;C+;D-
+rise        7.3;-3.9;7.1
+twist       -33.1;-26.2;147.5
+path        A1;B1;C1;A2;C2;A3;C3;A4;C4;B4;D1;B3;D4;B2;D3;D2

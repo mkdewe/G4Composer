@@ -1,0 +1,9 @@
+name        1qdf-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S...S...SS...S.
+sugar       NNSNSNSSSSNSNSN
+orient      A+;B-
+rise        3.2
+twist       21.6
+path        A1;B1;B2;A2;A3;B3;B4;A4

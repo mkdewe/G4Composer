@@ -1,0 +1,9 @@
+name        6yep-assembly1
+sequence    gggatgggacacagGggacggg
+structure   ^^^..^^^.....^^^...^^^
+chi         S....SS......S.....SS.
+sugar       SNSSNSNSSSNSSSNSSSSNNS
+orient      A+;B-;C-
+rise        3.5;3.4
+twist       20.6;22.1
+path        A1;B1;C1;C2;B2;A2;A4;B4;C4;C3;B3;A3

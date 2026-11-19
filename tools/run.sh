@@ -12,7 +12,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
-IMAGE="${QUADRO_IMAGE:-quadro$(echo "$VERSION" | tr '[:upper:]' '[:lower:]'):latest}"
+IMAGE="${QUADRO_IMAGE:-quadro:latest}"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "run.sh: image '$IMAGE' not found. Build it first:" >&2

@@ -1,0 +1,9 @@
+name        2rsk-assembly1
+sequence    GGAGGAGGAGGA
+structure   ^^.^^.^^.^^.
+chi         .....S......
+sugar       NSNNNSNNNNNN
+orient      A-;B-
+rise        2.7
+twist       31.7
+path        A1;B1;A4;B4;A3;B3;A2;B2

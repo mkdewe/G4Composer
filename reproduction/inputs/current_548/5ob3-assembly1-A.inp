@@ -1,0 +1,9 @@
+name        5ob3-assembly1
+sequence    GGGAGUACGGUGAGGGUCGGGUCCAGUAGGUACGCCUACUGUUGAGUAGAGUGUGGGCUCCGUACUCCC
+structure   ((((((((((.(..^^.(^^.(((((((((....)))))))..))^..^.^.^.)..).))))))))))
+chi         ................S...............SS...........S....S.S................
+sugar       NNNNNNNNNNNNNNSSSNNNNNNNNNNNNNNSSNNNNNNNNNNNSNSSNSSSNNNNNNNNNNNNNNNNN
+orient      A-;B-
+rise        3.3
+twist       32
+path        A1;B1;A4;B4;B2;A2;B3;A3

@@ -1,0 +1,9 @@
+name        7oa3-assembly1
+sequence    GGCUAGCUGGAGGGGCGCCAGUUCGCUGGUGGUUGGGUGCGGUCGGCUAGCC
+structure   ((((((((^(.^^.(((((((....))))).^...^^.))^^.)))))))))
+chi         ........................S...........................
+sugar       NNNNNNNNSSNNSSNNNNNNNNSSNNNNNNSSNSNNSSNNNSSNNNNNNNNN
+orient      A-;B+
+rise        3.5
+twist       58.4
+path        A1;A4;B1;B2;A2;B3;B4;A3

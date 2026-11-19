@@ -1,0 +1,9 @@
+name        8fi0-assembly1
+sequence    cttagtagggatgatgcggcagtgggcttcgcagttcctgcgaggggactaag
+structure   ((((((..^^.....(.^^....^^.)..((((.....))))..^^.))))))
+chi         ........S....S..SS.....S.............S......S........
+sugar       SSSSSSSSSSNNNSNSNSSSSSSSNNNNSSSSSSNSSNSSSNSSSNNSSSSSS
+orient      A+;B-
+rise        3.5
+twist       15.6
+path        A1;B1;B2;A2;A3;B3;B4;A4

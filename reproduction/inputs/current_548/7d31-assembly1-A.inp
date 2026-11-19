@@ -1,0 +1,9 @@
+name        7d31-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S..SS....S..SS.
+sugar       SNSSSSSSSSNSSSS
+orient      A+;B-
+rise        3.4
+twist       11.5
+path        A1;B1;B2;A2;A3;B3;B4;A4

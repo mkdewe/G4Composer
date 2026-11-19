@@ -1,0 +1,9 @@
+name        8u5j-assembly1
+sequence    GUACGAAGGAAGGUUUGGUAUGUGGUAGAUUCGUAC
+structure   (((((((^^..^^...^^...^.^.....)))))))
+chi         .....................S.SS...........
+sugar       NNNNNNNSSSNNNS.SNSNSSNSSSNNNNNNNNNNS
+orient      A-;B-
+rise        3.4
+twist       30
+path        A1;B1;A4;B4;A3;B3;B2;A2

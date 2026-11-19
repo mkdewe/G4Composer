@@ -1,0 +1,9 @@
+name        7z9l-assembly1
+sequence    tagggttagggttagggttaggg
+structure   ..^^^...^^^...^^^...^^^
+chi         ..SS....S.....SS....S..
+sugar       SNNSSSSSSSSSSSSSSSSSSSS
+orient      A+;B+;C-
+rise        6.7;3.4
+twist       18.9;14.9
+path        A1;B1;C1;C2;B2;A2;A3;B3;C3;C4;B4;A4

@@ -1,0 +1,9 @@
+name        2m90-assembly1
+sequence    gcgcgaagcattcgcggggaggtggggaaggg
+structure   ^((((((...))))))^^^.^^.^^^...^^^
+chi         S.........................S.....
+sugar       NNSNSSNSSNNSNNNNSNNNNSSNSSSSSNSS
+orient      A-;B-;C-
+rise        3.5;3.4
+twist       -56.9;30.5
+path        A1;A2;B1;C1;B4;C4;A4;B3;C3;A3;B2;C2

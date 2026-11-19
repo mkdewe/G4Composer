@@ -1,0 +1,9 @@
+name        6ia4-assembly1
+sequence    ttgggttagggttagggttaggga
+structure   (.^^^...^^^...^^^..)^^^.
+chi         ..S.....S.....SS....S...
+sugar       NSSSSSNNSNSSNSNNSSSSSNSS
+orient      A+;B-;C-
+rise        3.4;3.5
+twist       15.9;25.4
+path        A1;B1;C1;A4;B4;C4;C3;B3;A3;A2;B2;C2

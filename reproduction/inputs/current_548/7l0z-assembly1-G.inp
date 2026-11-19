@@ -1,0 +1,9 @@
+name        7l0z-assembly1
+sequence    GGGAGUACGGUGAGGGUCGGGUCCAGUAGGUACGCCUACUGUUGAGUAGAGUGUGGGCUCCGUACUCCC
+structure   ((((((((((.(..^^.(^^.(((((((((....)))))))..))^..^.^.^.)..).))))))))))
+chi         ................................SS...........S....S.S................
+sugar       NNNNNNNNNNNNNNSSSNNNNNNNNNNNNNNSSNNNNNNNNSNNSNSSNSSSNNNNNNNNNNNNNNNNN
+orient      A-;B-
+rise        3.3
+twist       31.7
+path        A1;B1;A4;B4;B2;A2;B3;A3

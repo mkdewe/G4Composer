@@ -1,0 +1,9 @@
+name        6jcd-assembly1
+sequence    tggttgtggtttggtgttggtggt
+structure   .^^..^.^^...^^....^.....
+chi         .S.....S...SS...........
+sugar       NSSSSNSNSNNSSSNSSNNNNNNS
+orient      A+;B-
+rise        4.2
+twist       21.7
+path        A1;B1;B4;A3;B3;B2;A2;A4

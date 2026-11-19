@@ -8,7 +8,9 @@ keyword is rejected with `ERROR 26`.**
 That strictness is deliberate. Earlier versions ignored unrecognised lines, so a
 misspelt field — `shugar` for `sugar` — was read as a comment and the run
 proceeded silently with the default. The result looked entirely valid while
-being a different calculation from the one that was asked for.
+being a different calculation from the one that was asked for. Engine 16
+accepts both spellings: `sugar` is canonical, and `shugar` is retained as an
+alias for legacy inputs.
 
 The value **must not contain spaces**: the parser reads `$2`, so `path A1; B1`
 silently loses everything after the first space. Use `A1;B1`.
@@ -230,12 +232,10 @@ For a run with `name FOO`:
 | `FOO_energy.txt` | final Xplor-NIH energy terms, including `Etotal` |
 | `FOO.runlog` | full engine output (written by the container entrypoint) |
 
-Every run produces **two** pairs, because the mirror pass is part of an ordinary
-run: `FOO.pdb` for the input as written, and `FOO_alt.pdb` for the mirrored
-arrangement — the same residues stacked with the opposite handedness. Keep
-whichever has the lower `Etotal`; see
-[ALGORITHM.md](ALGORITHM.md#the-mirror-pass). `--no-mirror` builds only the
-first.
+Engine 16 produces **one** pair per run. To sample the opposite-handed stack,
+run the mirrored input as a second job (see
+[ALGORITHM.md](ALGORITHM.md#the-mirror-pass)); keep whichever has the lower
+`Etotal`.
 
 `Etotal` is the figure to compare when ranking several models of the same
 sequence — lower is better.

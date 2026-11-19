@@ -1,0 +1,9 @@
+name        8kf9-assembly1
+sequence    gggtaggggcggggcggggcg
+structure   ^^....^^^.^^^..^^^^..
+chi         S....SS...S....S.....
+sugar       NSSSNNSSSSNNSSSNNNNNN
+orient      A+;B-;C+
+rise        3.5;-6.8
+twist       22.2;126
+path        A1;B1;B3;A3;C1;B4;A4;C2;C3;B2;A2;C4

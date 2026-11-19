@@ -1,0 +1,9 @@
+name        6k84-assembly1
+sequence    GGAGGAGGAGGAAGGAGGAGGAGGA
+structure   ^^.^^.^^.^^..^^.^^.^^.^^.
+chi         ............S.....S......
+sugar       SSNNSSSSNNNSSSSSNSSSSNSNS
+orient      A-;B-;C+;D+
+rise        3.4;-6.9;-3.3
+twist       38.8;-135.6;-36.6
+path        A1;B1;A4;B4;A3;B3;A2;B2;C1;D1;C2;D2;C3;D3;C4;D4

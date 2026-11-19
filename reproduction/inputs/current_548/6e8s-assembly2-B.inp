@@ -1,0 +1,9 @@
+name        6e8s-assembly2
+sequence    GCUACGAAGGAAGGAUUGGUAUGUGGUAUAUUCGUAGC
+structure   ((((((((^^..^^...^^...^.^.....))))))))
+chi         ......................S.SS............
+sugar       NNNNNNNNSSSNNNSSSNSNSSNSSSNNNNNNNNNNNN
+orient      A-;B-
+rise        3.3
+twist       30.8
+path        A1;B1;A4;B4;A3;B3;B2;A2

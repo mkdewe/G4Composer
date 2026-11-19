@@ -1,0 +1,9 @@
+name        8jfq-assembly1
+sequence    tcggggaggcagggcgggaggaagat
+structure   ...^^^.^^..^^^.^^^.....^..
+chi         ..........................
+sugar       NSSSSNSSSSSNNSSSSNSNSNNSNS
+orient      A-;B-;C-
+rise        3.3;3.3
+twist       30;25.6
+path        A1;B1;C1;A4;B4;A3;B3;C3;A2;B2;C2;C4

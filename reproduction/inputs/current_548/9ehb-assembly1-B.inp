@@ -1,0 +1,9 @@
+name        9ehb-assembly1
+sequence    cttagtagggatgatgcggtagtgggcttcgcagttcctgcgaggggactaag
+structure   ((((((..^^.....((^^....^^))..((((.....))))..^^.))))))
+chi         ......S.S....S...S.....S............S.......S........
+sugar       SNNSSSNSSSSNNSNSNSSNSSSSSSSNSSSSSSNSSSSSSSSSSSNNNSSNS
+orient      A+;B-
+rise        3.4
+twist       14.9
+path        A1;B1;B2;A2;A3;B3;B4;A4

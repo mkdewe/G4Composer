@@ -1,0 +1,9 @@
+name        8vxx-assembly1
+sequence    GCGUACGAAGGAGAGGAGAGGAAGAGGAGAGUACGC
+structure   ((((((...^^.^.^^.^.^^..^.^^.^.))))))
+chi         ...........S......S.....S...........
+sugar       SNNNNNNNNNNSSNNNSSSSNNNSNNNSSNNNNNNS
+orient      A-;B-;C+
+rise        3.3;3.4
+twist       35.9;26.9
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

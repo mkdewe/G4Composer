@@ -1,0 +1,9 @@
+name        6xt7-assembly1
+sequence    gttggggttggggttggggttgggg
+structure   ^..^^^^..^^^...^^^^..^^^^
+chi         S..S...........SSS...S...
+sugar       NSSSSSSNSNSSSSSSNSNNSSSNS
+orient      A+;B-;C-;D-
+rise        3.4;3.4;3.4
+twist       -74.8;32;27.8
+path        A1;A2;B1;C1;D1;B4;C4;D4;D3;C3;B3;A4;A3;B2;C2;D2

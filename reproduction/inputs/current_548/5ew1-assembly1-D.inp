@@ -1,0 +1,9 @@
+name        5ew1-assembly1
+sequence    tccgtggtagggcaggttggggtgac
+structure   (((^.^^..^^...^^..^..).)).
+chi         .........S.SS.....SS......
+sugar       NNNSNNNNSSSNSSSNSSNSSSNSNS
+orient      A-;B-
+rise        3.5
+twist       -63.5
+path        A1;A2;B1;B2;A3;A4;B3;B4

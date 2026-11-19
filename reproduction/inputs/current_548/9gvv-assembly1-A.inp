@@ -1,0 +1,9 @@
+name        9gvv-assembly1
+sequence    gcgggagggcgcgccagcggggtcggg
+structure   ..^^^.^^^(((....)))^^^..^^^
+chi         S.S...S............SS...S..
+sugar       SNSNSSSSSSNSSNNSSNSSNNSSSSS
+orient      A+;B-;C-
+rise        3.4;3.3
+twist       20;28.7
+path        A1;B1;C1;A4;B4;C4;C3;B3;A3;A2;B2;C2

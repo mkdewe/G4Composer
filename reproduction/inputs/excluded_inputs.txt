@@ -1,0 +1,25 @@
+1bub-assembly1-A.inp	Retain 1qdf as the representative of the 1bub/1qdf/1qdh source-structure duplicates; differences in ions were noted.
+1qdh-assembly1-A.inp	Retain 1qdf as the representative of the 1bub/1qdf/1qdh source-structure duplicates; differences in ions were noted.
+4kzd-assembly3-R.inp	One chain in the asymmetric unit.
+4kzd-assembly4-R.inp	Input selected for exclusion.
+4kze-assembly3-R.inp	One chain in the asymmetric unit.
+4kze-assembly4-R.inp	Input selected for exclusion.
+5dww-assembly1-A.inp	All inputs excluded: 2 chains (duplex), unimolecular G4.
+5dww-assembly2-C.inp	All inputs excluded: 2 chains (duplex), unimolecular G4.
+5dww-assembly3-E.inp	All inputs excluded: 2 chains (duplex), unimolecular G4.
+5dww-assembly4-G.inp	All inputs excluded: 2 chains (duplex), unimolecular G4.
+5dww-assembly5-E.inp	All inputs excluded: 2 chains (duplex), unimolecular G4. Chain E is repeated.
+6e80-assembly1-A-2.inp	One chain in the asymmetric unit.
+6e81-assembly1-A-2.inp	One chain in the asymmetric unit.
+6e84-assembly1-A-2.inp	One chain in the asymmetric unit.
+6h5r-assembly1-A-2.inp	One chain in the asymmetric unit.
+7d33-assembly3-E-2.inp	5 chains in the asymmetric unit; interlocked dimer through 2 T-tetrads.
+8k7w-assembly1-A-2.inp	One chain in the asymmetric unit.
+8vxz-assembly1-A-2.inp	3 chains in the asymmetric unit.
+9e2w-assembly1-F.inp	All inputs excluded: 2 chains (duplex), unimolecular G4.
+9e2x-assembly1-F.inp	All inputs excluded: 2 chains (duplex), unimolecular G4.
+9e2z-assembly1-F.inp	All inputs excluded: 2 chains (duplex), unimolecular G4.
+9uk6-assembly1-A-2.inp	One chain in the asymmetric unit.
+9vmz-assembly1-A-2.inp	One chain in the asymmetric unit.
+
+Not found: 9e2y

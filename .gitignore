@@ -29,6 +29,10 @@ out-*/
 # which is the figure a reader compares against, so it has to be tracked too.
 !examples/reference/*.pdb
 !examples/reference/*_energy.txt
+!reproduction/models/*.pdb
+!reproduction/models/*_energy.txt
+!reproduction/models_table1/*.pdb
+!reproduction/models_table1/*_energy.txt
 
 # Editor / OS noise
 .DS_Store

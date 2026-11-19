@@ -1,0 +1,9 @@
+name        7zek-assembly1
+sequence    ggctagggtcagggtgggtcag
+structure   ^^...^^^...^^^.^^^...^
+chi         S....S.....S...S.....S
+sugar       SNSSSSNSSSSSNSSSNSNNSN
+orient      A+;B-;C+
+rise        3.4;-6.9
+twist       16.7;-139
+path        A1;B1;B2;A2;C1;B3;A3;C2;B4;A4;C3;C4

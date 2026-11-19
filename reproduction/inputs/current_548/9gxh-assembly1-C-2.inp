@@ -1,0 +1,9 @@
+name        9gxh-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S...S....S.S.S.
+sugar       SNNSSSSNSSNSSSS
+orient      A+;B-
+rise        3.4
+twist       12.6
+path        A1;B1;B2;A2;A3;B3;B4;A4

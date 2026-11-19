@@ -1,0 +1,9 @@
+name        7oax-assembly1
+sequence    GGCUAGCUGGAGGGGCGCCAGUUCGCUGGUGGUUGGGUGCGGUCGGCUAGCC
+structure   ((((((((^(.^^.(((((((....))))).^...^^.))^^.)))))))))
+chi         ........................S...........................
+sugar       NNNNNNNNSSNNSSNNNNNNNNSSNNNNNNSSNNSNSSNNNSSNNNNNNNNN
+orient      A-;B+
+rise        3.5
+twist       56.6
+path        A1;A4;B1;B2;A2;B3;B4;A3

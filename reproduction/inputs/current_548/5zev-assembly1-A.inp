@@ -1,0 +1,9 @@
+name        5zev-assembly1
+sequence    gggtacccgggtgaggtgcggggt
+structure   ^^......^^^.^.^^...^^^^.
+chi         S.......S..S.......S...S
+sugar       SNNNNNSNSNSNNSNNNNSNNNSN
+orient      A+;B-;C+
+rise        2.9;-6.3
+twist       31;116.2
+path        A1;B1;B3;A3;C1;B4;A4;C2;C3;B2;A2;C4

@@ -1,0 +1,9 @@
+name        6gz6-assembly1
+sequence    gtggtggtggtgttgtggtggtggtgt
+structure   ^.^^.^^.^^.^..^.^^.^^.^^.^.
+chi         ...........................
+sugar       SSSSSSSSSSSSSSSSSSSSSSSSSSN
+orient      A-;B-;C+;D+
+rise        3.3;-6.6;-3.3
+twist       63;-142;-64.3
+path        A1;B1;A4;B4;A3;B3;A2;B2;C1;D1;C2;D2;C3;D3;C4;D4

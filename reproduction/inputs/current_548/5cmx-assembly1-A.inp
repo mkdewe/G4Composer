@@ -1,0 +1,9 @@
+name        5cmx-assembly1
+sequence    tgacgtaggttggtgtggttggggcgtcac
+structure   ((((((.^^..^^...^^..^^.)))))).
+chi         .......S...S....S...S.........
+sugar       SNSNSNNSNNSSSSSSSNNSSSSSSSNNN.
+orient      A+;B-
+rise        3.4
+twist       15.6
+path        A1;B1;B2;A2;A3;B3;B4;A4

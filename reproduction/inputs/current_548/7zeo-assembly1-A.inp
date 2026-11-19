@@ -1,0 +1,9 @@
+name        7zeo-assembly1
+sequence    ggctagggtgggtgggtcag
+structure   ^^...^^^.^^^.^^^...^
+chi         SS.................S
+sugar       SNSSNSNSSSSSSSSSNNSS
+orient      A+;B+;C+
+rise        3.4;-6.8
+twist       25.8;-146.2
+path        A1;B1;B2;A2;C1;B3;A3;C2;B4;A4;C3;C4

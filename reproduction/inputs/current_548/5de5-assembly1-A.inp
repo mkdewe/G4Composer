@@ -1,0 +1,9 @@
+name        5de5-assembly1
+sequence    GCUGCGGUGUGGAAGGAGUGGCUGGGUUGCGCAGC
+structure   (((((^((^.^^..^^.^.^^..^^^..)))))))
+chi         ............SS.....................
+sugar       NNNNNSNNSSNSSNNSSSSNSSNNNSSSNNNNNNN
+orient      A-;B+;C+
+rise        7;-3.5
+twist       77.8;-28.3
+path        A1;A4;B1;C1;B2;C2;A2;B3;C3;B4;C4;A3

@@ -1,0 +1,9 @@
+name        8tqs-assembly1
+sequence    aagtccgtggtagggcaggttggggtgact
+structure   ..((((^.^^..^^...^^..^..).))).
+chi         .S..........S.SS.....SS.......
+sugar       SNNNNNSNSNNSSSNNSSSSSNSSSSNSSS
+orient      A-;B-
+rise        3.6
+twist       -67.2
+path        A1;A2;B1;B2;A3;A4;B3;B4

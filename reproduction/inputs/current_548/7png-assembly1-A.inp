@@ -1,0 +1,9 @@
+name        7png-assembly1
+sequence    ttaggtgggtagggtgggctagtcattttgactagg
+structure   ...^^.^^^..^^^.^^^(((((((...)))))))^
+chi         ...................................S
+sugar       SSSSSNSSSSSNNSSSSSSSSSSNSSNSSNSNNSSS
+orient      A-;B-;C-
+rise        3.4;3.4
+twist       28.3;119
+path        A1;B1;A4;B4;C1;A3;B3;C4;A2;B2;C3;C2

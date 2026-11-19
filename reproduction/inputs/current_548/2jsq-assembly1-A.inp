@@ -1,0 +1,9 @@
+name        2jsq-assembly1
+sequence    tagggttagggttagggttagggtt
+structure   ..^^^...^^^...^^^...^^^..
+chi         ..S.....SS....S.....S....
+sugar       NSSNSSSSSSSSSNSSSSNNSNSNS
+orient      A+;B-;C-
+rise        3.5;3.4
+twist       23.5;31.6
+path        A1;B1;C1;C4;B4;A4;A3;B3;C3;A2;B2;C2

@@ -1,0 +1,9 @@
+name        1c34-assembly1
+sequence    ggttggtgtggttgg
+structure   ^^..^^...^^..^^
+chi         S...S...SS.....
+sugar       SNSNSSNSSSSSSSS
+orient      A+;B-
+rise        3.6
+twist       15.1
+path        A1;B1;B2;A2;A3;B3;B4;A4

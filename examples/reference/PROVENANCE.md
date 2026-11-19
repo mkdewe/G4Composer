@@ -6,9 +6,10 @@ behaves sanely before trusting it on real work.
 
 Because CYANA and Xplor-NIH are supplied by each user rather than pinned by this
 repository, results can differ slightly between installations. **Compare
-`Etotal` and heavy-atom RMSD, not the files byte for byte** — each PDB carries a
-`REMARK` line with the run's scratch path and timestamp, so even two runs on the
-same machine differ textually.
+`Etotal` and heavy-atom RMSD, not the files byte for byte.** The archived PDBs
+have the run-specific `REMARK FILENAME`/`REMARK DATE` lines stripped, and the
+energy files are reduced to the final `Etotal` summary, so a fresh run will not
+be textually identical even when the coordinates agree.
 
 Regenerate with:
 
@@ -22,47 +23,36 @@ tools/run.sh --outdir examples/reference \
 
 | Component | Version / build |
 |---|---|
-| quadro engine | 14M |
+| quadro engine | 16 (`quadro16.awk`, `tetrad16.lib`) |
 | CYANA | 2.1 |
 | Xplor-NIH | 2.39, Linux x86-64 |
 | Base image | `ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc` |
 | CPU | Intel Core i7-12700K (x86-64) |
-| Date | 2026-09-08 |
+| Date | 2026-11-16 |
 
 ## Results
 
-Each input yields two structures, because the mirror pass is part of an ordinary
-run: the topology as written, and the same residues in the opposite-handed
-stack.
+Engine 16 is single-pass: each input yields one structure. Run the mirrored
+input as a second job to sample the opposite-handed stack.
 
 | Input | Output | Atoms | Residues | `Etotal` |
 |---|---|---|---|---|
-| `6a-1hap_js12B.inp` | `1hap_js12B_100.pdb` | 488 | 15 | −620.281 |
-| | `1hap_js12B_100_alt.pdb` | 488 | 15 | **−629.866** |
-| `7ys7.inp` | `7ys7.pdb` | 649 | 20 | **−867.460** |
-| | `7ys7_alt.pdb` | 649 | 20 | −848.524 |
-| `6pnk.inp` | `6pnk.pdb` | 555 | 17 | −665.030 |
-| | `6pnk_alt.pdb` | 555 | 17 | **−666.835** |
+| `6a-1hap_js12B.inp` | `1hap_js12B_100.pdb` | 488 | 15 | −614.388 |
+| `7ys7.inp` | `7ys7.pdb` | 649 | 20 | −857.538 |
+| `6pnk.inp` | `6pnk.pdb` | 555 | 17 | −663.990 |
 
-All six runs completed with no `ERROR` lines in the engine output. The lower
-`Etotal` of each pair is shown in bold. It falls to the mirrored reading for
-`6a-1hap_js12B` and `6pnk` and to the input as written for `7ys7`, which is the
-point of building both: the direction is a property of each structure and cannot
-be assumed.
+All three runs completed with no `ERROR` lines in the engine output.
 
-The margins are worth reading carefully. For `6pnk` the two readings are
-1.8 apart on a total near 666, which does not discriminate between them. For
-`7ys7` the separation is 18.9, which does.
+Engine 16 now reads the documented `sugar` keyword (`shugar` is kept as an
+alias). `7ys7.inp` and `6pnk.inp` carry non-default pucker annotations, so their
+`Etotal` values changed when the fix was applied; `6a-1hap_js12B.inp` has no
+`sugar` line and is unchanged.
 
-## Comparison with 14L
+## Previous engines
 
-`6a-1hap_js12B.inp` and `6pnk.inp` gave −624.033 and −676.819 under 14L. Atom
-and residue counts are identical, so the two engines build the same molecules;
-the energies are not, and were not expected to be. (`7ys7.inp` has no 14L
-reference — it was added in 14M.)
-
-Two changes in the CYANA stage account for it. 14L re-read the accumulated angle
-file (`read ang Q<n>`) immediately before the closing minimisation and 14M does
-not, and 14L ran that closing minimisation for `iteration` steps where 14M fixes
-it at 100. Neither engine is a recomputation of the other: they hand Xplor-NIH
-different starting structures.
+The 14M repository shipped both handednesses automatically; its reference values
+were −620.281 / −629.866 (`1hap_js12B`), −867.460 / −848.524 (`7ys7`) and
+−665.030 / −666.835 (`6pnk`). Under 14L, `6a-1hap_js12B.inp` and `6pnk.inp` gave
+−624.033 and −676.819. The engines hand Xplor-NIH different starting structures,
+so the energies are not expected to agree. Version 16 is the engine used for the
+archived per-model RMSD and energy values in the G4Composer manuscript.

@@ -7,7 +7,8 @@ which residues form which tetrad, in which glycosidic orientation, stacked with
 what rise and twist. It assembles the molecule residue by residue in torsion
 space with CYANA, then refines it in Cartesian space with Xplor-NIH.
 
-Engine version in this repository: **14M** (see `VERSION`).
+Engine version in this repository: **16** (see `VERSION`).  Version 16 is the
+archived engine used for the manuscript measurements.
 
 > ### ⚠ Two dependencies are not included and cannot be
 >
@@ -46,37 +47,26 @@ Reference results for all three examples, and the environment that produced
 them, are in [`examples/reference/`](examples/reference/) — compare against
 those to check a fresh installation.
 
-### Every run builds both handednesses
+### One handedness per run
 
 A topology specified through `orient`, `rise`, `twist` and `path` does not
 determine the handedness of the stack. The opposite reading produces a
 sterically plausible structure that differs only in energy, so the ambiguity
-cannot be resolved by inspection of the model — only by building both and
-comparing.
+cannot be resolved by inspection of the model.
 
-quadro therefore does exactly that, on every run. The command above writes:
-
-```
-out/1hap_js12B_100.pdb        Etotal = -620.281   input as written
-out/1hap_js12B_100_alt.pdb    Etotal = -629.866   mirror image
-out/1hap_js12B_100_energy.txt
-out/1hap_js12B_100_alt_energy.txt
-```
-
-The lower `Etotal` identifies the favoured handedness — here the mirror, by 9.6.
-Which way it goes is a property of the structure, not a rule: for
-`examples/7ys7.inp` the input as written wins by 18.9, and for
-`examples/6pnk.inp` the two sit 1.8 apart and settle nothing. The transformation
-is specified in [docs/ALGORITHM.md](docs/ALGORITHM.md#the-mirror-pass).
-
-Pass `--no-mirror` to build only the input as written. It halves the run time
-and gives up the comparison.
+Engine 16 builds one handedness per invocation. The mirror input is produced by
+inverting the signs in `orient`, `rise` and `twist` and exchanging positions 2
+and 4 in every `path` token; run it as a second job and compare `Etotal`. The
+transformation is specified in
+[docs/ALGORITHM.md](docs/ALGORITHM.md#the-mirror-pass). `--no-mirror` is accepted
+for compatibility and changes nothing, because there is no built-in mirror pass
+in this engine.
 
 Without the wrappers:
 
 ```bash
-docker run --rm -v "$PWD:/work" quadro14m:latest examples/7ys7.inp
-docker run --rm -v "$PWD:/work" quadro14m:latest --help
+docker run --rm -v "$PWD:/work" quadro:latest examples/7ys7.inp
+docker run --rm -v "$PWD:/work" quadro:latest --help
 ```
 
 ---
@@ -192,8 +182,8 @@ Full reference, including the labelled `structure` notation, the optional
 | Refinement 1 — tetrad core frozen | Xplor-NIH | Cartesian | 1000 |
 | Refinement 2 — all released, planar + dihedral + NOE restraints | Xplor-NIH | Cartesian | 1000 |
 
-The whole sequence runs twice per invocation — once on the input as written and
-once on its mirror image. See [the mirror pass](docs/ALGORITHM.md#the-mirror-pass).
+One invocation runs the sequence once. The mirror input, when wanted, is a
+separate job; see [the mirror pass](docs/ALGORITHM.md#the-mirror-pass).
 
 **[docs/ALGORITHM.md](docs/ALGORITHM.md)** describes each stage, with the
 relevant lines of the engine quoted.
@@ -246,6 +236,16 @@ Running natively on Linux, without the container, is documented in
 recommended because the Dockerfile is the canonical record of the environment —
 the 32-bit runtime libraries CYANA 2.1 needs, the GNU awk requirement, and the
 Xplor-NIH layout are all easy to get subtly wrong by hand.
+
+---
+
+## Manuscript reproduction
+
+The complete reproduction package for the G4Composer manuscript is in
+[`reproduction/`](reproduction/): the pipeline, all 6,516 main models, the 180
+Table 1 models and the 15 3D-NuS-Qplex models. The analyses can be rerun
+without CYANA or Xplor-NIH from the archived coordinates; see
+[`reproduction/README.md`](reproduction/README.md).
 
 ---
 

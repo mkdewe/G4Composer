@@ -1,0 +1,2 @@
+# quadro 16 / Xplor-NIH 2.39 energy summary
+ | Etotal =17550.134  grad(E)=312.496    E(BOND)=4171.697   E(ANGL)=11845.555  |

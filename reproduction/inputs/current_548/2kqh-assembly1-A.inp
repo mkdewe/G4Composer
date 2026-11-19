@@ -1,0 +1,9 @@
+name        2kqh-assembly1
+sequence    cgggcgggcgcgagggagggt
+structure   .^^^.^^^.....^^^.^^^.
+chi         .....................
+sugar       NSNNSSNNSSSSSNNNNNSSN
+orient      A-;B-;C-
+rise        3.4;3.5
+twist       24.6;25.4
+path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2

@@ -1,0 +1,9 @@
+name        4kze-assembly1
+sequence    GGACGCGACCGAAAUGGUGAAGGACGGGUCCAGUGCGAAACACGCACUGUUGAGUAGAGUGUGAGCUCCGUAACUGGUCGCGUC
+structure   .((((((((((..((((.(..^^.(^^.(((((((((.....)))))))..))^..^.^.^.)..).))))..).)))))))))
+chi         .....................................................S...SS.S.......................
+sugar       NNNNNNNNNNNNNNNNNNSNNSSSNNNSNNNNNNNNNSSSNNNNNNNNNNSSSNSSSNSSSNNNNNNNNNNNNNSNNNNNNNNN
+orient      A-;B-
+rise        3.3
+twist       34.4
+path        A1;B1;A4;B4;B2;A2;B3;A3

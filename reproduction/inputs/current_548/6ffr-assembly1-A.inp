@@ -1,0 +1,9 @@
+name        6ffr-assembly1
+sequence    GggatgggacacaggggacGgg
+structure   ^^^..^^^.....^^^...^^^
+chi         .............SSSS.....
+sugar       NSSSSSSSSSSSNSNNSSNSSS
+orient      A-;B-;C-
+rise        3.4;3.4
+twist       20.4;28.7
+path        A1;B1;C1;A4;B4;C4;C2;B2;A2;A3;B3;C3

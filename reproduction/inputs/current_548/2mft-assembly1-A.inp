@@ -1,0 +1,9 @@
+name        2mft-assembly1
+sequence    gggttttgggtgggttttggg
+structure   ^^^....^^^.^^^....^^^
+chi         S..S...SS..SS.....S..
+sugar       SSSSNNSSNSSSNNNSSSNNN
+orient      A+;B-;C-
+rise        3.1;3.2
+twist       21;27.8
+path        A1;B1;C1;C3;B3;A3;C4;B4;A4;A2;B2;C2

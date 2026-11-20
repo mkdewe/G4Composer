@@ -30,6 +30,9 @@ All notable changes to G4Composer are recorded here.
 - The FoldBench comparison now covers all nine DNA and three RNA G4 targets;
   `7ZJ4` is listed as an unmodeled synthetic origami construct, with empty
   G4Composer cells.
+- `score_qplex_lddt.py` now deletes any pre-existing per-target lDDT JSON
+  before the Docker call and fails explicitly on a nonzero container exit, so
+  stale scores can no longer be silently reused.
 
 ## [1.0]
 

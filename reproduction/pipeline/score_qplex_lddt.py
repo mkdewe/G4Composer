@@ -72,6 +72,8 @@ def main() -> int:
         model = model_dir / target["qplex"]
         standardise(args.qplex_dir / target["qplex"], model)
         output = json_dir / f"{pdb}.json"
+        if output.exists():
+            output.unlink()
         command = [
             "docker", "run", "--rm", "-u", f"{os.getuid()}:{os.getgid()}",
             "-v", f"{model_dir}:/model:ro",
@@ -88,19 +90,25 @@ def main() -> int:
             "--min-nuc-length", "4",
             "-o", f"/out/{output.name}",
         ]
-        subprocess.run(command, capture_output=True, text=True, timeout=args.timeout)
+        proc = subprocess.run(command, capture_output=True, text=True, timeout=args.timeout)
         lddt = None
         status = "ok"
         error = ""
+        if proc.returncode != 0:
+            status = "failed"
+            error = f"docker exit {proc.returncode}: {proc.stderr.strip()[-200:]}"
         if output.exists():
             payload = output.read_text(encoding="utf-8")
             import json
             data = json.loads(payload)
-            lddt = data.get("lddt")
-            if lddt is None:
-                status = "failed"
-                error = data.get("status", "no lddt")
-        else:
+            if proc.returncode == 0:
+                lddt = data.get("lddt")
+                if lddt is None:
+                    status = "failed"
+                    error = data.get("status", "no lddt")
+            else:
+                error = f"{error}; JSON output present: lddt={data.get('lddt')} status={data.get('status', 'none')}"
+        elif proc.returncode == 0:
             status = "failed"
             error = "no JSON output"
         if lddt is None:

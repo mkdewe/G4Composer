@@ -185,7 +185,7 @@ analysis covers 6,516 models from 543 inputs; the representative analysis covers
 | `work/reports/S3_table.csv` | FoldBench comparison table |
 | `work/reports/S4_table.csv` | sequence-length correlations and quartile-bin statistics |
 | `figures/` | main RMSD/lDDT/energy violin and four supplementary PDF figures |
-| `reports/` | archived snapshots of the current tables and scores |
+| `reports/` | archived snapshots: table1.csv, numbers.json, S1_table.csv–S4_table.csv, rmsd_scores.csv, lddt_scores.csv, qplex_scores.csv, qplex_lddt.csv, G16_lddt.txt, assignments.csv, clusters_ap.csv, representatives_ap.txt, cluster_summary.json, lddt_reference_changes.csv, README.md |
 
 Refresh the archived report and figure snapshots with
 `bash pipeline/archive_reports.sh` after recomputing the current outputs.

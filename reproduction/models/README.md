@@ -5,7 +5,7 @@ modellable inputs.
 
 | property | value |
 |---|---|
-| engine | quadro 16 (`quadro16.awk`) with the `sugar` keyword fix |
+| engine | G4Composer 1.0 (`g4composer.awk`) with the `sugar` keyword fix |
 | CYANA | 2.1 |
 | Xplor-NIH | 2.39 |
 | depths | 30, 50, 70, 100, 150, 300 |

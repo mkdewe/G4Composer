@@ -1,0 +1,286 @@
+{
+  "n_files": 548,
+  "n_buckets": 272,
+  "n_clusters": 327,
+  "n_assigned": 548,
+  "failed_buckets": [],
+  "singleton_clusters": 210,
+  "max_cluster_size": 18,
+  "max_rise_spread_A": 0.7,
+  "max_twist_spread_deg": 10.9,
+  "affinity": "precomputed",
+  "damping": 0.9,
+  "max_iter": 2000,
+  "convergence_iter": 50,
+  "random_state": 0,
+  "library_warnings": {
+    "All samples have mutually equal similarities. Returning arbitrary cluster center(s).": 227
+  },
+  "two_member_buckets": [
+    {
+      "bucket": 46,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 47,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 48,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 49,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 50,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 51,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 52,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 53,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 54,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 55,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 56,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 57,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 58,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 59,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 60,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 61,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 62,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 63,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 64,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 65,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 66,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 67,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 68,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 69,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 70,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 71,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 72,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 73,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 74,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 75,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 76,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 77,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 78,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 79,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 80,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 81,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 82,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 83,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 84,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 85,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 86,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 87,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 88,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 89,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 90,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 91,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 92,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 93,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 94,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 95,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 96,
+      "clusters": 1,
+      "iterations": 0
+    },
+    {
+      "bucket": 97,
+      "clusters": 1,
+      "iterations": 0
+    }
+  ],
+  "versions": {
+    "numpy": "2.4.6",
+    "scipy": "1.18.0",
+    "sklearn": "1.9.1"
+  }
+}

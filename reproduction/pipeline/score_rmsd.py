@@ -4,77 +4,26 @@
 Protocol
 --------
 * hydrogens are removed from both the model and the reference;
-* the reference is restricted to the **author chain** named by the input
-  record (``auth_asym_id``, which PyMOL uses as its chain identifier), not to
+* the reference is restricted to the author chain named by the input record
+  (``auth_asym_id``, which PyMOL uses as its chain identifier), not to
   whichever chain PyMOL would prefer;
-* the two phosphate-oxygen aliases, ``OP1``/``O1P`` and ``OP2``/``O2P``, are
-  normalised so the heavy-atom set is complete;
-* PyMOL ``align`` is run for one pass (``cycles=0``) and the RMSD over the
-  common heavy atoms is recorded.
+* the phosphate-oxygen aliases ``OP1``/``O1P`` and ``OP2``/``O2P`` are
+  normalised on both structures;
+* PyMOL ``align`` is used only to establish the reference-to-model residue
+  mapping;
+* the model is then superposed, and the RMSD is calculated, over all heavy
+  atoms present in both mapped residues, including phosphate oxygens.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
-import json
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import common
-
-PYMOL_TEMPLATE = r'''
-import json
-from pathlib import Path
-from pymol import cmd
-
-reference = {reference!r}
-candidates = {candidates!r}
-models = {models!r}
-output = {output!r}
-
-cmd.load(reference, "ref_obj")
-cmd.remove("ref_obj and not polymer")
-chain = None
-for candidate in candidates:
-    if candidate and cmd.count_atoms(f'ref_obj and chain "{{candidate}}"') > 0:
-        chain = candidate
-        break
-if chain is None:
-    raise SystemExit("no reference chain matched: " + repr(candidates))
-cmd.remove(f'ref_obj and not chain "{{chain}}"')
-# Normalise PDB/CYANA phosphate-oxygen naming.
-cmd.alter("ref_obj and name OP1", 'name="O1P"')
-cmd.alter("ref_obj and name OP2", 'name="O2P"')
-cmd.remove("ref_obj and hydro")
-
-rows = []
-for item in models:
-    row = dict(item)
-    try:
-        cmd.load(item["path"], "mdl_obj")
-        cmd.remove("mdl_obj and hydro")
-        result = cmd.align("mdl_obj", "ref_obj", cycles=0)
-        row["rmsd_heavy"] = float(result[0])
-        row["n_heavy"] = int(result[1])
-        row["status"] = "ok"
-        row["error"] = ""
-        cmd.delete("mdl_obj")
-    except Exception as exc:
-        row["rmsd_heavy"] = None
-        row["n_heavy"] = 0
-        row["status"] = "align-failed"
-        row["error"] = str(exc)
-        cmd.delete("mdl_obj")
-    rows.append(row)
-
-with open(output, "w", encoding="utf-8") as stream:
-    for row in rows:
-        row.pop("path", None)
-    json.dump(dict(reference=Path(reference).name, chain=chain, rows=rows), stream, indent=2)
-'''
+import pymol_rmsd
 
 
 def resolve_chain(record: dict) -> list[str]:
@@ -99,7 +48,7 @@ def score_key(record: dict, args) -> list[dict]:
         for mode in common.MODES:
             path = common.model_path(key, depth, mode, args.models_dir)
             if path.exists() and path.stat().st_size > 0:
-                models.append(dict(depth=depth, mode=mode, path=str(path)))
+                models.append(dict(key=key, depth=depth, mode=mode, path=str(path)))
     if not reference.exists():
         return []
     if not models:
@@ -109,41 +58,31 @@ def score_key(record: dict, args) -> list[dict]:
     outdir = common.WORK / "data" / "pymol"
     outdir.mkdir(parents=True, exist_ok=True)
     output = outdir / f"{key}.json"
-    script = PYMOL_TEMPLATE.format(
-        reference=str(reference),
-        candidates=candidates,
-        models=models,
-        output=str(output),
-    )
-    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as stream:
-        stream.write(script)
-        script_path = stream.name
+    job = dict(reference=str(reference), candidates=candidates, models=models)
     try:
-        proc = subprocess.run(["pymol", "-cq", script_path], capture_output=True, text=True, timeout=1800)
-        if proc.returncode != 0 or not output.exists():
-            return [
-                dict(
-                    key=key, depth=item["depth"], mode=item["mode"],
-                    reference=reference.name, chain="", rmsd_heavy="", n_heavy=0,
-                    status="pymol-failed", error=(proc.stderr or proc.stdout or "")[-500:],
-                )
-                for item in models
-            ]
-        payload = json.loads(output.read_text(encoding="utf-8"))
-    finally:
-        Path(script_path).unlink(missing_ok=True)
+        payload = pymol_rmsd.run_jobs([job], output)
+    except Exception as exc:  # noqa: BLE001
+        return [
+            dict(
+                key=key, depth=item["depth"], mode=item["mode"],
+                reference=reference.name, chain="", rmsd_heavy="", n_heavy=0,
+                n_phosphate=0, status="pymol-failed", error=str(exc)[-500:],
+            )
+            for item in models
+        ]
 
     rows = []
-    for item in payload["rows"]:
+    for item in payload:
         rows.append(
             dict(
-                key=key,
+                key=item.get("key", key),
                 depth=item["depth"],
                 mode=item["mode"],
-                reference=reference.name,
-                chain=payload["chain"],
+                reference=item.get("reference", reference.name),
+                chain=item.get("chain", ""),
                 rmsd_heavy=item.get("rmsd_heavy"),
                 n_heavy=item.get("n_heavy", 0),
+                n_phosphate=item.get("n_phosphate", 0),
                 status=item.get("status", "ok"),
                 error=item.get("error", ""),
             )

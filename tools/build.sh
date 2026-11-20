@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Build the quadro image.
+# Build the g4composer image.
 #
-#   tools/build.sh                          # uses third_party/, tags quadro:latest
-#                                           # (and quadro16:latest)
-#   tools/build.sh -t myquadro:dev          # custom tag
+#   tools/build.sh                          # uses third_party/, tags g4composer:latest
+#                                           # and g4composer:1.0
+#   tools/build.sh -t myg4composer:dev          # custom tag
 #   tools/build.sh --no-cache               # rebuild every layer from scratch
 #
 # CYANA and Xplor-NIH are passed as BuildKit *named build contexts*, so they can
 # live anywhere — they do not have to be inside this repository. Override the
-# paths when they are shared with other quadro versions in a parent repository:
+# paths when they are shared with other g4composer versions in a parent repository:
 #
 #   CYANA_DIR=../cyana-2.1 XPLOR_DIR=../xplor-nih-2.39 tools/build.sh
 #
@@ -22,8 +22,8 @@ VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
 
 CYANA_DIR="${CYANA_DIR:-$REPO/third_party/cyana-2.1}"
 XPLOR_DIR="${XPLOR_DIR:-$REPO/third_party/xplor-nih-2.39}"
-TAG="${QUADRO_TAG:-quadro:latest}"
-VERSION_TAG="quadro$(echo "$VERSION" | tr '[:upper:]' '[:lower:]'):latest"
+TAG="${G4COMPOSER_TAG:-g4composer:latest}"
+VERSION_TAG="g4composer:$VERSION"
 
 NO_CACHE=()
 
@@ -64,7 +64,7 @@ DOCKER_BUILDKIT=1 docker buildx build \
     "${NO_CACHE[@]}" \
     -f "$REPO/docker/Dockerfile" \
     "${TAGS[@]}" \
-    --build-arg "QUADRO_VERSION=$VERSION" \
+    --build-arg "G4COMPOSER_VERSION=$VERSION" \
     --build-context "cyana=$CYANA_DIR" \
     --build-context "xplor=$XPLOR_DIR" \
     "$REPO"

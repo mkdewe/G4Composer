@@ -1,16 +1,17 @@
 cff-version: 1.2.0
-message: "If you use quadro, please cite it using the metadata below."
-title: "quadro: knowledge-based 3D structure generation for G-quadruplexes"
+message: "If you use G4Composer, please cite it using the metadata below."
+title: "G4Composer: knowledge-based 3D structure generation for G-quadruplexes"
 abstract: >-
-  quadro builds atomic models of G-quadruplexes from a topological description
+  G4Composer builds atomic models of G-quadruplexes from a topological description
   of the molecule — which residues form which tetrad, in what glycosidic
   orientation, stacked with what rise and twist. It assembles the structure
   residue by residue in torsion space using CYANA, then refines it in Cartesian
   space using Xplor-NIH under planarity, dihedral and hydrogen-bond restraints.
 type: software
-version: "16"
+version: "1.0"
 license: MIT
 repository-code: "https://github.com/mkdewe/quadro"
+doi: "10.5281/zenodo.22662319"
 
 authors:
   - family-names: Popenda

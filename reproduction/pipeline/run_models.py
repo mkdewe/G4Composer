@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build the 12 models per input with engine 16 in the ``quadro:latest`` image.
+"""Build 12 models per input with G4Composer 1.0 in ``g4composer:latest``.
 
-Engine 16 is single-pass, so each (iteration depth, mode) pair is one container
-run.  The alternative mode is obtained by generating the mirrored input
-ourselves (``common.mirror_fields``).
+G4Composer is single-pass, so each (iteration depth, mode) pair is one container
+run. The alternative mode is obtained by generating the mirrored input with
+``common.mirror_fields``.
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ def main() -> int:
     parser.add_argument("--models-dir", type=Path, default=common.MODELS)
     parser.add_argument("--runs-dir", type=Path, default=common.WORK / "runs")
     parser.add_argument("--logs-dir", type=Path, default=common.WORK / "logs")
-    parser.add_argument("--image", default=os.environ.get("QUADRO_IMAGE", "quadro:latest"))
+    parser.add_argument("--image", default=os.environ.get("G4COMPOSER_IMAGE", "g4composer:latest"))
     parser.add_argument("--jobs", type=int, default=12)
     parser.add_argument("--timeout", type=int, default=1200)
     parser.add_argument("--force", action="store_true", help="rebuild models even when present")

@@ -50,6 +50,7 @@ fi
     --results work/results/AP_unweighted_548 \
     --output figures/AP_violin.pdf
 "$PYTHON" pipeline/plot_pooled.py
+"$PYTHON" pipeline/length_analysis.py
 
 "$PYTHON" pipeline/summarize.py
 "$PYTHON" pipeline/check_paths.py

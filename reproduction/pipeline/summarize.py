@@ -23,12 +23,18 @@ import table1
 
 BAND = 0.10
 FOLDBENCH = [
-    dict(pdb="8D78", key="8d78_assembly1_A", family="Tetrahymena telomeric G4", af3=0.779616, boltz=0.499600, chai=0.810524, hf3=0.040058, protenix=0.861595),
-    dict(pdb="8D79", key="8d79_assembly1_A", family="Tetrahymena telomeric G4", af3=0.839642, boltz=0.177338, chai=0.758673, hf3=0.186173, protenix=0.737444),
-    dict(pdb="8G2N", key="8g2n_assembly1_A", family="Tetrahymena telomeric G4", af3=0.385517, boltz=0.302286, chai=0.382563, hf3=0.129086, protenix=0.390739),
-    dict(pdb="8P6B", key="8p6b_assembly1_A", family="Modified human telomeric G4", af3=0.311, boltz=0.289, chai=0.333, hf3=0.059, protenix=0.314),
-    dict(pdb="8TAA", key="8taa_assembly1_A", family="SLC2A1 LH/RH G4", af3=0.639, boltz=0.000, chai=0.112, hf3=0.084, protenix=0.244),
-    dict(pdb="8TWH", key="8twh_assembly1_A", family="(GGGTT)3GGG G4", af3=0.687, boltz=0.126, chai=0.601, hf3=0.515, protenix=0.145),
+    dict(pdb="8D78", key="8d78_assembly1_A", kind="DNA", family="Tetrahymena", af3=0.779616, boltz=0.499600, chai=0.810524, hf3=0.040058, protenix=0.861595),
+    dict(pdb="8D79", key="8d79_assembly1_A", kind="DNA", family="Tetrahymena", af3=0.839642, boltz=0.177338, chai=0.758673, hf3=0.186173, protenix=0.737444),
+    dict(pdb="8FHX", key="8fhx_assembly1_A", kind="DNA", family="Lettuce aptamer", af3=0.386872, boltz=0.356442, chai=0.310278, hf3=0.261006, protenix=0.298599),
+    dict(pdb="8FI1", key="8fi1_assembly1_A", kind="DNA", family="Lettuce aptamer", af3=0.308858, boltz=0.342063, chai=0.357788, hf3=0.345001, protenix=0.265875),
+    dict(pdb="8FI8", key="8fi8_assembly1_A", kind="DNA", family="Lettuce aptamer", af3=0.296103, boltz=0.375535, chai=0.352522, hf3=0.294318, protenix=0.354108),
+    dict(pdb="8G2N", key="8g2n_assembly1_A", kind="DNA", family="Tetrahymena", af3=0.385517, boltz=0.302181, chai=0.383049, hf3=0.129338, protenix=0.390826),
+    dict(pdb="8P6B", key="8p6b_assembly1_A", kind="DNA", family="Human telomeric", af3=0.310543, boltz=0.289351, chai=0.333431, hf3=0.059094, protenix=0.313643),
+    dict(pdb="8TAA", key="8taa_assembly1_A", kind="DNA", family="SLC2A1", af3=0.639185, boltz=0.000000, chai=0.111939, hf3=0.084285, protenix=0.243997),
+    dict(pdb="8TWH", key="8twh_assembly1_A", kind="DNA", family="(GGGTT)3GGG", af3=0.687486, boltz=0.125960, chai=0.601281, hf3=0.515339, protenix=0.144502),
+    dict(pdb="7SXP", key="7sxp_assembly1_A", kind="RNA", family="RNA G4", af3=0.572168, boltz=0.125737, chai=0.497242, hf3=0.065974, protenix=0.616384),
+    dict(pdb="8UTG", key="8utg_assembly1_A", kind="RNA", family="RNA G4", af3=0.206531, boltz=0.182417, chai=0.235238, hf3=0.195020, protenix=0.243684),
+    dict(pdb="7ZJ4", key=None, kind="RNA", family="RNA origami", af3=0.689033, boltz=0.424443, chai=0.527351, hf3=0.555304, protenix=0.535869),
 ]
 
 
@@ -343,19 +349,28 @@ def main() -> int:
     s3 = []
     for item in FOLDBENCH:
         key = item["key"]
-        ir = int(np.argmin(rmsd[key]))
-        il = int(np.argmax(lddt[key]))
-        ie = int(np.argmin(energy[key]))
+        if key is None:
+            scores = dict(
+                min_rmsd="", lddt_of_min_rmsd="", best_lddt="",
+                rmsd_of_best_lddt="", energy_selected_rmsd="", energy_selected_lddt="",
+            )
+        else:
+            ir = int(np.argmin(rmsd[key]))
+            il = int(np.argmax(lddt[key]))
+            ie = int(np.argmin(energy[key]))
+            scores = dict(
+                min_rmsd=fmt(rmsd[key][ir]),
+                lddt_of_min_rmsd=fmt(lddt[key][ir]),
+                best_lddt=fmt(lddt[key][il]),
+                rmsd_of_best_lddt=fmt(rmsd[key][il]),
+                energy_selected_rmsd=fmt(rmsd[key][ie]),
+                energy_selected_lddt=fmt(lddt[key][ie]),
+            )
         s3.append(dict(
-            pdb=item["pdb"], family=item["family"],
+            pdb=item["pdb"], kind=item["kind"], family=item["family"],
             af3=fmt(item["af3"]), boltz1=fmt(item["boltz"]), chai1=fmt(item["chai"]),
             helixfold3=fmt(item["hf3"]), protenix=fmt(item["protenix"]),
-            min_rmsd=fmt(rmsd[key][ir]),
-            lddt_of_min_rmsd=fmt(lddt[key][ir]),
-            best_lddt=fmt(lddt[key][il]),
-            rmsd_of_best_lddt=fmt(rmsd[key][il]),
-            energy_selected_rmsd=fmt(rmsd[key][ie]),
-            energy_selected_lddt=fmt(lddt[key][ie]),
+            **scores,
         ))
     with (args.reports / "S3_table.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, lineterminator="\n", fieldnames=list(s3[0]))

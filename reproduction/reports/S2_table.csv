@@ -1,19 +1,19 @@
 section,group,n,median_rmsd,q1_rmsd,q3_rmsd,iqr_rmsd,median_lddt,q1_lddt,q3_lddt,iqr_lddt,note
-Pooled,Pooled RMSD,6516,4.99,4.05,7.41,3.35,,,,,
-Pooled,Pooled lDDT,6516,,,,,0.51,0.34,0.61,0.27,
-Representatives,Best-of-12 RMSD,323,4.53,3.75,5.78,2.03,,,,,
-Representatives,Best-of-12 lDDT,323,,,,,0.57,0.50,0.64,0.14,
-By CYANA depth,30,1086,5.00,,,2.91,0.47,,,0.37,
-By CYANA depth,50,1086,4.98,,,3.23,0.50,,,0.27,
-By CYANA depth,70,1086,4.97,,,3.33,0.52,,,0.23,
-By CYANA depth,100,1086,4.90,,,3.45,0.52,,,0.24,
-By CYANA depth,150,1086,4.98,,,3.60,0.52,,,0.26,
-By CYANA depth,300,1086,5.12,,,3.54,0.52,,,0.29,
-By mode,n,3258,5.00,,,3.40,0.51,,,0.27,
-By mode,a,3258,4.99,,,3.34,0.51,,,0.27,
-Energy threshold (pooled),below,3724,4.36,,,1.37,0.59,,,0.13,57.2%
-Energy threshold (pooled),around,102,7.12,,,3.18,0.49,,,0.13,1.6%
-Energy threshold (pooled),above,2690,7.52,,,4.60,0.31,,,0.33,41.3%
-Energy threshold (representatives),below,262,4.55,,,1.74,0.59,,,0.13,81.1%
-Energy threshold (representatives),around,8,8.58,,,2.10,0.53,,,0.14,2.5%
-Energy threshold (representatives),above,53,9.19,,,4.26,0.40,,,0.12,16.4%
+Pooled,Pooled RMSD,6516,4.99,4.05,7.46,3.41,,,,,
+Pooled,Pooled lDDT,6516,,,,,0.52,0.37,0.62,0.24,
+Representatives,Best-of-12 RMSD,323,4.51,3.78,5.91,2.13,,,,,
+Representatives,Best-of-12 lDDT,323,,,,,0.58,0.51,0.64,0.14,
+By CYANA depth,30,1086,5.02,,,3.02,0.48,,,0.31,
+By CYANA depth,50,1086,4.96,,,3.36,0.51,,,0.23,
+By CYANA depth,70,1086,4.93,,,3.36,0.53,,,0.22,
+By CYANA depth,100,1086,4.87,,,3.49,0.54,,,0.23,
+By CYANA depth,150,1086,4.98,,,3.66,0.53,,,0.24,
+By CYANA depth,300,1086,5.12,,,3.57,0.54,,,0.25,
+By mode,n,3258,4.99,,,3.44,0.52,,,0.24,
+By mode,a,3258,4.99,,,3.39,0.52,,,0.24,
+Energy threshold (pooled),below,3724,4.34,,,1.33,0.60,,,0.13,57.2%
+Energy threshold (pooled),around,102,7.13,,,3.19,0.49,,,0.11,1.6%
+Energy threshold (pooled),above,2690,7.56,,,4.70,0.33,,,0.33,41.3%
+Energy threshold (representatives),below,262,4.50,,,1.70,0.59,,,0.13,81.1%
+Energy threshold (representatives),around,8,8.70,,,2.29,0.53,,,0.16,2.5%
+Energy threshold (representatives),above,53,9.17,,,4.40,0.42,,,0.11,16.4%

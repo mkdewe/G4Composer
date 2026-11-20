@@ -1,0 +1,10 @@
+panel,group,n,median_length,n_dna,n_rna,n_chimeric,rho_rmsd,p_rmsd,rho_lddt,p_lddt,rho_energy,p_energy,median_best_rmsd,q1_best_rmsd,q3_best_rmsd,median_best_lddt,q1_best_lddt,q3_best_lddt,median_energy_per_nt,q1_energy_per_nt,q3_energy_per_nt
+correlation,Representatives,323,24.00,260,58,5,+0.643,4.15e-39,-0.518,1.37e-23,+0.642,6.02e-39,,,,,,,,,
+correlation,All modellable inputs,543,24.00,415,123,5,+0.696,8.29e-80,-0.599,4.51e-54,+0.716,1.60e-86,,,,,,,,,
+correlation,DNA representatives,260,23.00,260,0,0,+0.505,3.38e-18,-0.369,8.76e-10,+0.549,6.72e-22,,,,,,,,,
+correlation,RNA representatives,58,36.00,0,58,0,+0.799,5.37e-14,-0.763,3.31e-12,+0.862,3.52e-18,,,,,,,,,
+correlation,"Representatives (partial, tetrads)",323,24.00,260,58,5,+0.751,1.55e-59,-0.697,3.90e-48,+0.699,1.56e-48,,,,,,,,,
+bin,12-21,84,19.00,79,5,0,,,,,,,3.88,3.30,4.30,0.64,0.57,0.71,-39.84,-41.47,-37.76
+bin,22-24,97,22.00,84,9,4,,,,,,,4.39,3.84,4.92,0.59,0.54,0.66,-36.78,-38.59,-34.05
+bin,25-28,64,26.00,59,4,1,,,,,,,4.35,3.64,5.46,0.60,0.53,0.64,-36.48,-39.45,-30.15
+bin,29-84,78,36.00,38,40,0,,,,,,,7.29,6.02,9.31,0.48,0.40,0.53,-11.34,-25.97,-6.77

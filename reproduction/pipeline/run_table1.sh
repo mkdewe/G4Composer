@@ -22,7 +22,7 @@ KEYS="$("$PYTHON" pipeline/table1.py)"
 "$PYTHON" pipeline/fetch_references.py --keys "$KEYS"
 "$PYTHON" pipeline/score_qplex.py
 "$PYTHON" pipeline/prepare_lddt.py --keys "$KEYS" --jobs "$JOBS"
-"$PYTHON" pipeline/score_lddt.py --keys "$KEYS" --jobs "$JOBS"
+"$PYTHON" pipeline/score_lddt.py --keys "$KEYS" --jobs "$JOBS" --force
 "$PYTHON" pipeline/score_qplex_lddt.py
 "$PYTHON" pipeline/summarize.py
 "$PYTHON" pipeline/check_paths.py

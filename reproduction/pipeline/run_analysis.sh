@@ -27,7 +27,7 @@ cd "$ROOT"
 "$PYTHON" pipeline/score_rmsd.py --output work/data/scores.csv
 "$PYTHON" pipeline/collect.py
 "$PYTHON" pipeline/prepare_lddt.py --jobs "$JOBS"
-"$PYTHON" pipeline/score_lddt.py --jobs "$JOBS"
+"$PYTHON" pipeline/score_lddt.py --jobs "$JOBS" --force
 "$PYTHON" pipeline/score_qplex_lddt.py
 "$PYTHON" pipeline/cluster_ap.py --inputs inputs/current_548 --output work/results/AP_unweighted
 
@@ -42,6 +42,7 @@ cd "$ROOT"
     --results work/results/AP_unweighted_548 \
     --output figures/AP_violin.pdf
 "$PYTHON" pipeline/plot_pooled.py
+"$PYTHON" pipeline/length_analysis.py
 
 "$PYTHON" pipeline/summarize.py
 "$PYTHON" pipeline/check_paths.py

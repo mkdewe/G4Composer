@@ -154,7 +154,7 @@ def main() -> int:
     axE = fig.add_subplot(grid[1, 3:6])
     transform = lambda v: np.arcsinh(np.asarray(v, dtype=float) / 100.0)
     violin(axA, [E / N], ["All 6,516 models"], color="#b7cbe6", ylabel="Energy per nucleotide", transform=transform,
-           ticks=[-20, 0, 100, 1000, 10000], tick_labels=["−20", "0", "100", "1,000", "10,000"],
+           ticks=[-20, 100, 1000, 10000], tick_labels=["−20", "100", "1,000", "10,000"],
            threshold=-20, ylim=(-60, 40000))
     violin(axB, [groups[label]["rmsd"] for label in ("below", "around", "above")], ["Below", "Around", "Above"], color="#a9d5c7", ylabel="RMSD (Å)")
     violin(axC, [groups[label]["lddt"] for label in ("below", "around", "above")], ["Below", "Around", "Above"], color="#d8c7a1", ylabel="lDDT", ylim=(0.0, 1.0))

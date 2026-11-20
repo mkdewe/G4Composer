@@ -19,7 +19,7 @@ inputs/            548 input records and their manifest
 qplex/             15 3D-NuS-Qplex models, manifest and provenance
 references/        pinned RCSB manifest (mmCIF files are downloaded into work/)
 models/            6,516 G4Composer PDBs and 6,516 energy summaries
-reports/           archived statistics, tables and per-model scores
+reports/           archived statistics, tables, cluster assignments and per-model scores
 figures/           archived main and supplementary PDF figures
 pipeline/          generation, scoring, plotting and reporting scripts
 work/              generated data and working outputs (git-ignored)
@@ -44,9 +44,10 @@ JOBS=12 bash pipeline/run_analysis.sh
 ```
 
 `run_analysis.sh` checks all 6,516 model/energy pairs, downloads the pinned RCSB
-references, computes heavy-atom RMSD with PyMOL, computes all-atom lDDT with
-OpenStructure 2.12.0, reruns Affinity Propagation, and regenerates the current
-tables, statistics and figures. It never starts a G4Composer model build.
+references, computes all-heavy-atom RMSD with PyMOL, computes all-atom lDDT
+with OpenStructure 2.12.0, reruns Affinity Propagation, and regenerates the
+current tables, statistics and figures. It never starts a G4Composer model
+build.
 `OPENSTRUCTURE_IMAGE` can override the image name for a locally mirrored copy;
 the pinned default is the official image above.
 
@@ -102,22 +103,28 @@ exchanged in every `path` token.
 reference is restricted to the author chain named by the input record
 (`auth_asym_id`, which PyMOL uses as its chain identifier), not to whichever
 chain PyMOL would prefer. The two phosphate-oxygen aliases `OP1`/`O1P` and
-`OP2`/`O2P` are normalised. PyMOL `align` is run for one pass (`cycles=0`) and
-the RMSD over the common heavy atoms is recorded.
+`OP2`/`O2P` are normalised on both structures. PyMOL `align` is used only to
+establish the reference-to-model residue mapping; the model is then superposed,
+and the RMSD is calculated, over all heavy atoms present in both mapped
+residues, including phosphate oxygens. The per-model table records the number
+of common heavy atoms and how many are phosphate oxygens.
 
 **All-atom lDDT.** Every G4Composer model and every 3D-NuS-Qplex comparison model is
 scored with `compare-structures --lddt` in the **official OpenStructure 2.12.0
 Docker image**. The prepared reference is the requested experimental chain,
-mapped to model chain A. The lDDT values are the global all-atom scores returned
-by OpenStructure; they are not derivatives of RMSD and are not estimated with an
-in-house implementation.
+mapped to model chain A. Reference and model sequences are aligned, and only
+non-standard reference residue names are replaced by their model counterpart;
+canonical reference bases are never renamed by residue number. The lDDT values
+are the global all-atom scores returned by OpenStructure; they are not
+derivatives of RMSD and are not estimated with an in-house implementation.
 
 **3D-NuS-Qplex.** The fifteen 3D-NuS-Qplex models in `qplex/` are rescored with the same
-RMSD and all-atom lDDT protocols, not taken from published values. For RMSD they
-use sequence-based PyMOL alignment because they have no chain ID and use
-`ADE`/`GUA`/`THY`/`CYT` residue names. For lDDT those residue names and the
-chain ID are standardised before scoring with OpenStructure. Hydrogens are
-removed for RMSD.
+RMSD and all-atom lDDT protocols, not taken from published values. Their
+`ADE`/`GUA`/`THY`/`CYT` residue names and blank chain ID are standardised for
+both scoring paths. Hydrogens are removed for RMSD. The corrected 2KF8 and
+5LQH models now match their 22-nt targets. PDB entry 9UK8 contains 23-nt
+(assemblies 1-A and 2-B) and 24-nt (3-C and 4-D) observed variants; Table 1
+uses the 23-nt assembly1-A chain, matching the 23-nt Qplex model.
 
 **Energy and threshold.** Each `_energy.txt` contains the final Xplor-NIH
 `Etotal` summary. Energy is used to compare models of the same input, and the
@@ -162,12 +169,12 @@ analysis covers 6,516 models from 543 inputs; the representative analysis covers
 
 | path | content |
 |---|---|
-| `work/data/scores.csv` | per-model heavy-atom RMSD and atom count |
+| `work/data/scores.csv` | per-model all-heavy-atom RMSD, common-heavy-atom count, and phosphate-oxygen count |
 | `work/data/lddt_scores.csv` | per-model official OpenStructure all-atom lDDT |
 | `work/data/G16_rmsd.txt` | 12-column G4Composer RMSD table (internal data filename) |
 | `work/data/G16_lddt.txt` | 12-column G4Composer lDDT table (internal data filename) |
 | `work/data/G16_energy_popr.txt` | 12-column G4Composer energy table and `-20*N` threshold (internal data filename) |
-| `work/data/qplex_scores.csv` | heavy-atom RMSD of the fifteen 3D-NuS-Qplex models |
+| `work/data/qplex_scores.csv` | all-heavy-atom RMSD and atom counts for the fifteen 3D-NuS-Qplex models |
 | `work/data/qplex_lddt.csv` | all-atom lDDT of the fifteen 3D-NuS-Qplex models |
 | `work/results/AP_unweighted_548/` | Affinity Propagation clusters |
 | `work/results/plot_data.csv` | per-representative exported measurements |
@@ -176,7 +183,8 @@ analysis covers 6,516 models from 543 inputs; the representative analysis covers
 | `work/reports/S1_table.csv` | representative subgroup table |
 | `work/reports/S2_table.csv` | pooled accuracy, depth, mode and energy-threshold table |
 | `work/reports/S3_table.csv` | FoldBench comparison table |
-| `figures/` | main RMSD/lDDT/energy violin and three supplementary PDF figures |
+| `work/reports/S4_table.csv` | sequence-length correlations and quartile-bin statistics |
+| `figures/` | main RMSD/lDDT/energy violin and four supplementary PDF figures |
 | `reports/` | archived snapshots of the current tables and scores |
 
 Refresh the archived report and figure snapshots with

@@ -7,10 +7,8 @@ which residues form which tetrad, in which glycosidic orientation, stacked with
 what rise and twist. It assembles the molecule residue by residue in torsion
 space with CYANA, then refines it in Cartesian space with Xplor-NIH.
 
-This is the engine released as **G4Composer 1.0**. Inside the repository it
-keeps the identifiers it was archived under: `VERSION` reads `16`, the script is
-`engine/quadro16.awk`, and `--version` reports `quadro 16`. Version 16 is the
-engine used for the manuscript measurements.
+Engine version in this repository: **1.0** (see `VERSION`). G4Composer 1.0 is the
+archived engine used for the manuscript measurements.
 
 > ### ⚠ Two dependencies are not included and cannot be
 >
@@ -56,8 +54,8 @@ determine the handedness of the stack. The opposite reading produces a
 sterically plausible structure that differs only in energy, so the ambiguity
 cannot be resolved by inspection of the model.
 
-G4Composer 1.0 builds one handedness per invocation. The mirror input is produced by
-inverting the signs in `orient`, `rise` and `twist` and exchanging positions 2
+G4Composer 1.0 builds one handedness per invocation. The mirror input is produced
+by inverting the signs in `orient`, `rise` and `twist` and exchanging positions 2
 and 4 in every `path` token; run it as a second job and compare `Etotal`. The
 transformation is specified in
 [docs/ALGORITHM.md](docs/ALGORITHM.md#the-mirror-pass). `--no-mirror` is accepted
@@ -67,8 +65,8 @@ in this engine.
 Without the wrappers:
 
 ```bash
-docker run --rm -v "$PWD:/work" quadro:latest examples/7ys7.inp
-docker run --rm -v "$PWD:/work" quadro:latest --help
+docker run --rm -v "$PWD:/work" g4composer:latest examples/7ys7.inp
+docker run --rm -v "$PWD:/work" g4composer:latest --help
 ```
 
 ---
@@ -120,7 +118,7 @@ engine decide. All dots here, so the engine chooses throughout.
 South (C2′-endo, DNA-like), `.` the default for that residue's sugar type. Omit
 the line to accept the defaults everywhere.
 
-**`orient`** (polarity) — hydrogen-bond directionality, one entry per tetrad, in
+**`orient`** (orientation) — hydrogen-bond directionality, one entry per tetrad, in
 tetrad order — three tetrads here, all `-`. `+` is Watson-Crick/Hoogsteen, `-`
 is Hoogsteen/Watson-Crick. The letter must match the tetrad's position: `A` for
 the first, `B` for the second, `C` for the third. This is what the animations
@@ -241,8 +239,8 @@ Xplor-NIH layout are all easy to get subtly wrong by hand.
 ## Manuscript reproduction
 
 The complete reproduction package for the G4Composer manuscript is in
-[`reproduction/`](reproduction/): the pipeline, all 6,516 main models, the 180
-Table 1 models and the 15 3D-NuS-Qplex models. The analyses can be rerun
+[`reproduction/`](reproduction/): the pipeline, all 6,516 G4Composer models and
+the 15 3D-NuS-Qplex models. The analyses can be rerun
 without CYANA or Xplor-NIH from the archived coordinates; see
 [`reproduction/README.md`](reproduction/README.md).
 
@@ -250,7 +248,7 @@ without CYANA or Xplor-NIH from the archived coordinates; see
 
 ## Citation
 
-If you use quadro, please cite the software (see `CITATION.cff`, or the "Cite
+If you use G4Composer, please cite the software (see `CITATION.cff`, or the "Cite
 this repository" button on GitHub) **and** both dependencies, as their licences
 request:
 

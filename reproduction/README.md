@@ -1,4 +1,4 @@
-# G4Composer manuscript reproduction
+# G4Composer 1.0 manuscript reproduction
 
 Pipeline and archived models for
 
@@ -6,101 +6,145 @@ Pipeline and archived models for
 > *G4Composer: topology-guided 3D structure modeling of canonical and
 > non-canonical G-quadruplexes.*
 
-The repository contains the full pipeline, all 6,516 main models, the 180
-Table 1 models and the 15 3D-NuS-Qplex models, so the analyses can be rerun
-without CYANA or Xplor-NIH. Rebuilding the models from scratch requires the
-`quadro:latest` image, which embeds licensed CYANA and Xplor-NIH.
+The repository contains the full pipeline, all **6,516 G4Composer models** and
+the **15 3D-NuS-Qplex comparison models**, together with their coordinates,
+energy summaries and archived RMSD/lDDT analyses. Rebuilding the models from
+scratch requires the `g4composer:latest` image, which embeds licensed CYANA and
+Xplor-NIH. Rescoring the archived models requires neither of those programs.
 
 ## Layout
 
 ```text
 inputs/            548 input records and their manifest
 qplex/             15 3D-NuS-Qplex models, manifest and provenance
-references/        pinned RCSB manifest (files are downloaded into work/)
-models/            6,516 main PDBs and energy summaries
-models_table1/     180 default-parameter PDBs and energy summaries
-reports/           archived numbers.json, Table 1 and S1 outputs
-figures/           archived AP_violin.pdf
-pipeline/          generation and analysis scripts
-work/              generated data (git-ignored)
+references/        pinned RCSB manifest (mmCIF files are downloaded into work/)
+models/            6,516 G4Composer PDBs and 6,516 energy summaries
+reports/           archived statistics, tables, cluster assignments and per-model scores
+figures/           archived main and supplementary PDF figures
+pipeline/          generation, scoring, plotting and reporting scripts
+work/              generated data and working outputs (git-ignored)
 ```
 
 ## Analysis from the archived models
 
-No CYANA/Xplor licence and no Docker are needed:
+Requirements are Python 3, PyMOL on `PATH`, and Docker for the **official
+OpenStructure 2.12.0 image**
+(`registry.scicore.unibas.ch/schwede/openstructure:2.12.0`). No CYANA or
+Xplor-NIH installation is needed. Network access is required when downloading
+references or pulling the OpenStructure image.
+
+From this directory:
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
 
-bash pipeline/run_analysis.sh
+JOBS=12 bash pipeline/run_analysis.sh
 ```
 
-This checks that every model/energy pair is present, downloads the RCSB
-references, rescores the Qplex and G4Composer models, reclusters the inputs,
-redraws the violin and regenerates every table and statistic. PyMOL must be on `PATH`.
+`run_analysis.sh` checks all 6,516 model/energy pairs, downloads the pinned RCSB
+references, computes all-heavy-atom RMSD with PyMOL, computes all-atom lDDT
+with OpenStructure 2.12.0, reruns Affinity Propagation, and regenerates the
+current tables, statistics and figures. It never starts a G4Composer model
+build.
+`OPENSTRUCTURE_IMAGE` can override the image name for a locally mirrored copy;
+the pinned default is the official image above.
+
+For the focused Table 1 lDDT refresh, after the full analysis tables and AP
+clusters exist, run:
+
+```bash
+JOBS=12 bash pipeline/run_table1.sh
+```
+
+This rescores the 15 × 12 G4Composer models and the 15 3D-NuS-Qplex models at the Table
+1 targets, retains the other archived per-model lDDT rows, and refreshes the
+summary reports. Run `run_analysis.sh` first in a fresh checkout so that the
+whole-dataset RMSD, energy and clustering inputs are available.
 
 ## Rebuilding from scratch
 
-Requirements: Docker with the `quadro:latest` image, and a `quadro` checkout
-whose image contains CYANA 2.1 and Xplor-NIH 2.39. Build the image from the
-parent repository with `tools/build.sh`.
+Model generation additionally requires Docker with the locally built
+`g4composer:latest` image and licensed CYANA 2.1 and Xplor-NIH 2.39. Build the
+image from the parent repository with `tools/build.sh`. Set
+`G4COMPOSER_IMAGE` to use another local tag.
 
 ```bash
 # build missing models, then run all analyses
 JOBS=12 bash pipeline/run_all.sh
-JOBS=12 bash pipeline/run_table1.sh
 
-# rebuild every model even if present
+# rebuild all 6,516 models even if present, then run all analyses
 FORCE=1 JOBS=12 bash pipeline/run_all.sh
-FORCE=1 JOBS=12 bash pipeline/run_table1.sh
 ```
 
-`run_all.sh` and `run_table1.sh` first call `check_models.py`. When the archived
-models are complete they skip generation entirely and run only the analysis;
-`FORCE=1` bypasses that check and rebuilds. If some models are missing, only the
-missing pairs are built. `run_models.py --no-build` fails with a missing-model
-list instead of starting Docker.
+`run_all.sh` first calls `check_models.py`. When the archive is complete it skips
+generation and runs only the analysis. If models are missing, only missing
+model/energy pairs are built; `FORCE=1` bypasses that reuse. The subsequent
+steps are the same RMSD, lDDT, clustering, plotting and summary steps as in
+`run_analysis.sh`.
+
+To verify completeness without starting Docker:
+
+```bash
+python3 pipeline/run_models.py --no-build
+```
 
 ## Protocol
 
-**Engine.** `quadro:latest`, engine 16 with the `sugar` keyword fix. The
-original engine-16 parser accepted only the misspelt `shugar`, so inputs
-carrying the documented `sugar` field silently used the default pucker. Each
-input is built at six CYANA iteration depths (30, 50, 70, 100, 150, 300) in the
-standard and alternative modes, giving 12 models per input. Engine 16 is
-single-pass, so the alternative mode is generated by the pipeline: `orient`,
-`rise` and `twist` signs are inverted and positions 2 and 4 are exchanged in
-every `path` token.
+**Engine.** G4Composer 1.0 in the `g4composer:latest` image includes the `sugar`
+keyword fix. Each input is built at six CYANA iteration depths (30, 50, 70, 100,
+150 and 300) in standard and alternative modes, giving 12 models per input.
+G4Composer is single-pass, so the pipeline generates the alternative input:
+`orient`, `rise` and `twist` signs are inverted and positions 2 and 4 are
+exchanged in every `path` token.
 
 **RMSD.** Hydrogens are removed from both the model and the reference. The
 reference is restricted to the author chain named by the input record
 (`auth_asym_id`, which PyMOL uses as its chain identifier), not to whichever
 chain PyMOL would prefer. The two phosphate-oxygen aliases `OP1`/`O1P` and
-`OP2`/`O2P` are normalised. PyMOL `align` is run for one pass (`cycles=0`) and
-the RMSD over the common heavy atoms is recorded.
+`OP2`/`O2P` are normalised on both structures. PyMOL `align` is used only to
+establish the reference-to-model residue mapping; the model is then superposed,
+and the RMSD is calculated, over all heavy atoms present in both mapped
+residues, including phosphate oxygens. The per-model table records the number
+of common heavy atoms and how many are phosphate oxygens.
 
-**3D-NuS-Qplex.** The fifteen Qplex models in `qplex/` are rescored with the
-same procedure, not taken from published values. They have no chain ID and use
-`ADE`/`GUA`/`THY`/`CYT` residue names, so PyMOL aligns them to the reference by
-sequence. The files retain the server's hydrogens; both sides are stripped
-before alignment.
+**All-atom lDDT.** Every G4Composer model and every 3D-NuS-Qplex comparison model is
+scored with `compare-structures --lddt` in the **official OpenStructure 2.12.0
+Docker image**. The prepared reference is the requested experimental chain,
+mapped to model chain A. Reference and model sequences are aligned, and only
+non-standard reference residue names are replaced by their model counterpart;
+canonical reference bases are never renamed by residue number. The lDDT values
+are the global all-atom scores returned by OpenStructure; they are not
+derivatives of RMSD and are not estimated with an in-house implementation.
 
-**Energy.** Each `_energy.txt` contains the final Xplor-NIH `Etotal` summary
-and is used only to rank models of the same input.
+**3D-NuS-Qplex.** The fifteen 3D-NuS-Qplex models in `qplex/` are rescored with the same
+RMSD and all-atom lDDT protocols, not taken from published values. Their
+`ADE`/`GUA`/`THY`/`CYT` residue names and blank chain ID are standardised for
+both scoring paths. Hydrogens are removed for RMSD. The corrected 2KF8 and
+5LQH models now match their 22-nt targets. PDB entry 9UK8 contains 23-nt
+(assemblies 1-A and 2-B) and 24-nt (3-C and 4-D) observed variants; Table 1
+uses the 23-nt assembly1-A chain, matching the 23-nt Qplex model.
+
+**Energy and threshold.** Each `_energy.txt` contains the final Xplor-NIH
+`Etotal` summary. Energy is used to compare models of the same input, and the
+12-column energy table includes the threshold **`-20*N`**, where `N` is the
+number of residues in that input. The supplementary threshold analysis reports
+below/around/above groups with a 10% band around this threshold, alongside the
+pooled RMSD and lDDT statistics.
 
 ## Archived models
 
-`models/` and `models_table1/` contain the coordinate and energy files produced
-by the full run. Naming is `<key>_<depth>_<mode>.pdb` / `_energy.txt`; see
+`models/` contains all 6,516 coordinate files and all 6,516 energy files: 12
+models for each of the 543 modellable inputs. Naming is
+`<key>_<depth>_<mode>.pdb` / `_energy.txt`; see
 [`models/README.md`](models/README.md) for details.
 
 The archived files are sanitized: PDB files have no run-specific
 `REMARK FILENAME`/`REMARK DATE` lines, and energy files are reduced to the
-`Etotal` summary. No software or parameter files from CYANA/Xplor-NIH are
-included. Coordinates and energies are research outputs generated under the
-authors' licences.
+`Etotal` summary under a G4Composer 1.0 header. No software or parameter files
+from CYANA/Xplor-NIH are included. Coordinates and energies are research outputs
+generated under the authors' licences.
 
 `pipeline/sanitize.py` applies this formatting after a rebuild.
 `pipeline/check_paths.py` fails if an archived artifact contains a host-specific
@@ -114,28 +158,37 @@ absolute path.
 - `inputs/excluded_inputs.txt` — the 23 records removed from 571 candidates.
 - `references/manifest.csv` — per key, the RCSB URL and SHA256 of the
   decompressed mmCIF. `fetch_references.py` refuses a file whose hash differs.
-- `qplex/` — the fifteen Qplex models, SHA256 manifest and provenance.
+- `qplex/` — the fifteen 3D-NuS-Qplex models, SHA256 manifest and provenance.
 
 The three mixed DNA/RNA records `4ni7-assembly1-B`, `4ni9-assembly1-B` and
-`4ni9-assembly1-D` cannot be built (`ERROR 106 bledna para`); the RMSD
-statistics cover 323 of the 325 representatives.
+`4ni9-assembly1-D` cannot be built (`ERROR 106 bledna para`). Thus the pooled
+analysis covers 6,516 models from 543 inputs; the representative analysis covers
+323 representatives.
 
-## Outputs
+## Current outputs
 
 | path | content |
 |---|---|
-| `work/data/scores.csv` | per-model heavy-atom RMSD and atom count |
-| `work/data/G16_rmsd.txt` | 12-column RMSD table |
-| `work/data/G16_energy_popr.txt` | 12-column energy table |
-| `work/data/table1_*.txt` | default-parameter branch |
-| `work/data/qplex_scores.csv` | all-heavy-atom RMSD of the Qplex models |
+| `work/data/scores.csv` | per-model all-heavy-atom RMSD, common-heavy-atom count, and phosphate-oxygen count |
+| `work/data/lddt_scores.csv` | per-model official OpenStructure all-atom lDDT |
+| `work/data/G16_rmsd.txt` | 12-column G4Composer RMSD table (internal data filename) |
+| `work/data/G16_lddt.txt` | 12-column G4Composer lDDT table (internal data filename) |
+| `work/data/G16_energy_popr.txt` | 12-column G4Composer energy table and `-20*N` threshold (internal data filename) |
+| `work/data/qplex_scores.csv` | all-heavy-atom RMSD and atom counts for the fifteen 3D-NuS-Qplex models |
+| `work/data/qplex_lddt.csv` | all-atom lDDT of the fifteen 3D-NuS-Qplex models |
 | `work/results/AP_unweighted_548/` | Affinity Propagation clusters |
-| `work/reports/numbers.json` | every manuscript statistic |
-| `work/reports/S1_table.csv` | subgroup table |
-| `work/reports/table1.csv` | Table 1 |
-| `reports/` | archived snapshots of the above |
+| `work/results/plot_data.csv` | per-representative exported measurements |
+| `work/reports/numbers.json` | pooled and representative manuscript statistics |
+| `work/reports/table1.csv` | fifteen-target RMSD/lDDT comparison |
+| `work/reports/S1_table.csv` | representative subgroup table |
+| `work/reports/S2_table.csv` | pooled accuracy, depth, mode and energy-threshold table |
+| `work/reports/S3_table.csv` | FoldBench comparison table |
+| `work/reports/S4_table.csv` | sequence-length correlations and quartile-bin statistics |
+| `figures/` | main RMSD/lDDT/energy violin and four supplementary PDF figures |
+| `reports/` | archived snapshots: table1.csv, numbers.json, S1_table.csv–S4_table.csv, rmsd_scores.csv, lddt_scores.csv, qplex_scores.csv, qplex_lddt.csv, G16_lddt.txt, assignments.csv, clusters_ap.csv, representatives_ap.txt, cluster_summary.json, lddt_reference_changes.csv, README.md |
 
-Refresh the archived snapshots with `bash pipeline/archive_reports.sh`.
+Refresh the archived report and figure snapshots with
+`bash pipeline/archive_reports.sh` after recomputing the current outputs.
 
 ## Path policy
 
@@ -145,7 +198,7 @@ or CSV outputs. Run `python3 pipeline/check_paths.py` to verify the archive.
 
 ## Licensing
 
-The engine, CYANA and Xplor-NIH are not included. CYANA is commercial;
-Xplor-NIH is free for non-profit institutions but cannot be redistributed. The
-`quadro:latest` image must be built locally with each user's own copies. See
-the parent repository's `docs/THIRD-PARTY.md`.
+CYANA and Xplor-NIH are not included in the reproduction archive. CYANA is
+commercial; Xplor-NIH is free for non-profit institutions but cannot be
+redistributed. The `g4composer:latest` image must be built locally with each
+user's own licensed copies. See the parent repository's `docs/THIRD-PARTY.md`.

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Draw the RMSD/energy violin figure (Fig. 2 in the manuscript).
+"""Draw the RMSD, lDDT and threshold-relative energy violins (Fig. 2).
 
-One value per Affinity Propagation representative: the minimum-RMSD model for
-panel A and the minimum-energy model for panel B.  Energy is shown on a
-symmetric logarithmic scale and its density is estimated in that transformed
-space, matching the manuscript caption.
+One value per Affinity Propagation representative: minimum RMSD (A), maximum
+lDDT (B), and minimum Xplor-NIH energy per nucleotide (C).  The horizontal
+line at -20 marks the RNAComposer-derived threshold used in the manuscript.
 """
 
 from __future__ import annotations
@@ -13,14 +12,13 @@ import argparse
 import csv
 from pathlib import Path
 
-import numpy as np
+import common
 import matplotlib
+import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
-
-MANUAL_EXCLUSIONS = {"7zj4-assembly1-E.inp", "7zj5-assembly1-E.inp"}
 
 
 def load_measurements(path: Path) -> dict[str, list[float]]:
@@ -33,7 +31,18 @@ def load_measurements(path: Path) -> dict[str, list[float]]:
     return out
 
 
-def draw(ax, values, transform, color, label, ticks, tick_labels, limits):
+def load_nres(path: Path) -> dict[str, int]:
+    out = {}
+    for line in path.read_text(encoding="utf-8").splitlines()[1:]:
+        if "|" not in line:
+            continue
+        left, right = line.split("|")
+        out[left.split()[0]] = int(right.split()[0])
+    return out
+
+
+def draw(ax, values, *, transform=lambda x: np.asarray(x, dtype=float), color, label, ticks, tick_labels, limits, threshold=None):
+    values = np.asarray(values, dtype=float)
     transformed = transform(values)
     low, high = transformed.min(), transformed.max()
     pad = 0.08 * (high - low) if high > low else 0.5
@@ -46,9 +55,11 @@ def draw(ax, values, transform, color, label, ticks, tick_labels, limits):
     low_w = transformed[transformed >= q1 - 1.5 * iqr].min()
     high_w = transformed[transformed <= q3 + 1.5 * iqr].max()
     ax.plot([1, 1], [low_w, high_w], color="#222222", linewidth=1.2, zorder=3)
-    ax.plot([0.94, 1.06], [low_w, low_w], color="#222222", linewidth=1.2, zorder=3)
-    ax.plot([0.94, 1.06], [high_w, high_w], color="#222222", linewidth=1.2, zorder=3)
+    for endpoint in (low_w, high_w):
+        ax.plot([0.94, 1.06], [endpoint, endpoint], color="#222222", linewidth=1.2, zorder=3)
     ax.plot([1], [median], marker="o", markersize=4, color="#111111", zorder=4)
+    if threshold is not None:
+        ax.axhline(threshold, color="#b7413a", linestyle="--", linewidth=1.2)
     ax.set_xlim(0.35, 1.65)
     ax.set_xticks([])
     ax.set_ylabel(label)
@@ -64,6 +75,7 @@ def draw(ax, values, transform, color, label, ticks, tick_labels, limits):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rmsd", type=Path, required=True)
+    parser.add_argument("--lddt", type=Path, required=True)
     parser.add_argument("--energy", type=Path, required=True)
     parser.add_argument("--results", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -72,37 +84,40 @@ def main() -> int:
     reps = sorted(
         row["representative"]
         for row in csv.DictReader((args.results / "clusters_ap.csv").open(encoding="utf-8-sig"))
-        if row["representative"] not in MANUAL_EXCLUSIONS
+        if row["representative"] not in common.MANUAL_EXCLUSIONS
     )
+    keys = [rep.removesuffix(".inp").replace("-", "_") for rep in reps]
     rmsd = load_measurements(args.rmsd)
+    lddt = load_measurements(args.lddt)
     energy = load_measurements(args.energy)
-    rmsd_values = [min(rmsd[key]) for rep in reps if (key := rep.removesuffix(".inp").replace("-", "_")) in rmsd]
-    energy_values = [min(energy[key]) for rep in reps if (key := rep.removesuffix(".inp").replace("-", "_")) in energy]
-    rmsd_values = np.array(rmsd_values)
-    energy_values = np.array(energy_values)
+    nres = load_nres(args.energy)
+    keys = [key for key in keys if key in rmsd and key in lddt and key in energy]
 
-    linthresh = 100.0
-    transform = lambda values: np.arcsinh(np.asarray(values, dtype=float) / linthresh)
+    rmsd_values = np.array([min(rmsd[key]) for key in keys])
+    lddt_values = np.array([max(lddt[key]) for key in keys])
+    energy_values = np.array([min(energy[key]) / nres[key] for key in keys])
 
     plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 11, "pdf.fonttype": 42})
-    fig, axes = plt.subplots(1, 2, figsize=(10, 6))
-    fig.subplots_adjust(left=0.09, right=0.97, bottom=0.09, top=0.86, wspace=0.35)
+    fig, axes = plt.subplots(1, 3, figsize=(12, 5.4))
+    fig.subplots_adjust(left=0.075, right=0.985, bottom=0.10, top=0.87, wspace=0.35)
     draw(
-        axes[0], rmsd_values, lambda v: np.asarray(v, dtype=float),
-        "#a9d5c7", "RMSD (Å)",
+        axes[0], rmsd_values, color="#a9d5c7", label="RMSD (Å)",
         ticks=[2.5, 5, 7.5, 10, 12.5, 15, 17.5],
-        tick_labels=["2.5", "5.0", "7.5", "10.0", "12.5", "15.0", "17.5"],
+        tick_labels=["2.50", "5.00", "7.50", "10.00", "12.50", "15.00", "17.50"],
         limits=(1.0, 18.5),
     )
     draw(
-        axes[1], energy_values, transform,
-        "#b7cbe6", "Energy",
-        ticks=[-1000, -100, 0, 100, 1000, 10000],
-        tick_labels=["−1,000", "−100", "0", "100", "1,000", "10,000"],
-        limits=(-2200, 25000),
+        axes[1], lddt_values, color="#d8c7a1", label="lDDT",
+        ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0], tick_labels=["0.00", "0.20", "0.40", "0.60", "0.80", "1.00"],
+        limits=(0.0, 1.0),
     )
-    axes[0].text(-0.12, 1.04, "A", transform=axes[0].transAxes, fontsize=14, weight="bold")
-    axes[1].text(-0.12, 1.04, "B", transform=axes[1].transAxes, fontsize=14, weight="bold")
+    draw(
+        axes[2], energy_values, color="#b7cbe6", label="Energy per nucleotide",
+        ticks=[-40, -20, 0, 40, 80], tick_labels=["−40", "−20", "0", "40", "80"],
+        limits=(-50, 105), threshold=-20,
+    )
+    for ax, label in zip(axes, "ABC"):
+        ax.text(-0.12, 1.04, label, transform=ax.transAxes, fontsize=14, weight="bold")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.output, facecolor="white")
     print(f"wrote {args.output}")

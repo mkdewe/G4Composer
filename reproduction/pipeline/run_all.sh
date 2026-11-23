@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reproduce the manuscript's main dataset with engine 16 and heavy-atom RMSD.
+# Rebuild any missing G4Composer models and run all analyses.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,6 +34,9 @@ fi
 
 "$PYTHON" pipeline/score_rmsd.py --output work/data/scores.csv || echo "WARNING: some models failed to score"
 "$PYTHON" pipeline/collect.py
+"$PYTHON" pipeline/prepare_lddt.py --jobs "$JOBS"
+"$PYTHON" pipeline/score_lddt.py --jobs "$JOBS"
+"$PYTHON" pipeline/score_qplex_lddt.py
 "$PYTHON" pipeline/cluster_ap.py --inputs inputs/current_548 --output work/results/AP_unweighted
 
 "$PYTHON" pipeline/export_plot_data.py \
@@ -42,8 +45,12 @@ fi
     --output work/results/plot_data.csv
 "$PYTHON" pipeline/plot_violin.py \
     --rmsd work/data/G16_rmsd.txt \
+    --lddt work/data/G16_lddt.txt \
     --energy work/data/G16_energy_popr.txt \
     --results work/results/AP_unweighted_548 \
-    --output work/results/AP_violin.pdf
+    --output figures/AP_violin.pdf
+"$PYTHON" pipeline/plot_pooled.py
+"$PYTHON" pipeline/length_analysis.py
 
 "$PYTHON" pipeline/summarize.py
+"$PYTHON" pipeline/check_paths.py

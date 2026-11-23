@@ -13,10 +13,10 @@ INPUTS = ROOT / "inputs" / "current_548"
 WORK = ROOT / "work"
 REFERENCES = WORK / "references"
 MODELS = ROOT / "models"
-MODELS_TABLE1 = ROOT / "models_table1"
 DATA = WORK / "data"
 RESULTS = WORK / "results"
 REPORTS = WORK / "reports"
+FIGURES = ROOT / "figures"
 
 MANUAL_EXCLUSIONS = {"7zj4-assembly1-E.inp", "7zj5-assembly1-E.inp"}
 KNOWN_UNBUILDABLE = {
@@ -110,7 +110,7 @@ def swap_path(value: str) -> str:
 
 
 def mirror_fields(fields: list[tuple[str, str]]) -> list[tuple[str, str]]:
-    """Return the opposite-handed record (engine 16 builds one handedness)."""
+    """Return the opposite-handed record (G4Composer builds one handedness)."""
     current = field_dict(fields)
     out = list(fields)
     out = replace_field(out, "orient", flip_orient(current["orient"]))
@@ -147,6 +147,19 @@ def describe_input(path: Path) -> dict:
         else sum(char.isupper() for char in info["structure"]) // 4
     )
     return info
+
+
+def chain_candidates(record: dict) -> list[str]:
+    """Return author-chain candidates in input-record order.
+
+    Duplicated copies carry a ``-N`` suffix (for example ``C-2``); try that
+    identifier first and the unsuffixed author chain second.
+    """
+    candidates = []
+    for candidate in (record.get("chain_token"), record["chain"]):
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+    return candidates
 
 
 def selected_input_paths() -> list[Path]:

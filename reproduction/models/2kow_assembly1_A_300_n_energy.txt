@@ -1,2 +1,2 @@
-# quadro 16 / Xplor-NIH 2.39 energy summary
+# G4Composer 1.0 / Xplor-NIH 2.39 energy summary
  | Etotal =0.70E+07   grad(E)=0.25E+07   E(BOND)=111770.056 E(ANGL)=20237.924  |

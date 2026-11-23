@@ -1,34 +1,34 @@
 #!/bin/bash
-# quadro container entrypoint.
+# g4composer container entrypoint.
 #
 # The engine resolves its data files relative to the working directory
-# (DIR="./"), so it must run from $QUADRO_HOME. This script therefore stages the
-# user's .inp into $QUADRO_HOME, runs it there, and copies the results back to
+# (DIR="./"), so it must run from $G4COMPOSER_HOME. This script therefore stages the
+# user's .inp into $G4COMPOSER_HOME, runs it there, and copies the results back to
 # the mounted /work directory — the user never has to know about that detail.
 
 set -uo pipefail
 
-QUADRO_HOME="${QUADRO_HOME:-/opt/bin}"
-ENGINE="${QUADRO_EXE:-quadro16.awk}"
+G4COMPOSER_HOME="${G4COMPOSER_HOME:-/opt/bin}"
+ENGINE="${G4COMPOSER_EXE:-g4composer.awk}"
 WORK="/work"
 OUTDIR="$WORK"
 ENGINE_OPTS=()
 
 usage() {
     cat <<EOF
-quadro — G-quadruplex 3D structure generator
+G4Composer 1.0 — G-quadruplex 3D structure generator
 
 USAGE
-    docker run --rm -v "\$PWD:/work" quadro:latest [OPTIONS] INPUT.inp [INPUT2.inp ...]
+    docker run --rm -v "\$PWD:/work" g4composer:latest [OPTIONS] INPUT.inp [INPUT2.inp ...]
 
     Paths are relative to /work, i.e. to the directory you mounted.
 
-    Engine 16 is single-pass: one input produces one PDB.  To sample the
+    G4Composer 1.0 is single-pass: one input produces one PDB. To sample the
     opposite-handed stack, run the mirrored input (orient/rise/twist signs
     inverted, path positions 2 and 4 exchanged) as a second input.
 
 OPTIONS
-    --no-mirror         Accepted for compatibility. Engine 16 is already
+    --no-mirror         Accepted for compatibility. G4Composer 1.0 is already
                         single-pass, so this changes nothing.
     --outdir DIR        Write results to DIR (relative to /work). Default: /work.
     --shell             Drop into an interactive shell inside the container.
@@ -37,12 +37,11 @@ OPTIONS
 
 OUTPUT
     For an input whose 'name' field is FOO, the engine writes FOO.pdb and
-    FOO_energy.txt, plus FOO_alt.pdb and FOO_alt_energy.txt from the mirror
-    pass. All are copied to the output directory, together with a .runlog
-    holding the full engine output.
+    FOO_energy.txt. These are copied to the output directory together with a
+    .runlog holding the full engine output.
 
 EXAMPLE
-    docker run --rm -v "\$PWD:/work" quadro:latest examples/7ys7.inp
+    docker run --rm -v "\$PWD:/work" g4composer:latest examples/7ys7.inp
 
 SEE ALSO
     docs/INPUT-FORMAT.md for the .inp file format.
@@ -56,9 +55,9 @@ while [ $# -gt 0 ]; do
         --no-mirror) ENGINE_OPTS=(--no-mirror); shift ;;
         --outdir)   OUTDIR="$WORK/$2"; shift 2 ;;
         --shell)    exec /bin/bash ;;
-        --version)  echo "quadro ${QUADRO_VERSION:-unknown} ($ENGINE)"; exit 0 ;;
+        --version)  echo "G4Composer ${G4COMPOSER_VERSION:-1.0} ($ENGINE)"; exit 0 ;;
         -h|--help)  usage; exit 0 ;;
-        -*)         echo "quadro: unknown option '$1'" >&2; usage >&2; exit 64 ;;
+        -*)         echo "g4composer: unknown option '$1'" >&2; usage >&2; exit 64 ;;
         *)          inputs+=("$1"); shift ;;
     esac
 done
@@ -68,12 +67,12 @@ if [ ${#inputs[@]} -eq 0 ]; then
     exit 64
 fi
 
-if [ ! -f "$QUADRO_HOME/$ENGINE" ]; then
-    echo "quadro: engine '$ENGINE' not found in $QUADRO_HOME" >&2
+if [ ! -f "$G4COMPOSER_HOME/$ENGINE" ]; then
+    echo "g4composer: engine '$ENGINE' not found in $G4COMPOSER_HOME" >&2
     exit 70
 fi
 
-mkdir -p "$OUTDIR" || { echo "quadro: cannot create output directory $OUTDIR" >&2; exit 73; }
+mkdir -p "$OUTDIR" || { echo "g4composer: cannot create output directory $OUTDIR" >&2; exit 73; }
 
 # ── Run ──────────────────────────────────────────────────────────────────────
 failures=0
@@ -81,7 +80,7 @@ failures=0
 for input in "${inputs[@]}"; do
     src="$WORK/$input"
     if [ ! -f "$src" ]; then
-        echo "quadro: input not found: $input (looked in $src)" >&2
+        echo "g4composer: input not found: $input (looked in $src)" >&2
         failures=$((failures + 1))
         continue
     fi
@@ -93,21 +92,21 @@ for input in "${inputs[@]}"; do
     echo "── $base ──────────────────────────────────────────────"
 
     # Each input gets its own scratch directory rather than running in
-    # $QUADRO_HOME. The engine resolves its data files relative to the working
+    # $G4COMPOSER_HOME. The engine resolves its data files relative to the working
     # directory (DIR="./"), so those files are copied in alongside the input —
     # about 400 kB, negligible next to the calculation itself.
     #
-    # Running in $QUADRO_HOME would need it writable, which forces the container
+    # Running in $G4COMPOSER_HOME would need it writable, which forces the container
     # to run as root and leaves root-owned results on the host. It would also
     # make two inputs share one directory, so their intermediate files and
     # outputs would overwrite each other. CYANA and Xplor-NIH are found through
     # PATH and do not need to be in the working directory.
-    run_dir="$(mktemp -d "${TMPDIR:-/tmp}/quadro.XXXXXXXX")" || {
-        echo "quadro: cannot create a scratch directory" >&2
+    run_dir="$(mktemp -d "${TMPDIR:-/tmp}/g4composer.XXXXXXXX")" || {
+        echo "g4composer: cannot create a scratch directory" >&2
         failures=$((failures + 1))
         continue
     }
-    find "$QUADRO_HOME" -maxdepth 1 -type f -exec cp {} "$run_dir/" \;
+    find "$G4COMPOSER_HOME" -maxdepth 1 -type f -exec cp {} "$run_dir/" \;
 
     # Strip CR on the way in. An .inp authored on Windows carries CRLF, and the
     # engine's awk parser takes the trailing \r as part of the field value — a
@@ -130,9 +129,9 @@ for input in "${inputs[@]}"; do
     # renumbers into the real result. Copying every *.pdb reported a single run
     # as 16 structures.
     #
-    # The run writes <name>.pdb, and <name>_alt.pdb for the mirror pass. Those
-    # are the results; everything else in the directory is not.
-    name="$(awk '$1 == "name" { n = $2 } END { print (n == "" ? "quadro7_test" : n) }' "$run_dir/$base")"
+    # The run writes <name>.pdb; everything else in the directory is not a
+    # final result.
+    name="$(awk '$1 == "name" { n = $2 } END { print (n == "" ? "g4composer_test" : n) }' "$run_dir/$base")"
 
     produced=0
     for f in "$run_dir/$name".pdb "$run_dir/$name"_*.pdb; do

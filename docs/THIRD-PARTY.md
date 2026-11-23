@@ -1,6 +1,6 @@
 # Installing CYANA and Xplor-NIH
 
-quadro drives two external programs that are **not included in this repository
+G4Composer drives two external programs that are **not included in this repository
 and cannot be** — both licences forbid passing the software on to third parties.
 Obtain each under your own licence:
 
@@ -12,7 +12,7 @@ Obtain each under your own licence:
 Free does not mean redistributable: Xplor-NIH is excluded from the repository
 for the same reason as CYANA.
 
-Version and build matter. quadro is tested against **CYANA 2.1** and the
+Version and build matter. G4Composer is tested against **CYANA 2.1** and the
 **Linux x86-64** build of **Xplor-NIH 2.39**. Other versions are untested.
 
 Two ways to get from there to a working setup:
@@ -117,12 +117,12 @@ will not find them otherwise.
 ### 4. Prepare the engine directory
 
 The engine resolves its data files **relative to the current directory**
-(`DIR="./"` near the top of `engine/quadro16.awk`). So it must be run from a
+(`DIR="./"` near the top of `engine/g4composer.awk`). So it must be run from a
 directory containing all of `engine/`, and the files must have Unix line endings:
 
 ```bash
-cp -r engine/ ~/quadro-run
-cd ~/quadro-run
+cp -r engine/ ~/g4composer-run
+cd ~/g4composer-run
 find . -type f -exec dos2unix {} \; 2>/dev/null
 chmod +x *.exe tor3aa
 ```
@@ -131,7 +131,7 @@ If your copy of the engine carries an absolute `DIR="..."` path instead, point
 it at the working directory once:
 
 ```bash
-sed -i 's|^DIR="/.*"$|DIR="./"|' quadro16.awk
+sed -i 's|^DIR="/.*"$|DIR="./"|' g4composer.awk
 ```
 
 ### 5. Run
@@ -140,12 +140,12 @@ Copy your `.inp` into that directory and run the engine from there:
 
 ```bash
 cp /path/to/my.inp .
-sh quadro16.awk my.inp
+sh g4composer.awk my.inp
 ls *.pdb *_energy.txt
 ```
 
-That builds one structure. Engine 16 is single-pass; run the mirrored input as
-a second job if the opposite-handed stack is needed.
+That builds one structure. G4Composer 1.0 is single-pass; run the mirrored input
+as a second job if the opposite-handed stack is needed.
 
 The engine exits non-zero when it rejects an input, but its status is otherwise
 whatever its last `system()` call returned, so judge a run by whether a `.pdb`

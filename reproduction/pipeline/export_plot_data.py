@@ -3,8 +3,8 @@ import argparse
 import csv
 from pathlib import Path
 
-# Constructs excluded from the manuscript dataset; they have no measurements.
-MANUAL_EXCLUSIONS = {'7zj4-assembly1-E.inp', '7zj5-assembly1-E.inp'}
+import common
+
 DEPTHS = (30, 50, 70, 100, 150, 300)
 # Column order of the measurement tables: each depth in standard then alternative mode.
 VARIANTS = [f'{d}{mode}' for d in DEPTHS for mode in ('n', 'a')]
@@ -39,7 +39,7 @@ def main():
         reps = sorted(
             row['representative']
             for row in csv.DictReader(stream)
-            if row['representative'] not in MANUAL_EXCLUSIONS
+            if row['representative'] not in common.EXCLUDED_INPUTS
         )
     rmsd = load_measurements(args.measurements / 'G16_rmsd.txt')
     energy = load_measurements(args.measurements / 'G16_energy_popr.txt')

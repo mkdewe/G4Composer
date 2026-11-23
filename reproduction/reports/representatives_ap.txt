@@ -114,7 +114,6 @@
 8vx1-assembly1-C.inp
 143d-assembly1-A.inp
 2m27-assembly1-A.inp
-4ni9-assembly1-B.inp
 1myq-assembly1-A.inp
 6rs3-assembly1-A.inp
 5mcr-assembly1-A.inp
@@ -163,8 +162,6 @@
 2la5-assembly1-A.inp
 6k84-assembly1-A.inp
 1my9-assembly1-B.inp
-7zj5-assembly1-E.inp
-7zj4-assembly1-E.inp
 5v3f-assembly1-B.inp
 7q6l-assembly1-A.inp
 7qa2-assembly1-A.inp
@@ -213,7 +210,6 @@
 2kqg-assembly1-A.inp
 2kqh-assembly1-A.inp
 2kyp-assembly1-A.inp
-8dut-assembly1-B.inp
 2n4y-assembly1-A.inp
 8fi0-assembly1-A.inp
 8fi1-assembly1-A.inp
@@ -225,7 +221,6 @@
 6r9k-assembly1-A.inp
 6r9l-assembly1-A.inp
 8r4e-assembly1-A.inp
-4ni7-assembly1-B.inp
 1oz8-assembly1-A.inp
 6gh0-assembly1-A.inp
 7zek-assembly1-A.inp

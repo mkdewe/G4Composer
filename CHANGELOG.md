@@ -2,6 +2,19 @@
 
 All notable changes to G4Composer are recorded here.
 
+## [Unreleased]
+
+### Reproduction
+
+- Six inputs are now excluded before clustering and in every downstream
+  analysis: the two unmodeled synthetic RNA origami constructs (7ZJ4/7ZJ5),
+  the three unbuildable mixed DNA/RNA records (4ni7-assembly1-B,
+  4ni9-assembly1-B, 4ni9-assembly1-D), and the 8DUT chain B duplex partner
+  whose duplex arms are unconstrained overhangs in the record. The pooled
+  analysis therefore covers 6,504 models from 542 inputs with 322 Affinity
+  Propagation representatives; the excluded inputs are listed in
+  `pipeline/common.py`.
+
 ## [1.0]
 
 G4Composer 1.0 is the public name and version of the engine used for the

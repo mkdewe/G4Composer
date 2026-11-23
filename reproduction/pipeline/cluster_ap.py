@@ -11,6 +11,7 @@ import sklearn
 from sklearn.cluster import AffinityPropagation
 from sklearn.exceptions import ConvergenceWarning
 import input_helpers as ci
+import common
 
 def create_output_directory(requested):
     """Reuse the requested directory and clear only this script's old exports."""
@@ -28,6 +29,11 @@ def main():
                         help='Output base path; the input count is appended automatically.')
     args = parser.parse_args()
     records = ci.load(str(args.inputs))
+    # Clustering and every downstream analysis see only the retained inputs.
+    excluded = sorted(r['_file'] for r in records if r['_file'] in common.EXCLUDED_INPUTS)
+    if excluded:
+        print('excluded:', ', '.join(excluded))
+        records = [r for r in records if r['_file'] not in common.EXCLUDED_INPUTS]
     buckets = ci.bucketize(records)
     out = create_output_directory(
         args.output.with_name(f'{args.output.name}_{len(records)}')

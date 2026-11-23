@@ -18,7 +18,18 @@ RESULTS = WORK / "results"
 REPORTS = WORK / "reports"
 FIGURES = ROOT / "figures"
 
-MANUAL_EXCLUSIONS = {"7zj4-assembly1-E.inp", "7zj5-assembly1-E.inp"}
+MANUAL_EXCLUSIONS = {
+    "7zj4-assembly1-E.inp",  # 374-nt synthetic RNA origami construct, unmodeled
+    "7zj5-assembly1-E.inp",  # 374-nt synthetic RNA origami construct, unmodeled
+    "8dut-assembly1-B.inp",  # duplex partner chain; its 15+15 nt duplex arms are unconstrained overhangs in the record
+}
+UNBUILDABLE = {
+    "4ni7-assembly1-B.inp",  # ERROR 106 bledna para (mixed DNA/RNA base pair)
+    "4ni9-assembly1-B.inp",  # ERROR 106 bledna para (mixed DNA/RNA base pair)
+    "4ni9-assembly1-D.inp",  # ERROR 106 bledna para (mixed DNA/RNA base pair)
+}
+# Inputs absent from clustering and from every downstream analysis.
+EXCLUDED_INPUTS = MANUAL_EXCLUSIONS | UNBUILDABLE
 KNOWN_UNBUILDABLE = {
     "4ni7_assembly1_B": "ERROR 106 bledna para (mixed DNA/RNA base pair)",
     "4ni9_assembly1_B": "ERROR 106 bledna para (mixed DNA/RNA base pair)",
@@ -164,6 +175,16 @@ def chain_candidates(record: dict) -> list[str]:
 
 def selected_input_paths() -> list[Path]:
     return sorted(INPUTS.glob("*.inp"))
+
+
+def retained_inputs(inputs_dir: Path | None = None) -> list[dict]:
+    """describe_input records for every input except EXCLUDED_INPUTS."""
+    directory = inputs_dir or INPUTS
+    return [
+        record
+        for record in map(describe_input, sorted(directory.glob("*.inp")))
+        if record["file"] not in EXCLUDED_INPUTS
+    ]
 
 
 def model_path(key: str, depth: int, mode: str, models_dir: Path | None = None) -> Path:

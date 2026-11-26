@@ -111,9 +111,9 @@ Each entry is a column letter followed by `+` or `-`:
 - `+` → Watson–Crick/Hoogsteen (`WH`) hydrogen-bond directionality
 - `-` → Hoogsteen/Watson–Crick (`HW`)
 
-This is the field the G4Composer interface, and the animations in
-[`media/`](media/), call **polarity**; `G4plus` and `G4minus` there are `+` and
-`-` here. It selects which of the two `…P` / `…M` tetrad library entries is used
+The G4Composer interface calls this field **polarity**. The animations in
+[`media/`](media/) call it `orient`, as here, and label the two tetrad library
+entries *positive orientation* and *negative orientation* — `+` and `-` here. It selects which of the two `…P` / `…M` tetrad library entries is used
 for that tetrad, so it fixes the direction the four Hoogsteen bonds run around
 the tetrad — clockwise or anticlockwise seen from the same side.
 

@@ -27,6 +27,12 @@ manuscript measurements.
 - CYANA 2.1 and Xplor-NIH 2.39 remain externally licensed dependencies supplied
   through BuildKit named contexts.
 
+### Examples and animations
+
+- `examples/example.inp` is the input shown in the animations.
+- The animations use the `.inp` keywords and the publication's terms
+  (*negative/positive orientation*, build-up *steps*).
+
 ### Reproduction
 
 - The archive contains all 6,516 built G4Composer models and the fifteen

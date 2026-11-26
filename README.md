@@ -74,18 +74,18 @@ docker run --rm -v "$PWD:/work" g4composer:latest --help
 ## Input
 
 One plain-text `.inp` file per structure - `keyword value`, one per line, order
-irrelevant. This is `examples/6pnk.inp`, the three-tetrad DNA G-quadruplex used
+irrelevant. This is `examples/example.inp`, the three-tetrad DNA G-quadruplex used
 in the animations above:
 
 ```
-name        6pnk
+name        example
 sequence    gggtgggttgggttggg
 structure   ^^^.^^^..^^^..^^^
 chi         .................
 sugar       SSSSSSNSSSSSNSNSS
 orient      A-;B-;C-
 rise        3.3;3.4
-twist       33.3;24.2
+twist       33.7;25.2
 path        A1;B1;C1;A4;B4;C4;A3;B3;C3;A2;B2;C2
 test        y
 rm_level    5
@@ -94,8 +94,8 @@ iteration   100
 
 Field by field:
 
-**`name`** — base name for the output. This run writes `6pnk.pdb` and
-`6pnk_energy.txt`.
+**`name`** — base name for the output. This run writes `example.pdb` and
+`example_energy.txt`.
 
 **`sequence`** — the nucleotides. **Case selects the sugar, the letter selects
 the base:** uppercase `ACGTU` is RNA (ribose), lowercase `acgtu` is DNA
@@ -121,8 +121,8 @@ the line to accept the defaults everywhere.
 **`orient`** (orientation) — hydrogen-bond directionality, one entry per tetrad, in
 tetrad order — three tetrads here, all `-`. `+` is Watson-Crick/Hoogsteen, `-`
 is Hoogsteen/Watson-Crick. The letter must match the tetrad's position: `A` for
-the first, `B` for the second, `C` for the third. This is what the animations
-below label *polarity*, `G4plus` and `G4minus`.
+the first, `B` for the second, `C` for the third. The animations below
+label them *negative orientation* and *positive orientation*.
 
 **`rise`** — displacement along the stack axis, in ångströms. One value, or one
 per step, as here: `3.3` from tetrad A to B, `3.4` from B to C. **Signed:** the
@@ -185,20 +185,19 @@ separate job; see [the mirror pass](docs/ALGORITHM.md#the-mirror-pass).
 relevant lines of the engine quoted.
 
 **Stage 1 - ideal tetrad geometry.** Tetrad polarity (`orient`), the
-pseudo-atoms and the rotation about the N9–C1′ bond, the pseudo-residue **Q**,
-and the stacking of three tetrads by `translate z` and `rotation z` - that is,
+numbering of the guanosines, the pseudo-atoms and the rotation about the N9–C1′
+bond, and the stacking of three tetrads by `translate z` and `rotation z` - that is,
 by `rise` and `twist`, both measured from the first tetrad and therefore signed.
 
-![Stage 1 - building the pseudo-residue Q and stacking three tetrads](docs/media/stage1-tetrad-geometry.webp)
+![Stage 1 - ideal tetrad geometry and stacking three tetrads](docs/media/stage1-tetrad-geometry.webp)
 
 **Stage 2 - build-up in torsion space.** From the bare quadruplex core to the
-final structure, one fragment at a time. The `path` bar along the top
+final structure, one fragment per step. The `path` bar along the top
 highlights each token as its residue is added.
 
-![Stage 2 - multi-stage minimisation in torsion-angle space, fragment by fragment](docs/media/stage2-torsion-buildup.webp)
+![Stage 2 - multi-step minimisation in torsion-angle space, fragment by fragment](docs/media/stage2-torsion-buildup.webp)
 
-Both animations run at 5× speed. The source films, and the mapping between
-their G4Composer interface labels and the `.inp` keywords, are in
+Both animations run at 5× speed; the full-length films are in
 [docs/media/](docs/media/).
 
 ---

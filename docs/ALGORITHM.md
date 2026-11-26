@@ -50,8 +50,8 @@ Loops and any dot-bracket duplex regions in `structure` are not placed here —
 they are grown in stage 2.
 
 This stage is shown in [`media/stage1-tetrad-geometry.mp4`](media/stage1-tetrad-geometry.mp4):
-polarity, the pseudo-residue **Q**, and three tetrads stacked by explicit
-`translate z` and `rotation z` operations.
+polarity (`orient`), the numbering of the guanosines, the pseudo-atoms, and
+three tetrads stacked by explicit Z-translation and Z-rotation operations.
 
 ## Stage 2 — build-up in torsion space (CYANA)
 
@@ -65,7 +65,7 @@ printf "minimize %d\n", iteration > FO_INIT     # once per build-up stage
 ```
 
 This stage is shown in [`media/stage2-torsion-buildup.mp4`](media/stage2-torsion-buildup.mp4):
-the whole build-up, stage by stage, with the `path` bar highlighting each token
+the whole build-up, step by step, with the `path` bar highlighting each token
 as its residue is added.
 
 Working in torsion space rather than Cartesian space is what makes this

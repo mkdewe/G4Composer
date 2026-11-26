@@ -1,0 +1,2 @@
+# G4Composer 1.0 / Xplor-NIH 2.39 energy summary
+ | Etotal =-670.026   grad(E)=7.266      E(BOND)=12.015     E(ANGL)=80.809     |

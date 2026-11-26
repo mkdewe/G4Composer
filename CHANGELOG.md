@@ -2,19 +2,6 @@
 
 All notable changes to G4Composer are recorded here.
 
-## [Unreleased]
-
-### Reproduction
-
-- Six inputs are now excluded before clustering and in every downstream
-  analysis: the two unmodeled synthetic RNA origami constructs (7ZJ4/7ZJ5),
-  the three unbuildable mixed DNA/RNA records (4ni7-assembly1-B,
-  4ni9-assembly1-B, 4ni9-assembly1-D), and the 8DUT chain B duplex partner
-  whose duplex arms are unconstrained overhangs in the record. The pooled
-  analysis therefore covers 6,504 models from 542 inputs with 322 Affinity
-  Propagation representatives; the excluded inputs are listed in
-  `pipeline/common.py`.
-
 ## [1.0]
 
 G4Composer 1.0 is the public name and version of the engine used for the
@@ -42,13 +29,22 @@ manuscript measurements.
 
 ### Reproduction
 
-- The archive contains all 6,516 G4Composer models and the fifteen
-  3D-NuS-Qplex comparison models.
+- The archive contains all 6,516 built G4Composer models and the fifteen
+  3D-NuS-Qplex comparison models; the pooled analysis covers the 6,504 models
+  of the 542 retained inputs.
 - The analysis reports heavy-atom RMSD and official OpenStructure 2.12.0
   all-atom lDDT, with Xplor-NIH energy summaries and the `-20*N` threshold.
 - `run_all.sh`, `run_analysis.sh` and `run_table1.sh` drive the current
-  generation and analysis workflow; archived reports and all four figures are
+  generation and analysis workflow; archived reports and all five figures are
   documented in `reproduction/`.
+- Six inputs are now excluded before clustering and in every downstream
+  analysis: the two unmodeled synthetic RNA origami constructs (7ZJ4/7ZJ5),
+  the three unbuildable mixed DNA/RNA records (4ni7-assembly1-B,
+  4ni9-assembly1-B, 4ni9-assembly1-D), and the 8DUT chain B duplex partner
+  whose duplex arms are unconstrained overhangs in the record. The pooled
+  analysis therefore covers 6,504 models from 542 inputs with 322 Affinity
+  Propagation representatives; the excluded inputs are listed in
+  `pipeline/common.py`.
 
 ### Reproduction corrections
 
@@ -73,7 +69,7 @@ Applied to the reproduction package after the initial 1.0 snapshot (2026-11-20).
   Qplex and G4Composer comparisons use the same observed sequence; the PDB
   entry also contains 23-nt assembly2-B and 24-nt assemblies 3-C/4-D.
 - A sequence-length analysis now reports Spearman correlations and
-  sequence-length quartile-bin accuracy/energy statistics for the 323
+  sequence-length quartile-bin accuracy/energy statistics for the 322
   representatives, archived as `S4_table.csv` and `S4_length_dependence.pdf`.
 - The FoldBench comparison now covers all nine DNA and three RNA G4 targets;
   `7ZJ4` is listed as an unmodeled synthetic origami construct, with empty

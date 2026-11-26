@@ -197,7 +197,7 @@ highlights each token as its residue is added.
 
 ![Stage 2 - multi-step minimisation in torsion-angle space, fragment by fragment](docs/media/stage2-torsion-buildup.webp)
 
-Both animations run at 5× speed; the full-length films are in
+Both animations run at 4× speed; the full-length films are in
 [docs/media/](docs/media/).
 
 ---

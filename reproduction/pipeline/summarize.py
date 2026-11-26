@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Compute every quantitative result reported in the manuscript.
 
-Reads the archived 12-column RMSD, lDDT and energy tables for all 6,516
-G4Composer models.  Reports include per-representative selections, pooled
-statistics without selection, threshold groups at -20 times sequence length,
-and correlations. Table 1 contains RMSD and lDDT for both methods.
+Reads the archived 12-column RMSD, lDDT and energy tables for all 6,504
+G4Composer models (542 retained inputs).  Reports include per-representative
+selections, pooled statistics without selection, threshold groups at -20 times
+sequence length, and correlations. Table 1 contains RMSD and lDDT for both
+methods.
 """
 
 from __future__ import annotations
@@ -172,7 +173,7 @@ def main() -> int:
     parser.add_argument("--qplex-scores", type=Path, default=common.DATA / "qplex_scores.csv")
     parser.add_argument("--qplex-lddt", type=Path, default=common.DATA / "qplex_lddt.csv")
     parser.add_argument("--inputs-dir", type=Path, default=common.INPUTS)
-    parser.add_argument("--results", type=Path, default=common.RESULTS / "AP_unweighted_548")
+    parser.add_argument("--results", type=Path, default=common.RESULTS / "AP_unweighted_542")
     parser.add_argument("--reports", type=Path, default=common.REPORTS)
     args = parser.parse_args()
 
@@ -180,7 +181,8 @@ def main() -> int:
     lddt = load_table(args.lddt)
     energy = load_table(args.energy)
     nres = load_nres(args.energy)
-    keys = sorted(k for k in rmsd if k in lddt and k in energy)
+    excluded_keys = {common.key_for(Path(name)) for name in common.EXCLUDED_INPUTS}
+    keys = sorted(k for k in rmsd if k in lddt and k in energy and k not in excluded_keys)
     reps = [key for key in representatives(args.results) if key in rmsd]
     args.reports.mkdir(parents=True, exist_ok=True)
 
@@ -238,13 +240,10 @@ def main() -> int:
 
     # Subgroup table (representatives only).
     inputs = []
-    for path in sorted(args.inputs_dir.glob("*.inp")):
-        if path.name in common.MANUAL_EXCLUSIONS:
-            continue
-        record = common.describe_input(path)
+    for record in common.retained_inputs(args.inputs_dir):
         sequence = record["sequence"]
         kind = "DNA" if sequence == sequence.lower() else ("RNA" if sequence == sequence.upper() else "chimeric")
-        inputs.append(dict(file=path.name, key=record["key"], kind=kind, tetrads=record["tetrads"]))
+        inputs.append(dict(file=record["file"], key=record["key"], kind=kind, tetrads=record["tetrads"]))
     by_file = {row["file"].replace("-", "_").removesuffix(".inp"): row for row in inputs}
     groups = [
         ("All representatives", lambda row: True),
@@ -294,10 +293,10 @@ def main() -> int:
         s2.append(dict(section=section, group=label, n=stats["n"], median_rmsd=fmt(stats["median"]) if is_rmsd else "", q1_rmsd=fmt(stats["q1"]) if is_rmsd else "", q3_rmsd=fmt(stats["q3"]) if is_rmsd else "", iqr_rmsd=fmt(stats["iqr"]) if is_rmsd else "", median_lddt=fmt(stats["median"]) if not is_rmsd else "", q1_lddt=fmt(stats["q1"]) if not is_rmsd else "", q3_lddt=fmt(stats["q3"]) if not is_rmsd else "", iqr_lddt=fmt(stats["iqr"]) if not is_rmsd else "", note=""))
     for depth in common.DEPTHS:
         item = payload["pooled"]["by_depth"][str(depth)]
-        s2.append(dict(section="By CYANA depth", group=depth, n=1086, median_rmsd=fmt(item["rmsd_median"]), q1_rmsd="", q3_rmsd="", iqr_rmsd=fmt(item["rmsd_iqr"]), median_lddt=fmt(item["lddt_median"]), q1_lddt="", q3_lddt="", iqr_lddt=fmt(item["lddt_iqr"]), note=""))
+        s2.append(dict(section="By CYANA depth", group=depth, n=1084, median_rmsd=fmt(item["rmsd_median"]), q1_rmsd="", q3_rmsd="", iqr_rmsd=fmt(item["rmsd_iqr"]), median_lddt=fmt(item["lddt_median"]), q1_lddt="", q3_lddt="", iqr_lddt=fmt(item["lddt_iqr"]), note=""))
     for mode in common.MODES:
         item = payload["pooled"]["by_mode"][mode]
-        s2.append(dict(section="By mode", group=mode, n=3258, median_rmsd=fmt(item["rmsd_median"]), q1_rmsd="", q3_rmsd="", iqr_rmsd=fmt(item["rmsd_iqr"]), median_lddt=fmt(item["lddt_median"]), q1_lddt="", q3_lddt="", iqr_lddt=fmt(item["lddt_iqr"]), note=""))
+        s2.append(dict(section="By mode", group=mode, n=3252, median_rmsd=fmt(item["rmsd_median"]), q1_rmsd="", q3_rmsd="", iqr_rmsd=fmt(item["rmsd_iqr"]), median_lddt=fmt(item["lddt_median"]), q1_lddt="", q3_lddt="", iqr_lddt=fmt(item["lddt_iqr"]), note=""))
     for scope in ("pooled", "representatives"):
         for group in ("below", "around", "above"):
             item = payload[scope]["thresholds"][group]

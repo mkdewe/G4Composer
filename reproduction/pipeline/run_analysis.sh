@@ -32,14 +32,14 @@ cd "$ROOT"
 "$PYTHON" pipeline/cluster_ap.py --inputs inputs/current_548 --output work/results/AP_unweighted
 
 "$PYTHON" pipeline/export_plot_data.py \
-    --results work/results/AP_unweighted_548 \
+    --results work/results/AP_unweighted_542 \
     --measurements work/data \
     --output work/results/plot_data.csv
 "$PYTHON" pipeline/plot_violin.py \
     --rmsd work/data/G16_rmsd.txt \
     --lddt work/data/G16_lddt.txt \
     --energy work/data/G16_energy_popr.txt \
-    --results work/results/AP_unweighted_548 \
+    --results work/results/AP_unweighted_542 \
     --output figures/AP_violin.pdf
 "$PYTHON" pipeline/plot_pooled.py
 "$PYTHON" pipeline/length_analysis.py

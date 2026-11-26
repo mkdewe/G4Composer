@@ -1,10 +1,10 @@
 {
-  "n_files": 548,
-  "n_buckets": 272,
-  "n_clusters": 327,
-  "n_assigned": 548,
+  "n_files": 542,
+  "n_buckets": 267,
+  "n_clusters": 322,
+  "n_assigned": 542,
   "failed_buckets": [],
-  "singleton_clusters": 210,
+  "singleton_clusters": 206,
   "max_cluster_size": 18,
   "max_rise_spread_A": 0.7,
   "max_twist_spread_deg": 10.9,
@@ -14,7 +14,7 @@
   "convergence_iter": 50,
   "random_state": 0,
   "library_warnings": {
-    "All samples have mutually equal similarities. Returning arbitrary cluster center(s).": 227
+    "All samples have mutually equal similarities. Returning arbitrary cluster center(s).": 222
   },
   "two_member_buckets": [
     {
@@ -269,11 +269,6 @@
     },
     {
       "bucket": 96,
-      "clusters": 1,
-      "iterations": 0
-    },
-    {
-      "bucket": 97,
       "clusters": 1,
       "iterations": 0
     }

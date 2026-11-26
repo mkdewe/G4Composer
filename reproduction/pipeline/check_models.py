@@ -11,12 +11,7 @@ import common
 
 
 def expected_keys() -> list[str]:
-    records = {
-        record["key"]: record
-        for record in map(common.describe_input, sorted(common.INPUTS.glob("*.inp")))
-        if record["file"] not in common.MANUAL_EXCLUSIONS
-    }
-    return [key for key in records if key not in common.KNOWN_UNBUILDABLE]
+    return [record["key"] for record in common.retained_inputs()]
 
 
 def missing_models(keys: list[str], models_dir: Path) -> list[str]:

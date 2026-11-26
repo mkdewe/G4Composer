@@ -43,7 +43,8 @@ pip install -r requirements.txt
 JOBS=12 bash pipeline/run_analysis.sh
 ```
 
-`run_analysis.sh` checks all 6,516 model/energy pairs, downloads the pinned RCSB
+`run_analysis.sh` checks all 6,504 model/energy pairs of the 542 analyzed inputs,
+downloads the pinned RCSB
 references, computes all-heavy-atom RMSD with PyMOL, computes all-atom lDDT
 with OpenStructure 2.12.0, reruns Affinity Propagation, and regenerates the
 current tables, statistics and figures. It never starts a G4Composer model
@@ -136,7 +137,8 @@ pooled RMSD and lDDT statistics.
 ## Archived models
 
 `models/` contains all 6,516 coordinate files and all 6,516 energy files: 12
-models for each of the 543 modellable inputs. Naming is
+models for each of the 543 buildable inputs (the 542 analyzed inputs plus the
+excluded 8DUT chain B duplex partner). Naming is
 `<key>_<depth>_<mode>.pdb` / `_energy.txt`; see
 [`models/README.md`](models/README.md) for details.
 
@@ -152,18 +154,24 @@ absolute path.
 
 ## Inputs and references
 
-- `inputs/current_548/` — 548 retained records (546 measured instances plus
-  the two synthetic constructs 7ZJ4/7ZJ5, kept for clustering but not modelled).
+- `inputs/current_548/` — 548 records. Six of them are excluded before
+  clustering and in every downstream analysis (see below), leaving **542
+  analyzed inputs**.
   `inputs/manifest.csv` pins every file by SHA256.
 - `inputs/excluded_inputs.txt` — the 23 records removed from 571 candidates.
 - `references/manifest.csv` — per key, the RCSB URL and SHA256 of the
   decompressed mmCIF. `fetch_references.py` refuses a file whose hash differs.
 - `qplex/` — the fifteen 3D-NuS-Qplex models, SHA256 manifest and provenance.
 
-The three mixed DNA/RNA records `4ni7-assembly1-B`, `4ni9-assembly1-B` and
-`4ni9-assembly1-D` cannot be built (`ERROR 106 bledna para`). Thus the pooled
-analysis covers 6,516 models from 543 inputs; the representative analysis covers
-323 representatives.
+Six inputs are excluded from clustering and from all analyses
+(`MANUAL_EXCLUSIONS` and `UNBUILDABLE` in `pipeline/common.py`): the two
+374-nt synthetic RNA origami constructs `7zj4-assembly1-E` and
+`7zj5-assembly1-E`, the three mixed DNA/RNA records `4ni7-assembly1-B`,
+`4ni9-assembly1-B` and `4ni9-assembly1-D`, which cannot be built
+(`ERROR 106 bledna para`), and `8dut-assembly1-B`, the duplex-partner chain of
+a dimeric duplex–G4–duplex assembly whose 15+15 nt duplex arms are unconstrained
+overhangs in the record. Thus the pooled analysis covers 6,504 models from 542
+inputs; the representative analysis covers 322 representatives.
 
 ## Current outputs
 
@@ -176,7 +184,7 @@ analysis covers 6,516 models from 543 inputs; the representative analysis covers
 | `work/data/G16_energy_popr.txt` | 12-column G4Composer energy table and `-20*N` threshold (internal data filename) |
 | `work/data/qplex_scores.csv` | all-heavy-atom RMSD and atom counts for the fifteen 3D-NuS-Qplex models |
 | `work/data/qplex_lddt.csv` | all-atom lDDT of the fifteen 3D-NuS-Qplex models |
-| `work/results/AP_unweighted_548/` | Affinity Propagation clusters |
+| `work/results/AP_unweighted_542/` | Affinity Propagation clusters |
 | `work/results/plot_data.csv` | per-representative exported measurements |
 | `work/reports/numbers.json` | pooled and representative manuscript statistics |
 | `work/reports/table1.csv` | fifteen-target RMSD/lDDT comparison |

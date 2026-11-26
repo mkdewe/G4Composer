@@ -84,7 +84,7 @@ def main() -> int:
     reps = sorted(
         row["representative"]
         for row in csv.DictReader((args.results / "clusters_ap.csv").open(encoding="utf-8-sig"))
-        if row["representative"] not in common.MANUAL_EXCLUSIONS
+        if row["representative"] not in common.EXCLUDED_INPUTS
     )
     keys = [rep.removesuffix(".inp").replace("-", "_") for rep in reps]
     rmsd = load_measurements(args.rmsd)

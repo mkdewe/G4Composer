@@ -116,7 +116,8 @@ def main() -> int:
     lddt = load_table(args.lddt)
     energy = load_table(args.energy)
     nres = load_nres(args.energy)
-    keys = sorted(k for k in rmsd if k in lddt and k in energy)
+    excluded_keys = {common.key_for(Path(name)) for name in common.EXCLUDED_INPUTS}
+    keys = sorted(k for k in rmsd if k in lddt and k in energy and k not in excluded_keys)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     R = np.concatenate([rmsd[k] for k in keys])
@@ -136,8 +137,8 @@ def main() -> int:
     # S1: whole-dataset accuracy and the relationship between metrics.
     fig, axes = plt.subplots(1, 3, figsize=(10.5, 3.5))
     fig.subplots_adjust(left=0.075, right=0.985, bottom=0.16, top=0.86, wspace=0.34)
-    violin(axes[0], [R], ["All 6,516 models"], color="#a9d5c7", ylabel="RMSD (Å)")
-    violin(axes[1], [L], ["All 6,516 models"], color="#d8c7a1", ylabel="lDDT", ylim=(0.0, 1.0))
+    violin(axes[0], [R], ["All 6,504 models"], color="#a9d5c7", ylabel="RMSD (Å)")
+    violin(axes[1], [L], ["All 6,504 models"], color="#d8c7a1", ylabel="lDDT", ylim=(0.0, 1.0))
     hexplot(axes[2], R, L, "RMSD (Å)", "lDDT", float(spearmanr(L, R)[0]), ylim=(0.0, 1.0))
     for ax, label in zip(axes, "ABC"):
         ax.text(-0.14, 1.04, label, transform=ax.transAxes, fontsize=13, weight="bold")
@@ -153,7 +154,7 @@ def main() -> int:
     axD = fig.add_subplot(grid[1, 0:3])
     axE = fig.add_subplot(grid[1, 3:6])
     transform = lambda v: np.arcsinh(np.asarray(v, dtype=float) / 100.0)
-    violin(axA, [E / N], ["All 6,516 models"], color="#b7cbe6", ylabel="Energy per nucleotide", transform=transform,
+    violin(axA, [E / N], ["All 6,504 models"], color="#b7cbe6", ylabel="Energy per nucleotide", transform=transform,
            ticks=[-20, 100, 1000, 10000], tick_labels=["−20", "100", "1,000", "10,000"],
            threshold=-20, ylim=(-60, 40000))
     violin(axB, [groups[label]["rmsd"] for label in ("below", "around", "above")], ["Below", "Around", "Above"], color="#a9d5c7", ylabel="RMSD (Å)")

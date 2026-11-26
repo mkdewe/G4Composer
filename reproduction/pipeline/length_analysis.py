@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sequence-length dependence of representative accuracy and energy (S4).
 
-For the 323 Affinity Propagation representatives, correlate input sequence
+For the 322 Affinity Propagation representatives, correlate input sequence
 length with best-of-12 RMSD, best-of-12 lDDT and minimum energy per nucleotide.
 The same correlations are reported for all modellable inputs and for the DNA
 and RNA subsets, together with a Spearman partial correlation controlling for
@@ -337,7 +337,7 @@ def main() -> int:
     parser.add_argument("--lddt", type=Path, default=common.DATA / "G16_lddt.txt")
     parser.add_argument("--energy", type=Path, default=common.DATA / "G16_energy_popr.txt")
     parser.add_argument("--inputs", type=Path, default=common.INPUTS)
-    parser.add_argument("--results", type=Path, default=common.RESULTS / "AP_unweighted_548")
+    parser.add_argument("--results", type=Path, default=common.RESULTS / "AP_unweighted_542")
     parser.add_argument("--reports", type=Path, default=common.REPORTS)
     parser.add_argument("--figures", type=Path, default=common.FIGURES)
     args = parser.parse_args()
@@ -347,8 +347,9 @@ def main() -> int:
     energy = load_table(args.energy)
     nres = load_nres(args.energy)
     table_keys = set(rmsd) & set(lddt) & set(energy)
-    if len(table_keys) != 543:
-        raise SystemExit(f"expected 543 modellable inputs, found {len(table_keys)}")
+    table_keys -= {common.key_for(Path(name)) for name in common.EXCLUDED_INPUTS}
+    if len(table_keys) != 542:
+        raise SystemExit(f"expected 542 modellable inputs, found {len(table_keys)}")
 
     records = load_records(args.inputs, table_keys, nres)
     if set(records) != table_keys:
@@ -356,8 +357,8 @@ def main() -> int:
         raise SystemExit(f"no input record for {len(missing)} table keys: {missing[:5]}")
 
     representatives = load_representatives(args.results, table_keys)
-    if len(representatives) != 323:
-        raise SystemExit(f"expected 323 representatives, found {len(representatives)}")
+    if len(representatives) != 322:
+        raise SystemExit(f"expected 322 representatives, found {len(representatives)}")
 
     rep_data = measure(representatives, records, rmsd, lddt, energy, nres)
     all_keys = sorted(table_keys)
